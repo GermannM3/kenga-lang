@@ -70,6 +70,9 @@ fn normalize_line(line: &str) -> String {
     if matches_any(&lower, &["quit", "exit", "выход", "пока"]) {
         return "quit".into();
     }
+    if matches_any(&lower, &["привет", "hello", "hi", "здравств", "hey"]) {
+        return "greet".into();
+    }
     if matches_any(&lower, &["help", "помощь", "?"]) {
         return "help".into();
     }
@@ -217,6 +220,13 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
         "quit" | "exit" | "q" => {
             println!("пока — mind на диске, если сохранил");
             return Ok(false);
+        }
+        "greet" => {
+            let m = mind.borrow();
+            println!(
+                "привет. я world-model Kenga: steps={}, dim={}. скажи «смотри 5 1 6» или «помощь»",
+                m.model.steps, m.model.dim
+            );
         }
         "help" | "?" => {
             println!("смотри 5 1 6     — что модель видит дальше");
