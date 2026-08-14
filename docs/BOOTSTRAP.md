@@ -1,24 +1,24 @@
-# Bootstrap 1.2
+# Bootstrap 1.3
 
 ## Что уже «твоё»
 
 - Программы на `.kenga` (включая нейромодель)
-- Обученный mind в `minds/*.km` — сохраняется и грузится
-- `kenga talk` — интерактив с world-model
+- Обученный mind в `minds/*.km`
+- `kenga chat` — русский диалог с world-model
+- Self-host seed: арифметика на чистом Kenga
 
 ## Что ещё bootstrap
 
-Компилятор и VM пока хостятся на **Rust**. Это нормальный этап языка (как Go на C).  
-**Python не нужен.** Self-host — следующий крупный шаг.
+Компилятор/VM хостятся на **Rust**. Python не нужен.
 
 | Слой | Статус |
 |---|---|
 | Язык + VM | ✅ |
 | Prophet residual MLP | ✅ |
 | Pure-Kenga neuromodel | ✅ |
-| save/load mind + talk | ✅ |
-| emit-c / build | ✅ |
-| Self-host компилятор | 🚧 |
-| LLM-чат «как GPT» | ❌ не цель этой модели |
+| save/load + chat | ✅ |
+| Self-host seed (arith) | ✅ |
+| Полный self-host | 🚧 |
+| LLM-чат «как GPT» | ❌ не эта модель |
 
-World-model предсказывает динамику состояний (`[pos,vel,fuel]→next`), а не пишет стихи.
+См. `docs/SELFHOST.md`.

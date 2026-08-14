@@ -182,6 +182,8 @@ pub enum Op {
     Round,
     SaveMind,
     LoadMind,
+    /// ord("a") → codepoint
+    Ord,
     /// break/continue placeholders patched to jumps
     BreakPlaceholder,
     ContinuePlaceholder,
@@ -303,6 +305,7 @@ fn format_op(op: &Op) -> String {
         Op::Round => "ROUND".into(),
         Op::SaveMind => "SAVE_MIND".into(),
         Op::LoadMind => "LOAD_MIND".into(),
+        Op::Ord => "ORD".into(),
         Op::BreakPlaceholder => "BREAK?".into(),
         Op::ContinuePlaceholder => "CONTINUE?".into(),
     }

@@ -89,7 +89,7 @@ fn real_main() -> Result<()> {
             })?;
             println!("built {}", bin.display());
         }
-        "talk" => {
+        "talk" | "chat" => {
             let mind = args
                 .iter()
                 .find(|a| !a.starts_with('-') && a.ends_with(".km"))
@@ -150,13 +150,14 @@ fn print_usage() {
 
 Команды:
   kenga run <file.kenga>              VM
-  kenga talk [mind.km] [--script f]   диалог с world-model
+  kenga talk|chat [mind.km] [--script f]  диалог с world-model
   kenga parse|compile <file.kenga>
   kenga emit-c / build
   kenga eval '<code>'
   kenga version
 
 Важно: компилятор пока bootstrap на Rust. Программы .kenga и mind — уже твои.
+Self-host seed: examples/selfhost/arith.kenga
 Python не нужен.
 
 https://github.com/GermannM3/kenga-lang"

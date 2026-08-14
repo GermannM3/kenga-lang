@@ -1,4 +1,4 @@
-//! Interactive Prophet session: train, sense, foresee, teach, save.
+//! Interactive Prophet session + natural-language chat layer.
 
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -19,9 +19,9 @@ pub fn run_talk(mind_path: Option<PathBuf>, scripted: Option<&str>) -> Result<()
         new_memory_config(0.05, 128, 48)?
     };
 
-    println!("Kenga talk — живой world-model (не чат-LLM)");
-    println!("команды: train | see a b c | future n | teach a b c -> x y z | sleep | recall a b c");
-    println!("         status | save | load | help | quit");
+    println!("Kenga chat — живой world-model");
+    println!("можно: «смотри 5 1 6», «что будет через 4», «обучи», «статус»");
+    println!("или команды: train | see | future | teach | sleep | save | quit");
     println!();
 
     if let Some(script) = scripted {
@@ -31,7 +31,7 @@ pub fn run_talk(mind_path: Option<PathBuf>, scripted: Option<&str>) -> Result<()
                 continue;
             }
             println!("> {line}");
-            if !handle_line(&mind, &path, line)? {
+            if !dispatch(&mind, &path, line)? {
                 break;
             }
         }
@@ -51,11 +51,161 @@ pub fn run_talk(mind_path: Option<PathBuf>, scripted: Option<&str>) -> Result<()
         if line.is_empty() {
             continue;
         }
-        if !handle_line(&mind, &path, line)? {
+        if !dispatch(&mind, &path, line)? {
             break;
         }
     }
     Ok(())
+}
+
+fn dispatch(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
+    let cmd = normalize_line(line);
+    handle_line(mind, path, &cmd)
+}
+
+fn normalize_line(line: &str) -> String {
+    let lower = line.to_lowercase();
+    let nums = extract_numbers(line);
+
+    if matches_any(&lower, &["quit", "exit", "выход", "пока"]) {
+        return "quit".into();
+    }
+    if matches_any(&lower, &["help", "помощь", "?"]) {
+        return "help".into();
+    }
+    if matches_any(&lower, &["status", "статус", "как дела", "stats"]) {
+        return "status".into();
+    }
+    if matches_any(&lower, &["sleep", "спи", "консолид", "засни"]) {
+        return "sleep".into();
+    }
+    if matches_any(&lower, &["save", "сохрани", "запиши mind"]) {
+        return "save".into();
+    }
+    if matches_any(&lower, &["load", "загрузи"]) {
+        return "load".into();
+    }
+
+    if matches_any(&lower, &["train", "обучи", "тренир", "учись"]) {
+        let n = nums.first().copied().unwrap_or(8.0) as i64;
+        return format!("train {n}");
+    }
+
+    if matches_any(
+        &lower,
+        &[
+            "future",
+            "будущ",
+            "через",
+            "что будет",
+            "разверн",
+            "unroll",
+            "предскажи будущее",
+        ],
+    ) {
+        if nums.len() >= 4 {
+            let steps = nums[nums.len() - 1] as i64;
+            let obs: Vec<String> = nums[..nums.len() - 1]
+                .iter()
+                .map(|n| format!("{n}"))
+                .collect();
+            return format!("future {} {steps}", obs.join(" "));
+        }
+        if nums.len() == 1 {
+            return format!("future {}", nums[0] as i64);
+        }
+        if nums.len() >= 3 {
+            let obs: Vec<String> = nums.iter().map(|n| format!("{n}")).collect();
+            return format!("future {} 4", obs.join(" "));
+        }
+        return "future 4".into();
+    }
+
+    if matches_any(
+        &lower,
+        &["see", "смотри", "наблюд", "сейчас", "состояние", "sense"],
+    ) {
+        if nums.is_empty() {
+            return "help".into();
+        }
+        let obs: Vec<String> = nums.iter().map(|n| format!("{n}")).collect();
+        return format!("see {}", obs.join(" "));
+    }
+
+    if matches_any(&lower, &["teach", "научи", "запомни", "выучи"]) {
+        if let Some(rewritten) = rewrite_teach(line, &nums) {
+            return rewritten;
+        }
+    }
+
+    if matches_any(&lower, &["recall", "вспомни", "похож"]) {
+        if nums.is_empty() {
+            return "help".into();
+        }
+        let obs: Vec<String> = nums.iter().map(|n| format!("{n}")).collect();
+        return format!("recall {}", obs.join(" "));
+    }
+
+    // bare numbers → see
+    if !nums.is_empty()
+        && line
+            .split_whitespace()
+            .all(|t| t.parse::<f64>().is_ok() || t == "->" || t == "→")
+    {
+        if line.contains("->") || line.contains('→') {
+            if let Some(r) = rewrite_teach(line, &nums) {
+                return r;
+            }
+        }
+        let obs: Vec<String> = nums.iter().map(|n| format!("{n}")).collect();
+        return format!("see {}", obs.join(" "));
+    }
+
+    line.to_string()
+}
+
+fn rewrite_teach(line: &str, nums: &[f64]) -> Option<String> {
+    if nums.len() < 2 {
+        return None;
+    }
+    let mid = nums.len() / 2;
+    if line.contains("->") || line.contains('→') || line.contains("станет") || line.contains("->")
+    {
+        let left: Vec<String> = nums[..mid].iter().map(|n| format!("{n}")).collect();
+        let right: Vec<String> = nums[mid..].iter().map(|n| format!("{n}")).collect();
+        return Some(format!("teach {} -> {}", left.join(" "), right.join(" ")));
+    }
+    if nums.len() >= 6 {
+        let left: Vec<String> = nums[..3].iter().map(|n| format!("{n}")).collect();
+        let right: Vec<String> = nums[3..6].iter().map(|n| format!("{n}")).collect();
+        return Some(format!("teach {} -> {}", left.join(" "), right.join(" ")));
+    }
+    None
+}
+
+fn matches_any(hay: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|n| hay.contains(n))
+}
+
+fn extract_numbers(s: &str) -> Vec<f64> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    for ch in s.chars() {
+        if ch.is_ascii_digit() || ch == '.' || (ch == '-' && cur.is_empty()) {
+            cur.push(ch);
+        } else if !cur.is_empty() {
+            if let Ok(n) = cur.parse() {
+                out.push(n);
+            }
+            cur.clear();
+        }
+    }
+    if !cur.is_empty() {
+        if let Ok(n) = cur.parse() {
+            out.push(n);
+        }
+    }
+    out
 }
 
 fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
@@ -65,38 +215,36 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
     }
     match parts[0] {
         "quit" | "exit" | "q" => {
-            println!("bye");
+            println!("пока — mind на диске, если сохранил");
             return Ok(false);
         }
         "help" | "?" => {
-            println!("train          — эпоха физики агента");
-            println!("see 5 1 6      — наблюдение → predict + foresee + surprise");
-            println!("future 4       — unroll от последнего see / или future 5 1 6 4");
-            println!("teach 5 1 6 -> 6 1 5");
-            println!("sleep          — consolidate");
-            println!("recall 5 1 6   — ближайшие следы");
-            println!("status | save | load");
+            println!("смотри 5 1 6     — что модель видит дальше");
+            println!("что будет через 4 — разворот будущего");
+            println!("обучи 10         — доучить физику");
+            println!("научи 5 1 6 станет 6 1 5");
+            println!("статус | спи | сохрани | выход");
         }
         "status" => {
             let m = mind.borrow();
             println!(
-                "ep={} core={} steps={} dim={} hidden={} lr={}",
+                "я помню: ep={} core={} steps={} dim={} (lr={})",
                 m.episodic.len(),
                 m.core.len(),
                 m.model.steps,
                 m.model.dim,
-                m.model.hidden,
                 m.lr
             );
         }
         "train" => {
             let n = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(8usize);
+            println!("учусь {n} эпох…");
             for e in 0..n {
                 let loss = train_physics_epoch(&mut mind.borrow_mut());
-                println!("epoch {e}: loss={loss:.6}");
+                println!("  эпоха {e}: loss={loss:.6}");
             }
             let folded = consolidate(&mut mind.borrow_mut());
-            println!("sleep folded={folded}");
+            println!("поспал, сложил эпизодов: {folded}");
         }
         "see" => {
             let obs = parse_vec(&parts[1..])?;
@@ -107,24 +255,29 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
             let pred = predict(&m, &obs);
             let fore = foresee(&m, &obs);
             let s = surprise_score(&pred, &obs);
-            println!("obs     {}", fmt_vec(&obs));
-            println!("predict {}", fmt_vec(&pred));
-            println!("round   {}", fmt_round(&pred));
-            println!("foresee {}", fmt_vec(&fore));
-            println!("surprise_vs_obs {s:.4}");
+            println!("сейчас     {}", fmt_round(&obs));
+            println!("я жду      {}", fmt_round(&pred));
+            println!("(точно)    {}", fmt_vec(&pred));
+            println!("гибрид     {}", fmt_round(&fore));
+            if s > 0.5 {
+                println!("это для меня странновато (surprise={s:.3})");
+            } else {
+                println!("похоже на знакомое (surprise={s:.3})");
+            }
             drop(m);
-            // stash last obs in a side channel via remember of last_see? keep simple: print only
             LAST_OBS.with(|c| *c.borrow_mut() = obs);
         }
         "future" => {
-            let (obs, steps) = if parts.len() >= 2 && parts[1].chars().all(|c| c == '-' || c.is_ascii_digit())
-                && parts.len() == 2
+            let (obs, steps) = if parts.len() == 2
+                && parts[1]
+                    .chars()
+                    .all(|c| c == '-' || c.is_ascii_digit())
             {
                 let steps: usize = parts[1].parse().unwrap_or(4);
                 let obs = LAST_OBS.with(|c| c.borrow().clone());
                 if obs.is_empty() {
                     return Err(KengaError::new(
-                        "future n needs prior `see`, or: future a b c n",
+                        "сначала «смотри …», или: что будет 5 1 6 через 4",
                         None,
                     ));
                 }
@@ -137,13 +290,13 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
                 return Err(KengaError::new("usage: future n | future a b c n", None));
             };
             let traj = unroll(&mind.borrow(), &obs, steps);
-            println!("unroll from {}", fmt_vec(&obs));
+            println!("если старт {}, то через {steps} шагов:", fmt_round(&obs));
             for (i, s) in traj.iter().enumerate() {
-                println!("  t+{}  {}  ({})", i + 1, fmt_round(s), fmt_vec(s));
+                println!("  +{} → {}", i + 1, fmt_round(s));
             }
+            LAST_OBS.with(|c| *c.borrow_mut() = obs);
         }
         "teach" => {
-            // teach 5 1 6 -> 6 1 5
             let arrow = parts.iter().position(|p| *p == "->" || *p == "→");
             let Some(ai) = arrow else {
                 return Err(KengaError::new("usage: teach a b c -> x y z", None));
@@ -152,32 +305,43 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
             let y = parse_vec(&parts[ai + 1..])?;
             remember_pair(&mut mind.borrow_mut(), x.clone(), Some(y.clone()), 0.6, 0);
             let loss = learn(&mut mind.borrow_mut(), &x, &y);
-            println!("learned {} -> {}  loss={loss:.6}", fmt_vec(&x), fmt_vec(&y));
+            println!(
+                "запомнил {} → {}  (loss={loss:.4})",
+                fmt_round(&x),
+                fmt_round(&y)
+            );
         }
         "sleep" => {
             let n = consolidate(&mut mind.borrow_mut());
-            println!("folded {n}");
+            println!("сон: в ядро ушло {n}");
         }
         "recall" => {
             let q = parse_vec(&parts[1..])?;
             let hits = recall(&mind.borrow(), &q, 3);
+            println!("ближайшие следы к {}:", fmt_round(&q));
             for (i, h) in hits.iter().enumerate() {
-                println!("  [{i}] {}", fmt_vec(h));
+                println!("  [{i}] {}", fmt_round(h));
             }
         }
         "save" => {
-            let p = parts.get(1).map(PathBuf::from).unwrap_or_else(|| path.to_path_buf());
+            let p = parts
+                .get(1)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| path.to_path_buf());
             save_mind(&mind.borrow(), &p)?;
-            println!("saved {}", p.display());
+            println!("сохранил {}", p.display());
         }
         "load" => {
-            let p = parts.get(1).map(PathBuf::from).unwrap_or_else(|| path.to_path_buf());
+            let p = parts
+                .get(1)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| path.to_path_buf());
             let loaded = load_mind(&p)?;
             *mind.borrow_mut() = loaded.borrow().clone();
-            println!("loaded {}", p.display());
+            println!("загрузил {}", p.display());
         }
         other => {
-            println!("unknown command '{other}' (help)");
+            println!("не понял «{other}». напиши «помощь»");
         }
     }
     Ok(true)

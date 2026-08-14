@@ -84,7 +84,8 @@ kenga run examples/unroll.kenga
 kenga run examples/neuromodel.kenga   # чистая нейромодель на Kenga
 kenga run examples/persist_mind.kenga # обучить и сохранить minds/agent.km
 kenga talk minds/agent.km             # поговорить с world-model
-kenga talk minds/agent.km --script examples/talk_session.txt
+kenga chat minds/agent.km --script examples/chat_session.txt
+kenga run examples/selfhost/arith.kenga  # self-host seed
 kenga emit-c examples/native_lists.kenga -o native_lists.c
 kenga build examples/native_struct.kenga   # emit-c + gcc/clang
 kenga compile examples/living.kenga        # bytecode IR
@@ -169,7 +170,8 @@ fn main() {
 | MLP residual world-model + `unroll` / `foresee_n` | ✅ |
 | `round` (скаляр / list) для eval предсказаний | ✅ |
 | Пример `examples/neuromodel.kenga` (train→sleep→predict) | ✅ |
-| `save_mind` / `load_mind` + `kenga talk` | ✅ |
+| `save_mind` / `load_mind` + `kenga talk`/`chat` | ✅ |
+| Self-host seed: `examples/selfhost/arith.kenga` | ✅ |
 | `emit-c`: i64, lists, structs, for/while, fn, import | ✅ |
 | `kenga build` (emit-c + системный C-компилятор) | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |

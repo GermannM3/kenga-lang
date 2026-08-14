@@ -740,6 +740,24 @@ impl Vm {
                 let v = self.pop()?;
                 self.stack.push(round_value(v)?);
             }
+            Op::Ord => {
+                let v = self.pop()?;
+                let code = match v {
+                    Value::Str(s) => s
+                        .chars()
+                        .next()
+                        .ok_or_else(|| KengaError::new("ord on empty string", None))?
+                        as u32 as i64,
+                    Value::I64(n) => n,
+                    _ => {
+                        return Err(KengaError::new(
+                            "ord expects str (or i64 passthrough)",
+                            None,
+                        ))
+                    }
+                };
+                self.stack.push(Value::I64(code));
+            }
             Op::SaveMind => {
                 let path = match self.pop()? {
                     Value::Str(s) => s,

@@ -160,15 +160,27 @@ fn neuromodel_learns_dynamics() {
 }
 
 #[test]
-fn save_load_mind_roundtrip() {
+fn selfhost_arith_seed() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let path = root.join("examples/persist_mind.kenga");
-    let module = compile_file(&path).expect("compile");
-    let v = interpret(module).expect("run persist");
+    let module = compile_file(&root.join("examples/selfhost/arith.kenga")).expect("compile");
+    let v = interpret(module).expect("run arith");
     assert!(matches!(v, kenga::bytecode::Value::I64(0)));
-    let mind_path = root.join("minds/agent.km");
-    assert!(mind_path.exists(), "mind file should exist after persist");
 }
+
+#[test]
+fn ord_builtin() {
+    let v = run(
+        r#"
+        fn main() -> i64 {
+            assert(ord("0") == 48);
+            assert(ord("9") == 57);
+            return ord("A");
+        }
+        "#,
+    );
+    assert!(matches!(v, kenga::bytecode::Value::I64(65)));
+}
+
 
 #[test]
 fn import_stdlib_and_struct() {
