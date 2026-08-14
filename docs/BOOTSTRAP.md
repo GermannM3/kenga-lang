@@ -1,18 +1,24 @@
-# Bootstrap 1.1
+# Bootstrap 1.2
 
-Закрытый объём «языка, на котором уже можно жить»:
+## Что уже «твоё»
+
+- Программы на `.kenga` (включая нейромодель)
+- Обученный mind в `minds/*.km` — сохраняется и грузится
+- `kenga talk` — интерактив с world-model
+
+## Что ещё bootstrap
+
+Компилятор и VM пока хостятся на **Rust**. Это нормальный этап языка (как Go на C).  
+**Python не нужен.** Self-host — следующий крупный шаг.
 
 | Слой | Статус |
 |---|---|
-| Lexer / parser / AST | ✅ |
-| Bytecode + VM | ✅ |
-| Living `ttl` / `sweep` | ✅ |
-| Events `on` / `emit` / `pump` | ✅ |
-| Prophet memory + residual MLP world-model | ✅ |
-| Pure-Kenga neuromodel (`examples/neuromodel.kenga`) | ✅ |
-| `emit-c` (i64, list, struct, control flow, import) | ✅ |
-| `kenga build` (системный gcc/clang/cl) | ✅ |
-| Stdlib `math` / `list` / `agent` | ✅ |
-| CI + GitHub Releases | ✅ |
+| Язык + VM | ✅ |
+| Prophet residual MLP | ✅ |
+| Pure-Kenga neuromodel | ✅ |
+| save/load mind + talk | ✅ |
+| emit-c / build | ✅ |
+| Self-host компилятор | 🚧 |
+| LLM-чат «как GPT» | ❌ не цель этой модели |
 
-Не в 1.x (следующий горизонт): LLVM, self-host, пакетный менеджер, отдельный сайт.
+World-model предсказывает динамику состояний (`[pos,vel,fuel]→next`), а не пишет стихи.

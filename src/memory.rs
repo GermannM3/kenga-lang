@@ -535,3 +535,298 @@ pub fn stats(mem: &ProphetMemory) -> Value {
         Value::I64(mem.model.hidden as i64),
     ])
 }
+
+fn write_f64s(out: &mut String, xs: &[f64]) {
+    for (i, x) in xs.iter().enumerate() {
+        if i > 0 {
+            out.push(' ');
+        }
+        out.push_str(&format!("{x}"));
+    }
+    out.push('\n');
+}
+
+fn parse_f64s(line: &str) -> Result<Vec<f64>> {
+    line.split_whitespace()
+        .map(|t| {
+            t.parse::<f64>()
+                .map_err(|_| KengaError::new(format!("bad f64 '{t}' in mind file"), None))
+        })
+        .collect()
+}
+
+fn parse_u64_field(line: &str, key: &str) -> Result<u64> {
+    let parts: Vec<_> = line.split_whitespace().collect();
+    if parts.len() != 2 || parts[0] != key {
+        return Err(KengaError::new(
+            format!("expected '{key} <n>', got '{line}'"),
+            None,
+        ));
+    }
+    parts[1]
+        .parse()
+        .map_err(|_| KengaError::new(format!("bad u64 for {key}"), None))
+}
+
+fn parse_f64_field(line: &str, key: &str) -> Result<f64> {
+    let parts: Vec<_> = line.split_whitespace().collect();
+    if parts.len() != 2 || parts[0] != key {
+        return Err(KengaError::new(
+            format!("expected '{key} <n>', got '{line}'"),
+            None,
+        ));
+    }
+    parts[1]
+        .parse()
+        .map_err(|_| KengaError::new(format!("bad f64 for {key}"), None))
+}
+
+fn parse_usize_field(line: &str, key: &str) -> Result<usize> {
+    Ok(parse_u64_field(line, key)? as usize)
+}
+
+/// Serialize Prophet memory to a portable text mind file.
+pub fn save_mind(mem: &ProphetMemory, path: &std::path::Path) -> Result<()> {
+    let mut out = String::new();
+    out.push_str("KENGA_MIND 1\n");
+    out.push_str(&format!("threshold {}\n", mem.threshold));
+    out.push_str(&format!("ep_cap {}\n", mem.ep_cap));
+    out.push_str(&format!("core_cap {}\n", mem.core_cap));
+    out.push_str(&format!("lr {}\n", mem.lr));
+    out.push_str(&format!(
+        "model {} {} {}\n",
+        mem.model.dim, mem.model.hidden, mem.model.steps
+    ));
+    write_f64s(&mut out, &mem.model.w1);
+    write_f64s(&mut out, &mem.model.b1);
+    write_f64s(&mut out, &mem.model.w2);
+    write_f64s(&mut out, &mem.model.b2);
+    write_f64s(&mut out, &mem.model.w1_lock);
+    write_f64s(&mut out, &mem.model.b1_lock);
+    write_f64s(&mut out, &mem.model.w2_lock);
+    write_f64s(&mut out, &mem.model.b2_lock);
+
+    out.push_str(&format!("core {}\n", mem.core.len()));
+    for c in &mem.core {
+        out.push_str(&format!("{} {} {}\n", c.importance, c.replays, c.pattern.len()));
+        write_f64s(&mut out, &c.pattern);
+    }
+
+    out.push_str(&format!("episodic {}\n", mem.episodic.len()));
+    for e in &mem.episodic {
+        let has_t = if e.target.is_some() { 1 } else { 0 };
+        out.push_str(&format!(
+            "{} {} {} {} {}\n",
+            e.surprise,
+            e.ts_ms,
+            e.pattern.len(),
+            has_t,
+            e.target.as_ref().map(|t| t.len()).unwrap_or(0)
+        ));
+        write_f64s(&mut out, &e.pattern);
+        if let Some(t) = &e.target {
+            write_f64s(&mut out, t);
+        }
+    }
+
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                KengaError::new(format!("cannot create {}: {e}", parent.display()), None)
+            })?;
+        }
+    }
+    std::fs::write(path, out).map_err(|e| {
+        KengaError::new(format!("cannot write {}: {e}", path.display()), None)
+    })?;
+    Ok(())
+}
+
+/// Load Prophet memory from a mind file.
+pub fn load_mind(path: &std::path::Path) -> Result<MemoryHandle> {
+    let raw = std::fs::read_to_string(path).map_err(|e| {
+        KengaError::new(format!("cannot read {}: {e}", path.display()), None)
+    })?;
+    let mut lines = raw.lines().filter(|l| !l.trim().is_empty());
+    let magic = lines
+        .next()
+        .ok_or_else(|| KengaError::new("empty mind file", None))?;
+    if magic != "KENGA_MIND 1" {
+        return Err(KengaError::new(
+            format!("unsupported mind format: {magic}"),
+            None,
+        ));
+    }
+
+    let threshold = parse_f64_field(
+        lines
+            .next()
+            .ok_or_else(|| KengaError::new("missing threshold", None))?,
+        "threshold",
+    )?;
+    let ep_cap = parse_usize_field(
+        lines
+            .next()
+            .ok_or_else(|| KengaError::new("missing ep_cap", None))?,
+        "ep_cap",
+    )?;
+    let core_cap = parse_usize_field(
+        lines
+            .next()
+            .ok_or_else(|| KengaError::new("missing core_cap", None))?,
+        "core_cap",
+    )?;
+    let lr = parse_f64_field(
+        lines
+            .next()
+            .ok_or_else(|| KengaError::new("missing lr", None))?,
+        "lr",
+    )?;
+
+    let model_line = lines
+        .next()
+        .ok_or_else(|| KengaError::new("missing model header", None))?;
+    let mp: Vec<_> = model_line.split_whitespace().collect();
+    if mp.len() != 4 || mp[0] != "model" {
+        return Err(KengaError::new(
+            format!("bad model header: {model_line}"),
+            None,
+        ));
+    }
+    let dim: usize = mp[1]
+        .parse()
+        .map_err(|_| KengaError::new("bad model dim", None))?;
+    let hidden: usize = mp[2]
+        .parse()
+        .map_err(|_| KengaError::new("bad model hidden", None))?;
+    let steps: u64 = mp[3]
+        .parse()
+        .map_err(|_| KengaError::new("bad model steps", None))?;
+
+    let rest: Vec<&str> = lines.collect();
+    let mut i = 0usize;
+    let take = |i: &mut usize, n: usize, what: &str| -> Result<Vec<f64>> {
+        let line = rest
+            .get(*i)
+            .ok_or_else(|| KengaError::new(format!("missing {what}"), None))?;
+        *i += 1;
+        let xs = parse_f64s(line)?;
+        if xs.len() != n {
+            return Err(KengaError::new(
+                format!("{what}: expected {n} floats, got {}", xs.len()),
+                None,
+            ));
+        }
+        Ok(xs)
+    };
+
+    let w1 = take(&mut i, hidden * dim, "w1")?;
+    let b1 = take(&mut i, hidden, "b1")?;
+    let w2 = take(&mut i, dim * hidden, "w2")?;
+    let b2 = take(&mut i, dim, "b2")?;
+    let w1_lock = take(&mut i, hidden * dim, "w1_lock")?;
+    let b1_lock = take(&mut i, hidden, "b1_lock")?;
+    let w2_lock = take(&mut i, dim * hidden, "w2_lock")?;
+    let b2_lock = take(&mut i, dim, "b2_lock")?;
+
+    let core_hdr = rest
+        .get(i)
+        .ok_or_else(|| KengaError::new("missing core header", None))?;
+    i += 1;
+    let core_n = parse_usize_field(core_hdr, "core")?;
+    let mut core = Vec::with_capacity(core_n);
+    for _ in 0..core_n {
+        let meta = rest
+            .get(i)
+            .ok_or_else(|| KengaError::new("missing core meta", None))?;
+        i += 1;
+        let p: Vec<_> = meta.split_whitespace().collect();
+        if p.len() != 3 {
+            return Err(KengaError::new(format!("bad core meta: {meta}"), None));
+        }
+        let importance: f64 = p[0].parse().map_err(|_| KengaError::new("bad importance", None))?;
+        let replays: u64 = p[1].parse().map_err(|_| KengaError::new("bad replays", None))?;
+        let plen: usize = p[2].parse().map_err(|_| KengaError::new("bad pattern len", None))?;
+        let pattern = take(&mut i, plen, "core pattern")?;
+        core.push(CoreTrace {
+            pattern,
+            importance,
+            replays,
+        });
+    }
+
+    let ep_hdr = rest
+        .get(i)
+        .ok_or_else(|| KengaError::new("missing episodic header", None))?;
+    i += 1;
+    let ep_n = parse_usize_field(ep_hdr, "episodic")?;
+    let mut episodic = Vec::with_capacity(ep_n);
+    for _ in 0..ep_n {
+        let meta = rest
+            .get(i)
+            .ok_or_else(|| KengaError::new("missing episode meta", None))?;
+        i += 1;
+        let p: Vec<_> = meta.split_whitespace().collect();
+        if p.len() != 5 {
+            return Err(KengaError::new(format!("bad episode meta: {meta}"), None));
+        }
+        let surprise: f64 = p[0].parse().map_err(|_| KengaError::new("bad surprise", None))?;
+        let ts_ms: u64 = p[1].parse().map_err(|_| KengaError::new("bad ts", None))?;
+        let plen: usize = p[2].parse().map_err(|_| KengaError::new("bad plen", None))?;
+        let has_t: u64 = p[3].parse().map_err(|_| KengaError::new("bad has_t", None))?;
+        let tlen: usize = p[4].parse().map_err(|_| KengaError::new("bad tlen", None))?;
+        let pattern = take(&mut i, plen, "episode pattern")?;
+        let target = if has_t == 1 {
+            Some(take(&mut i, tlen, "episode target")?)
+        } else {
+            None
+        };
+        episodic.push(Episode {
+            pattern,
+            target,
+            surprise,
+            ts_ms,
+        });
+    }
+
+    let mem = ProphetMemory {
+        episodic,
+        core,
+        model: WorldModel {
+            dim,
+            hidden,
+            w1,
+            b1,
+            w2,
+            b2,
+            w1_lock,
+            b1_lock,
+            w2_lock,
+            b2_lock,
+            steps,
+        },
+        threshold,
+        ep_cap,
+        core_cap,
+        lr,
+    };
+    Ok(Rc::new(RefCell::new(mem)))
+}
+
+/// Helper used by talk REPL / tests.
+pub fn train_physics_epoch(mem: &mut ProphetMemory) -> f64 {
+    let mut loss = 0.0f64;
+    let mut n = 0.0f64;
+    for pos in 0..14 {
+        for vel in 0..3i64 {
+            let v = vel - 1;
+            let fuel = 9i64;
+            let x = vec![pos as f64, v as f64, fuel as f64];
+            let y = vec![(pos + v) as f64, v as f64, (fuel - 1) as f64];
+            remember_pair(mem, x.clone(), Some(y.clone()), 0.5, 0);
+            loss += learn(mem, &x, &y);
+            n += 1.0;
+        }
+    }
+    loss / n.max(1.0)
+}

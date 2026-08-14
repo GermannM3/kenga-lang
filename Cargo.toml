@@ -1,8 +1,8 @@
 [package]
 name = "kenga"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
-description = "Kenga — programming language for living AI (bootstrap 1.0)"
+description = "Kenga — programming language for living AI"
 authors = ["Kenga AI <https://github.com/GermannM3>"]
 license = "MIT"
 repository = "https://github.com/GermannM3/kenga-lang"

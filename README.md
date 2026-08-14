@@ -22,8 +22,8 @@
 
 **Kenga** проектируется как язык, где тензор, время жизни памяти (`ttl`), консолидация и агентный цикл — не библиотеки, а часть семантики.
 
-Сейчас в репозитории — **bootstrap 1.0**: синтаксис → AST → bytecode → VM, плюс `emit-c` / `kenga build` в C99.  
-Rust здесь только временный хост (как C у раннего Go). Цель — self-host: компилятор на самой Kenga.
+Сейчас в репозитории — **bootstrap 1.2**: синтаксис → AST → bytecode → VM, `emit-c` / `kenga build`, Prophet mind + `kenga talk`.  
+Rust здесь только временный **хост компилятора** (как C у раннего Go). Программы пишутся на Kenga, Python не нужен. Цель — self-host: компилятор на самой Kenga.
 
 <p align="center">
   <img src="assets/architecture.jpg" alt="Kenga architecture" width="900"/>
@@ -82,6 +82,9 @@ kenga run examples/prophet.kenga
 kenga run examples/train.kenga
 kenga run examples/unroll.kenga
 kenga run examples/neuromodel.kenga   # чистая нейромодель на Kenga
+kenga run examples/persist_mind.kenga # обучить и сохранить minds/agent.km
+kenga talk minds/agent.km             # поговорить с world-model
+kenga talk minds/agent.km --script examples/talk_session.txt
 kenga emit-c examples/native_lists.kenga -o native_lists.c
 kenga build examples/native_struct.kenga   # emit-c + gcc/clang
 kenga compile examples/living.kenga        # bytecode IR
@@ -166,6 +169,7 @@ fn main() {
 | MLP residual world-model + `unroll` / `foresee_n` | ✅ |
 | `round` (скаляр / list) для eval предсказаний | ✅ |
 | Пример `examples/neuromodel.kenga` (train→sleep→predict) | ✅ |
+| `save_mind` / `load_mind` + `kenga talk` | ✅ |
 | `emit-c`: i64, lists, structs, for/while, fn, import | ✅ |
 | `kenga build` (emit-c + системный C-компилятор) | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |
@@ -182,6 +186,7 @@ fn main() {
 
 ```
 kenga run <file.kenga>              VM
+kenga talk [mind.km] [--script f]   диалог с обученным mind
 kenga parse|compile <file.kenga>    AST / IR
 kenga emit-c <file.kenga> [-o out.c]
 kenga build <file.kenga> [-o out] [--keep-c]

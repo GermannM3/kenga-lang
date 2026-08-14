@@ -8,6 +8,7 @@ pub mod error;
 pub mod lexer;
 pub mod memory;
 pub mod parser;
+pub mod talk;
 pub mod token;
 pub mod vm;
 

@@ -1,0 +1,14 @@
+# train and chat with the living world-model
+train 10
+status
+see 5 1 6
+future 4
+see 2 1 12
+future 5
+teach 8 0 4 -> 8 0 3
+sleep
+recall 5 1 6
+see 8 0 4
+status
+save
+quit

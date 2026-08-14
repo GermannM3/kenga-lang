@@ -1,0 +1,32 @@
+// Train mind in pure Kenga, save to disk, reload, verify predict.
+
+fn main() -> i64 {
+    let mind: Memory = memory_config(5, 64, 24);
+
+    for e in 0..6 {
+        for pos in 0..10 {
+            for vel in 0..3 {
+                let v = vel - 1;
+                let x = [pos, v, 8];
+                let y = [pos + v, v, 7];
+                remember_next(mind, x, y, 40);
+                learn(mind, x, y);
+            }
+        }
+        println(e);
+    }
+    consolidate(mind);
+
+    assert(save_mind(mind, "minds/agent.km") == true);
+    println("saved minds/agent.km");
+
+    let mind2: Memory = load_mind("minds/agent.km");
+    let pred = round(predict(mind2, [4, 1, 8]));
+    println(pred);
+    assert(pred[0] == 5);
+    assert(pred[1] == 1);
+    assert(pred[2] == 7);
+
+    println("save/load ok");
+    return 0;
+}

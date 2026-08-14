@@ -180,6 +180,8 @@ pub enum Op {
     MemStats,
     /// round(f64|list) → i64|list of i64
     Round,
+    SaveMind,
+    LoadMind,
     /// break/continue placeholders patched to jumps
     BreakPlaceholder,
     ContinuePlaceholder,
@@ -299,6 +301,8 @@ fn format_op(op: &Op) -> String {
         Op::Recall => "RECALL".into(),
         Op::MemStats => "MEM_STATS".into(),
         Op::Round => "ROUND".into(),
+        Op::SaveMind => "SAVE_MIND".into(),
+        Op::LoadMind => "LOAD_MIND".into(),
         Op::BreakPlaceholder => "BREAK?".into(),
         Op::ContinuePlaceholder => "CONTINUE?".into(),
     }

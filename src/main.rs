@@ -11,6 +11,7 @@ use kenga::driver::{compile_file, parse_file};
 use kenga::error::{KengaError, Result};
 use kenga::lexer::Lexer;
 use kenga::parser::{dump_program, Parser};
+use kenga::talk::run_talk;
 use kenga::vm::interpret;
 
 fn main() {
@@ -88,6 +89,22 @@ fn real_main() -> Result<()> {
             })?;
             println!("built {}", bin.display());
         }
+        "talk" => {
+            let mind = args
+                .iter()
+                .find(|a| !a.starts_with('-') && a.ends_with(".km"))
+                .map(PathBuf::from);
+            let script_path = flag_value(&args, "--script");
+            let script = if let Some(p) = script_path {
+                Some(
+                    fs::read_to_string(&p)
+                        .map_err(|e| KengaError::new(format!("cannot read {p}: {e}"), None))?,
+                )
+            } else {
+                None
+            };
+            run_talk(mind, script.as_deref())?;
+        }
         "eval" => {
             let src = args.join(" ");
             if src.is_empty() {
@@ -104,7 +121,7 @@ fn real_main() -> Result<()> {
             interpret(module)?;
         }
         "version" | "--version" | "-V" => {
-            println!("kenga {} (bootstrap complete)", env!("CARGO_PKG_VERSION"));
+            println!("kenga {}", env!("CARGO_PKG_VERSION"));
         }
         "help" | "--help" | "-h" => print_usage(),
         other => {
@@ -133,14 +150,14 @@ fn print_usage() {
 
 Команды:
   kenga run <file.kenga>              VM
-  kenga parse|compile <file.kenga>    AST / IR
-  kenga emit-c <file.kenga> [-o out.c]
-  kenga build <file.kenga> [-o out] [--keep-c]
+  kenga talk [mind.km] [--script f]   диалог с world-model
+  kenga parse|compile <file.kenga>
+  kenga emit-c / build
   kenga eval '<code>'
   kenga version
 
-Установка:
-  cargo install --git https://github.com/GermannM3/kenga-lang --locked
+Важно: компилятор пока bootstrap на Rust. Программы .kenga и mind — уже твои.
+Python не нужен.
 
 https://github.com/GermannM3/kenga-lang"
     );

@@ -740,6 +740,27 @@ impl Vm {
                 let v = self.pop()?;
                 self.stack.push(round_value(v)?);
             }
+            Op::SaveMind => {
+                let path = match self.pop()? {
+                    Value::Str(s) => s,
+                    _ => return Err(KengaError::new("save_mind path must be str", None)),
+                };
+                match self.pop()? {
+                    Value::Memory(h) => {
+                        crate::memory::save_mind(&h.borrow(), std::path::Path::new(&path))?;
+                        self.stack.push(Value::Bool(true));
+                    }
+                    _ => return Err(KengaError::new("save_mind expects Memory", None)),
+                }
+            }
+            Op::LoadMind => {
+                let path = match self.pop()? {
+                    Value::Str(s) => s,
+                    _ => return Err(KengaError::new("load_mind path must be str", None)),
+                };
+                let h = crate::memory::load_mind(std::path::Path::new(&path))?;
+                self.stack.push(Value::Memory(h));
+            }
             Op::BreakPlaceholder | Op::ContinuePlaceholder => {
                 return Err(KengaError::new(
                     "internal: unpatched break/continue",

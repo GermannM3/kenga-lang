@@ -571,6 +571,17 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                     compile_expr(&args[0], ops)?;
                     ops.push(Op::MemStats);
                 }
+                "save_mind" => {
+                    expect_argc("save_mind", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::SaveMind);
+                }
+                "load_mind" => {
+                    expect_argc("load_mind", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::LoadMind);
+                }
                 _ => {
                     for a in args {
                         compile_expr(a, ops)?;
