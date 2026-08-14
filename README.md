@@ -81,7 +81,8 @@ kenga run examples/agent.kenga
 kenga run examples/prophet.kenga
 kenga run examples/train.kenga
 kenga run examples/unroll.kenga
-kenga emit-c examples/native_hello.kenga -o /tmp/hello.c
+kenga emit-c examples/native_lists.kenga -o native_lists.c
+# gcc native_lists.c -o native_lists && ./native_lists
 kenga compile examples/living.kenga   # bytecode IR
 kenga eval "println(2 + 2);"
 ```
@@ -162,7 +163,7 @@ fn main() {
 | Память Пророка: `memory` / `remember` / `consolidate` | ✅ |
 | World model: `learn` / `predict` / `remember_next` | ✅ |
 | MLP + `unroll` / `foresee_n` (разворот будущего) | ✅ |
-| `emit-c` (нативный C MVP) | ✅ |
+| `emit-c`: i64, lists, for/while/break, fn | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |
 | Bytecode IR (`kenga compile`) | ✅ |
 | Полный LLVM / self-host | 🚧 next |

@@ -1,0 +1,31 @@
+// Native C subset: lists + for + break
+
+fn sum(xs: list) -> i64 {
+    let s: i64 = 0;
+    for v in xs {
+        s = s + v;
+    }
+    return s;
+}
+
+fn main() -> i64 {
+    println("native lists");
+    let xs: list = [1, 2, 3, 4];
+    xs[0] = 10;
+    println(xs);
+    println(len(xs));
+    println(sum(xs));
+
+    let acc: i64 = 0;
+    for i in 0..5 {
+        if i == 3 {
+            break;
+        }
+        acc = acc + i;
+    }
+    println(acc);
+
+    let ys = push(xs, 99);
+    println(ys);
+    return 0;
+}
