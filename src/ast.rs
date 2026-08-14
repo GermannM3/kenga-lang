@@ -46,6 +46,16 @@ pub enum Item {
     Function(Function),
     Intrinsic(IntrinsicDecl),
     Struct(StructDef),
+    /// `on "event"(args) { ... }` — native agent handler
+    EventHandler(EventHandler),
+}
+
+#[derive(Debug, Clone)]
+pub struct EventHandler {
+    pub event: String,
+    pub params: Vec<Param>,
+    pub body: Block,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]

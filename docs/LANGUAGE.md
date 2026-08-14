@@ -30,8 +30,25 @@ fn main() -> i64 {
 
 - `print` / `println`
 - `len` / `push`
-- `tensor` / `sweep` / `now_ms`
+- `tensor` / `sweep` / `now_ms` / `sleep_ms`
 - `assert` / `typeof`
+- `listen` / `emit` / `pump` / `pending`
+
+## Event loop
+
+```kenga
+on "tick"(n: i64) {
+    println(n);
+    if n < 5 { emit("tick", n + 1); }
+}
+
+fn main() {
+    emit("tick", 0);
+    pump(32);
+}
+```
+
+Обработчики `on` регистрируются автоматически. `pump(n)` снимает до `n` событий из очереди и вызывает хендлеры.
 
 ## Living memory
 

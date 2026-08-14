@@ -1,0 +1,29 @@
+// Native event loop — observe → think → act
+
+on "sense"(x: i64) {
+    println(x);
+    if x < 3 {
+        emit("think", x + 1);
+    }
+}
+
+on "think"(x: i64) {
+    // "foresee" next step and act
+    emit("act", x * 2);
+}
+
+on "act"(x: i64) {
+    println(x);
+    if x < 8 {
+        emit("sense", x);
+    }
+}
+
+fn main() -> i64 {
+    println("prophet loop");
+    emit("sense", 0);
+    let n = pump(32);
+    println(n);
+    assert(pending() == 0);
+    return 0;
+}

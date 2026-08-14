@@ -214,6 +214,7 @@ impl<'a> Lexer<'a> {
             "continue" => TokenKind::Continue,
             "struct" => TokenKind::Struct,
             "import" => TokenKind::Import,
+            "on" => TokenKind::On,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
             "ttl" => TokenKind::Ttl,

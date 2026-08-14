@@ -60,15 +60,20 @@ fn range_break() {
 }
 
 #[test]
-fn struct_fields() {
+fn event_loop_on_emit_pump() {
     let v = run(
         r#"
-        struct P { x: i64, y: i64 }
+        on "tick"(n: i64) {
+            if n < 2 {
+                emit("tick", n + 1);
+            }
+        }
         fn main() -> i64 {
-            let p = P { x: 2, y: 5 };
-            return p.x + p.y;
+            emit("tick", 0);
+            return pump(10);
         }
         "#,
     );
-    assert!(matches!(v, kenga::bytecode::Value::I64(7)));
+    // 0,1,2 processed = 3
+    assert!(matches!(v, kenga::bytecode::Value::I64(3)));
 }

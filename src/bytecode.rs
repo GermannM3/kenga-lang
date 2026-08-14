@@ -142,6 +142,11 @@ pub enum Op {
     Assert,
     TypeOf,
     SweepMemory,
+    Listen,
+    Emit,
+    Pump,
+    Pending,
+    SleepMs,
     /// break/continue placeholders patched to jumps
     BreakPlaceholder,
     ContinuePlaceholder,
@@ -159,6 +164,8 @@ pub struct Module {
     pub functions: HashMap<String, FunctionChunk>,
     pub structs: HashMap<String, Vec<String>>,
     pub intrinsics: HashMap<String, usize>,
+    /// event name -> handler function name
+    pub handlers: Vec<(String, String)>,
 }
 
 impl Module {
@@ -167,6 +174,7 @@ impl Module {
             functions: HashMap::new(),
             structs: HashMap::new(),
             intrinsics: HashMap::new(),
+            handlers: Vec::new(),
         }
     }
 }
@@ -239,6 +247,11 @@ fn format_op(op: &Op) -> String {
         Op::Assert => "ASSERT".into(),
         Op::TypeOf => "TYPEOF".into(),
         Op::SweepMemory => "SWEEP_MEMORY".into(),
+        Op::Listen => "LISTEN".into(),
+        Op::Emit => "EMIT".into(),
+        Op::Pump => "PUMP".into(),
+        Op::Pending => "PENDING".into(),
+        Op::SleepMs => "SLEEP_MS".into(),
         Op::BreakPlaceholder => "BREAK?".into(),
         Op::ContinuePlaceholder => "CONTINUE?".into(),
     }

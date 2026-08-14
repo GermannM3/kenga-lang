@@ -38,3 +38,4 @@ jobs:
           cargo run --quiet -- run examples/hello.kenga
           cargo run --quiet -- run examples/living.kenga
           cargo run --quiet -- run examples/showcase.kenga
+          cargo run --quiet -- run examples/agent.kenga

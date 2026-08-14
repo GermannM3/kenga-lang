@@ -79,7 +79,34 @@ impl Parser {
         if self.check(&TokenKind::Struct) {
             return Ok(Item::Struct(self.parse_struct()?));
         }
+        if self.check(&TokenKind::On) {
+            return Ok(Item::EventHandler(self.parse_on_handler()?));
+        }
         Ok(Item::Function(self.parse_function()?))
+    }
+
+    fn parse_on_handler(&mut self) -> Result<EventHandler> {
+        let tok = self.bump(); // on
+        let ev = self.bump();
+        let event = match ev.kind {
+            TokenKind::Str(s) => s,
+            _ => {
+                return Err(KengaError::at(
+                    "expected event name string after on",
+                    ev.span,
+                ))
+            }
+        };
+        self.expect(TokenKind::LParen, "expected '(' after event name")?;
+        let params = self.parse_params()?;
+        self.expect(TokenKind::RParen, "expected ')'")?;
+        let body = self.parse_block()?;
+        Ok(EventHandler {
+            event,
+            params,
+            body,
+            span: tok.span,
+        })
     }
 
     fn parse_struct(&mut self) -> Result<StructDef> {
@@ -658,6 +685,13 @@ pub fn dump_program(program: &Program) -> String {
             }
             Item::Struct(s) => {
                 out.push_str(&format!("struct {} {{ ... }}\n\n", s.name));
+            }
+            Item::EventHandler(h) => {
+                out.push_str(&format!(
+                    "on \"{}\"(...) {{ {} stmts }}\n\n",
+                    h.event,
+                    h.body.stmts.len()
+                ));
             }
             Item::Function(f) => {
                 out.push_str(&format!(

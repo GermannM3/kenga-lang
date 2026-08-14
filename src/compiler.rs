@@ -24,6 +24,11 @@ pub fn compile_with_options(program: &Program, require_main: bool) -> Result<Mod
     module.intrinsics.insert("push".into(), 2);
     module.intrinsics.insert("assert".into(), 1);
     module.intrinsics.insert("typeof".into(), 1);
+    module.intrinsics.insert("listen".into(), 2);
+    module.intrinsics.insert("emit".into(), 2);
+    module.intrinsics.insert("pump".into(), 1);
+    module.intrinsics.insert("pending".into(), 0);
+    module.intrinsics.insert("sleep_ms".into(), 1);
 
     for item in &program.items {
         if let Item::Struct(s) = item {
@@ -32,12 +37,27 @@ pub fn compile_with_options(program: &Program, require_main: bool) -> Result<Mod
         }
     }
 
+    let mut handler_i = 0usize;
     for item in &program.items {
         match item {
             Item::Intrinsic(i) => {
                 module.intrinsics.insert(i.name.clone(), i.params.len());
             }
             Item::Struct(_) => {}
+            Item::EventHandler(h) => {
+                let fname = format!("__on_{}_{}", sanitize(&h.event), handler_i);
+                handler_i += 1;
+                let f = Function {
+                    name: fname.clone(),
+                    params: h.params.clone(),
+                    ret: Type::Void,
+                    body: h.body.clone(),
+                    span: h.span.clone(),
+                };
+                let chunk = compile_function(&f)?;
+                module.functions.insert(fname.clone(), chunk);
+                module.handlers.push((h.event.clone(), fname));
+            }
             Item::Function(f) => {
                 let chunk = compile_function(f)?;
                 if module.functions.contains_key(&f.name) {
@@ -422,6 +442,35 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                     compile_expr(&args[0], ops)?;
                     ops.push(Op::TypeOf);
                 }
+                "listen" => {
+                    expect_argc("listen", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::Listen);
+                    ops.push(Op::Const(Value::Nil));
+                }
+                "emit" => {
+                    expect_argc("emit", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::Emit);
+                    ops.push(Op::Const(Value::Nil));
+                }
+                "pump" => {
+                    expect_argc("pump", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::Pump);
+                }
+                "pending" => {
+                    expect_argc("pending", args, 0, span)?;
+                    ops.push(Op::Pending);
+                }
+                "sleep_ms" => {
+                    expect_argc("sleep_ms", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::SleepMs);
+                    ops.push(Op::Const(Value::Nil));
+                }
                 _ => {
                     for a in args {
                         compile_expr(a, ops)?;
@@ -435,6 +484,13 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn sanitize(event: &str) -> String {
+    event
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 fn expect_argc(

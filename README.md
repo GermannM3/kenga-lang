@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Kenga" width="640"/>
+  <img src="assets/banner.jpg" alt="Kenga" width="640"/>
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@
 Rust здесь только временный хост (как C у раннего Go). Цель — self-host: компилятор на самой Kenga.
 
 <p align="center">
-  <img src="assets/architecture.svg" alt="Kenga architecture" width="900"/>
+  <img src="assets/architecture.jpg" alt="Kenga architecture" width="900"/>
 </p>
 
 ---
@@ -77,6 +77,7 @@ cargo build --release
 ```bash
 kenga run examples/hello.kenga
 kenga run examples/showcase.kenga
+kenga run examples/agent.kenga
 kenga compile examples/living.kenga   # bytecode IR
 kenga eval "println(2 + 2);"
 ```
@@ -113,6 +114,20 @@ fn main() -> i64 {
 }
 ```
 
+Агентский цикл (`observe → think → act`):
+
+```kenga
+on "sense"(x: i64) {
+    println(x);
+    if x < 3 { emit("sense", x + 1); }
+}
+
+fn main() -> i64 {
+    emit("sense", 0);
+    return pump(16);
+}
+```
+
 ---
 
 ## Что уже есть в языке
@@ -126,12 +141,13 @@ fn main() -> i64 {
 | `struct` + литералы + поля | ✅ |
 | `import "path.kenga"` | ✅ |
 | Living types: `ttl 5s`, `sweep` | ✅ |
-| `Tensor`, `typeof`, `assert` | ✅ |
+| Event loop: `on` / `emit` / `pump` | ✅ |
+| `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |
 | Bytecode IR (`kenga compile`) | ✅ |
 | Нативный LLVM / self-host | 🚧 next |
 
 <p align="center">
-  <img src="assets/logo.svg" alt="Kenga mark" width="96"/>
+  <img src="assets/logo.png" alt="Kenga mark" width="96"/>
 </p>
 
 ---
@@ -166,10 +182,9 @@ kenga-lang/
 
 1. **Стабильный язык 0.x** — модули, ошибки с подсказками, больше stdlib  
 2. **Нативный бэкенд** — LLVM или C-emit, без интерпретатора в hot path  
-3. **Event loop** — `observe → think → act → adapt` для агентов  
-4. **Sleep / consolidate** — память Пророка без catastrophic forgetting  
-5. **Self-host** — компилятор Kenga на Kenga, отрезаем Rust-пуповину  
-6. **Сайт + пакетные менеджеры** — когда язык перестанет быть «лабораторией»
+3. **Sleep / consolidate** — память Пророка без catastrophic forgetting  
+4. **Self-host** — компилятор Kenga на Kenga, отрезаем Rust-пуповину  
+5. **Сайт + пакетные менеджеры** — когда язык перестанет быть «лабораторией»
 
 Связанные проекты автора: [KengaAI_Engine](https://github.com/GermannM3/KengaAI_Engine), [The-Prophet](https://github.com/GermannM3/The-Prophet), [kengarust](https://github.com/GermannM3/kengarust).
 

@@ -15,6 +15,7 @@ pub enum TokenKind {
     Continue,
     Struct,
     Import,
+    On,
     True,
     False,
     Ttl,
