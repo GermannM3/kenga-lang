@@ -1,0 +1,47 @@
+// Prophet + event loop: sense → surprise gate → act → sleep
+
+on "sense"(x: i64) {
+    // payload is a single signal; pack into pattern
+    let obs = [x, x / 2, x * 2];
+    // handlers can't close over locals from main — use listen pattern with global mind via emit chain
+    emit("learn", x);
+}
+
+on "learn"(x: i64) {
+    emit("sleep", x);
+}
+
+on "sleep"(x: i64) {
+    emit("done", x);
+}
+
+fn main() -> i64 {
+    let mind: Memory = memory();
+
+    // Train offline first
+    remember(mind, [0, 0, 0], 50);
+    remember(mind, [1, 0, 2], 55);
+    consolidate(mind);
+
+    // Live tick: observe → surprise → maybe remember → consolidate
+    for i in 0..6 {
+        let obs = [i, i / 2, i * 2];
+        let pred = foresee(mind, obs);
+        let s = surprise(pred, obs);
+        if s > 0.15 {
+            remember(mind, obs, s);
+            println(i);
+        }
+    }
+
+    let folded = consolidate(mind);
+    println(mem_stats(mind));
+    println(folded);
+
+    // Event bus still works alongside prophet memory
+    emit("sense", 7);
+    pump(8);
+
+    println(typeof(mind));
+    return 0;
+}

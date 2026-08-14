@@ -33,6 +33,7 @@ fn main() -> i64 {
 - `tensor` / `sweep` / `now_ms` / `sleep_ms`
 - `assert` / `typeof`
 - `listen` / `emit` / `pump` / `pending`
+- Prophet: `memory` / `memory_config` / `remember` / `surprise` / `foresee` / `consolidate` / `recall` / `mem_stats`
 
 ## Event loop
 
@@ -50,11 +51,31 @@ fn main() {
 
 Обработчики `on` регистрируются автоматически. `pump(n)` снимает до `n` событий из очереди и вызывает хендлеры.
 
-## Living memory
+## Память Пророка
+
+Два слоя:
+
+1. **Episodic** — короткоживущий буфер сюрпризов (то, что сломало ожидание)
+2. **Core** — сжатые «законы мира» с importance-lock (EWC-lite), чтобы новый опыт не стирал старый
+
+```kenga
+let mind: Memory = memory_config(10, 32, 16); // threshold=0.10
+
+let pred = foresee(mind, obs);
+let s = surprise(pred, obs);
+remember(mind, obs, s);   // false, если s < threshold
+
+consolidate(mind);         // сон: replay → core + locks
+recall(mind, query, 3);    // ближайшие следы
+mem_stats(mind);           // [episodic, core, locked]
+```
+
+`i64` surprise в `remember` / `memory_config` трактуется как проценты (`80` → `0.80`).
+
+## Living memory (TTL)
 
 ```kenga
 let flash: Tensor ttl 5s = tensor(8, 8);
-// … использование …
 sweep(); // выкинуть просроченные слоты
 ```
 

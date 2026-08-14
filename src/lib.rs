@@ -4,6 +4,7 @@ pub mod compiler;
 pub mod driver;
 pub mod error;
 pub mod lexer;
+pub mod memory;
 pub mod parser;
 pub mod token;
 pub mod vm;

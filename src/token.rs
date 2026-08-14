@@ -28,6 +28,7 @@ pub enum TokenKind {
     TypeStr,
     TypeTensor,
     TypeList,
+    TypeMemory,
 
     // literals / idents
     Ident(String),

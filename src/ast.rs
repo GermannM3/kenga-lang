@@ -10,6 +10,7 @@ pub enum Type {
     Str,
     Tensor,
     List,
+    Memory,
     Named(String),
     Void,
 }
@@ -23,6 +24,7 @@ impl Type {
             Type::Str => "str".into(),
             Type::Tensor => "Tensor".into(),
             Type::List => "list".into(),
+            Type::Memory => "Memory".into(),
             Type::Named(n) => n.clone(),
             Type::Void => "void".into(),
         }

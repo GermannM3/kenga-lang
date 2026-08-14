@@ -78,6 +78,7 @@ cargo build --release
 kenga run examples/hello.kenga
 kenga run examples/showcase.kenga
 kenga run examples/agent.kenga
+kenga run examples/prophet.kenga
 kenga compile examples/living.kenga   # bytecode IR
 kenga eval "println(2 + 2);"
 ```
@@ -128,6 +129,18 @@ fn main() -> i64 {
 }
 ```
 
+Память Пророка (без catastrophic forgetting):
+
+```kenga
+fn main() {
+    let mind = memory();
+    remember(mind, [9, 0, 9], 80);   // только surprise
+    consolidate(mind);               // сон / консолидация
+    println(foresee(mind, [9, 0, 0]));
+    println(recall(mind, [9, 0, 9], 2));
+}
+```
+
 ---
 
 ## Что уже есть в языке
@@ -142,6 +155,7 @@ fn main() -> i64 {
 | `import "path.kenga"` | ✅ |
 | Living types: `ttl 5s`, `sweep` | ✅ |
 | Event loop: `on` / `emit` / `pump` | ✅ |
+| Память Пророка: `memory` / `remember` / `consolidate` | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |
 | Bytecode IR (`kenga compile`) | ✅ |
 | Нативный LLVM / self-host | 🚧 next |
@@ -182,9 +196,8 @@ kenga-lang/
 
 1. **Стабильный язык 0.x** — модули, ошибки с подсказками, больше stdlib  
 2. **Нативный бэкенд** — LLVM или C-emit, без интерпретатора в hot path  
-3. **Sleep / consolidate** — память Пророка без catastrophic forgetting  
-4. **Self-host** — компилятор Kenga на Kenga, отрезаем Rust-пуповину  
-5. **Сайт + пакетные менеджеры** — когда язык перестанет быть «лабораторией»
+3. **Self-host** — компилятор Kenga на Kenga, отрезаем Rust-пуповину  
+4. **Сайт + пакетные менеджеры** — когда язык перестанет быть «лабораторией»
 
 Связанные проекты автора: [KengaAI_Engine](https://github.com/GermannM3/KengaAI_Engine), [The-Prophet](https://github.com/GermannM3/The-Prophet), [kengarust](https://github.com/GermannM3/kengarust).
 

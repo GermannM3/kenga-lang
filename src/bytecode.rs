@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use crate::memory::MemoryHandle;
+
 #[derive(Debug, Clone)]
 pub enum Value {
     I64(i64),
@@ -21,6 +23,8 @@ pub enum Value {
         start: i64,
         end: i64,
     },
+    /// Prophet memory (episodic + core + locks)
+    Memory(MemoryHandle),
     Nil,
 }
 
@@ -35,6 +39,7 @@ impl Value {
             Value::Struct { .. } => "struct",
             Value::Tensor { .. } => "Tensor",
             Value::Range { .. } => "range",
+            Value::Memory(_) => "Memory",
             Value::Nil => "nil",
         }
     }
@@ -78,6 +83,15 @@ impl Value {
                 format!("Tensor(shape={shape:?}, len={})", data.len())
             }
             Value::Range { start, end } => format!("{start}..{end}"),
+            Value::Memory(h) => {
+                let m = h.borrow();
+                format!(
+                    "Memory(ep={}, core={}, thr={:.2})",
+                    m.episodic.len(),
+                    m.core.len(),
+                    m.threshold
+                )
+            }
             Value::Nil => "nil".into(),
         }
     }
@@ -147,6 +161,15 @@ pub enum Op {
     Pump,
     Pending,
     SleepMs,
+    /// Prophet memory
+    MakeMemory,
+    MakeMemoryConfig,
+    Remember,
+    Surprise,
+    Foresee,
+    Consolidate,
+    Recall,
+    MemStats,
     /// break/continue placeholders patched to jumps
     BreakPlaceholder,
     ContinuePlaceholder,
@@ -252,6 +275,14 @@ fn format_op(op: &Op) -> String {
         Op::Pump => "PUMP".into(),
         Op::Pending => "PENDING".into(),
         Op::SleepMs => "SLEEP_MS".into(),
+        Op::MakeMemory => "MAKE_MEMORY".into(),
+        Op::MakeMemoryConfig => "MAKE_MEMORY_CONFIG".into(),
+        Op::Remember => "REMEMBER".into(),
+        Op::Surprise => "SURPRISE".into(),
+        Op::Foresee => "FORESEE".into(),
+        Op::Consolidate => "CONSOLIDATE".into(),
+        Op::Recall => "RECALL".into(),
+        Op::MemStats => "MEM_STATS".into(),
         Op::BreakPlaceholder => "BREAK?".into(),
         Op::ContinuePlaceholder => "CONTINUE?".into(),
     }

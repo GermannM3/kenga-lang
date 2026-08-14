@@ -225,6 +225,7 @@ impl<'a> Lexer<'a> {
             "str" => TokenKind::TypeStr,
             "Tensor" => TokenKind::TypeTensor,
             "list" => TokenKind::TypeList,
+            "Memory" => TokenKind::TypeMemory,
             _ => TokenKind::Ident(s),
         };
         Token::new(kind, start)

@@ -537,6 +537,107 @@ impl Vm {
                 };
                 thread::sleep(Duration::from_millis(ms));
             }
+            Op::MakeMemory => {
+                self.stack
+                    .push(Value::Memory(crate::memory::new_memory()));
+            }
+            Op::MakeMemoryConfig => {
+                let core_cap = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("memory_config core_cap must be i64", None)),
+                };
+                let ep_cap = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("memory_config ep_cap must be i64", None)),
+                };
+                let thr = match self.pop()? {
+                    Value::F64(n) => n,
+                    Value::I64(n) => n as f64 / 100.0, // 15 => 0.15
+                    _ => {
+                        return Err(KengaError::new(
+                            "memory_config threshold must be f64 or i64",
+                            None,
+                        ))
+                    }
+                };
+                let h = crate::memory::new_memory_config(thr, ep_cap, core_cap)?;
+                self.stack.push(Value::Memory(h));
+            }
+            Op::Remember => {
+                let surprise = match self.pop()? {
+                    Value::F64(n) => n,
+                    Value::I64(n) => n as f64 / 100.0,
+                    _ => return Err(KengaError::new("remember surprise must be number", None)),
+                };
+                let obs = self.pop()?;
+                let mem = self.pop()?;
+                let pattern = crate::memory::value_to_pattern(&obs)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let kept = crate::memory::remember(
+                            &mut h.borrow_mut(),
+                            pattern,
+                            surprise,
+                            Self::now_ms(),
+                        );
+                        self.stack.push(Value::Bool(kept));
+                    }
+                    _ => return Err(KengaError::new("remember expects Memory", None)),
+                }
+            }
+            Op::Surprise => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                let pa = crate::memory::value_to_pattern(&a)?;
+                let pb = crate::memory::value_to_pattern(&b)?;
+                let s = crate::memory::surprise_score(&pa, &pb);
+                self.stack.push(Value::F64(s));
+            }
+            Op::Foresee => {
+                let obs = self.pop()?;
+                let mem = self.pop()?;
+                let pattern = crate::memory::value_to_pattern(&obs)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let pred = crate::memory::foresee(&h.borrow(), &pattern);
+                        self.stack.push(crate::memory::pattern_to_list(&pred));
+                    }
+                    _ => return Err(KengaError::new("foresee expects Memory", None)),
+                }
+            }
+            Op::Consolidate => match self.pop()? {
+                Value::Memory(h) => {
+                    let n = crate::memory::consolidate(&mut h.borrow_mut());
+                    self.stack.push(Value::I64(n));
+                }
+                _ => return Err(KengaError::new("consolidate expects Memory", None)),
+            },
+            Op::Recall => {
+                let k = match self.pop()? {
+                    Value::I64(n) if n >= 1 => n as usize,
+                    _ => return Err(KengaError::new("recall k must be i64 >= 1", None)),
+                };
+                let query = self.pop()?;
+                let mem = self.pop()?;
+                let q = crate::memory::value_to_pattern(&query)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let hits = crate::memory::recall(&h.borrow(), &q, k);
+                        let list = hits
+                            .into_iter()
+                            .map(|p| crate::memory::pattern_to_list(&p))
+                            .collect();
+                        self.stack.push(Value::List(list));
+                    }
+                    _ => return Err(KengaError::new("recall expects Memory", None)),
+                }
+            }
+            Op::MemStats => match self.pop()? {
+                Value::Memory(h) => {
+                    self.stack.push(crate::memory::stats(&h.borrow()));
+                }
+                _ => return Err(KengaError::new("mem_stats expects Memory", None)),
+            },
             Op::BreakPlaceholder | Op::ContinuePlaceholder => {
                 return Err(KengaError::new(
                     "internal: unpatched break/continue",

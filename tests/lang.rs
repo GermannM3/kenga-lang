@@ -77,3 +77,26 @@ fn event_loop_on_emit_pump() {
     // 0,1,2 processed = 3
     assert!(matches!(v, kenga::bytecode::Value::I64(3)));
 }
+
+#[test]
+fn prophet_memory_consolidate() {
+    let v = run(
+        r#"
+        fn main() -> i64 {
+            let m = memory_config(10, 16, 8);
+            assert(remember(m, [1, 2, 3], 5) == false);
+            assert(remember(m, [9, 0, 9], 80) == true);
+            assert(remember(m, [8, 1, 8], 70) == true);
+            let n = consolidate(m);
+            assert(n == 2);
+            let st = mem_stats(m);
+            assert(st[0] == 0);
+            assert(st[1] == 2);
+            let hits = recall(m, [9, 0, 9], 1);
+            assert(len(hits) == 1);
+            return st[1];
+        }
+        "#,
+    );
+    assert!(matches!(v, kenga::bytecode::Value::I64(2)));
+}

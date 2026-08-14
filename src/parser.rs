@@ -206,6 +206,7 @@ impl Parser {
             TokenKind::TypeStr => Ok(Type::Str),
             TokenKind::TypeTensor => Ok(Type::Tensor),
             TokenKind::TypeList => Ok(Type::List),
+            TokenKind::TypeMemory => Ok(Type::Memory),
             TokenKind::Ident(name) => Ok(Type::Named(name)),
             _ => Err(KengaError::at("expected type name", t.span)),
         }
