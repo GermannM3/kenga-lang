@@ -631,6 +631,48 @@ impl Vm {
                     _ => return Err(KengaError::new("learn expects Memory", None)),
                 }
             }
+            Op::Unroll => {
+                let steps = match self.pop()? {
+                    Value::I64(n) if n >= 1 => n as usize,
+                    _ => return Err(KengaError::new("unroll steps must be i64 >= 1", None)),
+                };
+                let obs = self.pop()?;
+                let mem = self.pop()?;
+                let pattern = crate::memory::value_to_pattern(&obs)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let traj = crate::memory::unroll(&h.borrow(), &pattern, steps);
+                        let list = traj
+                            .into_iter()
+                            .map(|p| crate::memory::pattern_to_list(&p))
+                            .collect();
+                        self.stack.push(Value::List(list));
+                    }
+                    _ => return Err(KengaError::new("unroll expects Memory", None)),
+                }
+            }
+            Op::ForeseeN => {
+                let steps = match self.pop()? {
+                    Value::I64(n) if n >= 1 => n as usize,
+                    _ => {
+                        return Err(KengaError::new("foresee_n steps must be i64 >= 1", None))
+                    }
+                };
+                let obs = self.pop()?;
+                let mem = self.pop()?;
+                let pattern = crate::memory::value_to_pattern(&obs)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let traj = crate::memory::foresee_n(&h.borrow(), &pattern, steps);
+                        let list = traj
+                            .into_iter()
+                            .map(|p| crate::memory::pattern_to_list(&p))
+                            .collect();
+                        self.stack.push(Value::List(list));
+                    }
+                    _ => return Err(KengaError::new("foresee_n expects Memory", None)),
+                }
+            }
             Op::RememberNext => {
                 let surprise = match self.pop()? {
                     Value::F64(n) => n,

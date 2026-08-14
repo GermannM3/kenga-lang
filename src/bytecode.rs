@@ -86,11 +86,12 @@ impl Value {
             Value::Memory(h) => {
                 let m = h.borrow();
                 format!(
-                    "Memory(ep={}, core={}, steps={}, dim={}, thr={:.2})",
+                    "Memory(ep={}, core={}, steps={}, dim={}x{}, thr={:.2})",
                     m.episodic.len(),
                     m.core.len(),
                     m.model.steps,
                     m.model.dim,
+                    m.model.hidden,
                     m.threshold
                 )
             }
@@ -172,6 +173,8 @@ pub enum Op {
     Predict,
     Learn,
     RememberNext,
+    Unroll,
+    ForeseeN,
     Consolidate,
     Recall,
     MemStats,
@@ -288,6 +291,8 @@ fn format_op(op: &Op) -> String {
         Op::Predict => "PREDICT".into(),
         Op::Learn => "LEARN".into(),
         Op::RememberNext => "REMEMBER_NEXT".into(),
+        Op::Unroll => "UNROLL".into(),
+        Op::ForeseeN => "FORESEE_N".into(),
         Op::Consolidate => "CONSOLIDATE".into(),
         Op::Recall => "RECALL".into(),
         Op::MemStats => "MEM_STATS".into(),

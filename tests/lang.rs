@@ -114,6 +114,7 @@ fn prophet_learn_predict() {
             assert(typeof(p) == "list");
             let st = mem_stats(m);
             assert(st[3] >= 2);
+            assert(st[5] >= 8);
             return st[3];
         }
         "#,
@@ -122,4 +123,24 @@ fn prophet_learn_predict() {
         kenga::bytecode::Value::I64(n) => assert!(n >= 2),
         _ => panic!("expected i64"),
     }
+}
+
+#[test]
+fn prophet_unroll() {
+    let v = run(
+        r#"
+        fn main() -> i64 {
+            let m = memory();
+            for i in 0..6 {
+                let x = [i, 1];
+                let y = [i + 1, 1];
+                learn(m, x, y);
+            }
+            let traj = unroll(m, [0, 1], 4);
+            assert(len(traj) == 4);
+            return len(traj);
+        }
+        "#,
+    );
+    assert!(matches!(v, kenga::bytecode::Value::I64(4)));
 }

@@ -37,6 +37,8 @@ pub fn compile_with_options(program: &Program, require_main: bool) -> Result<Mod
     module.intrinsics.insert("foresee".into(), 2);
     module.intrinsics.insert("predict".into(), 2);
     module.intrinsics.insert("learn".into(), 3);
+    module.intrinsics.insert("unroll".into(), 3);
+    module.intrinsics.insert("foresee_n".into(), 3);
     module.intrinsics.insert("consolidate".into(), 1);
     module.intrinsics.insert("recall".into(), 3);
     module.intrinsics.insert("mem_stats".into(), 1);
@@ -524,6 +526,20 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                     compile_expr(&args[1], ops)?;
                     compile_expr(&args[2], ops)?;
                     ops.push(Op::Learn);
+                }
+                "unroll" => {
+                    expect_argc("unroll", args, 3, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    compile_expr(&args[2], ops)?;
+                    ops.push(Op::Unroll);
+                }
+                "foresee_n" => {
+                    expect_argc("foresee_n", args, 3, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    compile_expr(&args[2], ops)?;
+                    ops.push(Op::ForeseeN);
                 }
                 "remember_next" => {
                     expect_argc("remember_next", args, 4, span)?;

@@ -80,6 +80,7 @@ kenga run examples/showcase.kenga
 kenga run examples/agent.kenga
 kenga run examples/prophet.kenga
 kenga run examples/train.kenga
+kenga run examples/unroll.kenga
 kenga emit-c examples/native_hello.kenga -o /tmp/hello.c
 kenga compile examples/living.kenga   # bytecode IR
 kenga eval "println(2 + 2);"
@@ -138,9 +139,9 @@ fn main() {
     let mind = memory();
     remember_next(mind, [1, 2, 3], [2, 3, 4], 50);
     learn(mind, [1, 2, 3], [2, 3, 4]);
-    consolidate(mind);                 // сон: core + веса W
-    println(predict(mind, [1, 2, 3])); // нейропредсказание
-    println(foresee(mind, [1, 2, 3])); // hybrid: веса + core
+    consolidate(mind);
+    println(predict(mind, [1, 2, 3]));
+    println(unroll(mind, [1, 2, 3], 5)); // будущее на 5 шагов
 }
 ```
 
@@ -160,6 +161,7 @@ fn main() {
 | Event loop: `on` / `emit` / `pump` | ✅ |
 | Память Пророка: `memory` / `remember` / `consolidate` | ✅ |
 | World model: `learn` / `predict` / `remember_next` | ✅ |
+| MLP + `unroll` / `foresee_n` (разворот будущего) | ✅ |
 | `emit-c` (нативный C MVP) | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |
 | Bytecode IR (`kenga compile`) | ✅ |

@@ -1,0 +1,28 @@
+// Разворот будущего: MLP world-model + unroll N steps
+
+fn main() -> i64 {
+    let mind: Memory = memory_config(5, 64, 16);
+    println("unroll future");
+
+    // Train a simple drift: each step adds ~1 on first component
+    for i in 0..12 {
+        let x = [i, 0, 1];
+        let y = [i + 1, 0, 1];
+        remember_next(mind, x, y, 40);
+        learn(mind, x, y);
+    }
+    consolidate(mind);
+    println(mem_stats(mind)); // + hidden size at [5]
+
+    let start = [2, 0, 1];
+    let future = unroll(mind, start, 5);
+    println(len(future));
+    println(future[0]);
+    println(future[4]);
+
+    let hybrid = foresee_n(mind, start, 3);
+    println(hybrid);
+
+    println("unroll ok");
+    return 0;
+}

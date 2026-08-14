@@ -1,8 +1,7 @@
-//! Prophet memory: episodic buffer + core knowledge + trainable world weights.
+//! Prophet memory: episodic + core + MLP world model + multi-step unroll.
 //!
-//! Surprise gates episodic storage. `consolidate` (sleep) replays into core
-//! traces with EWC-lite locks AND updates a linear world model `W, b` so
-//! `foresee` / `predict` improve over time without wiping old knowledge.
+//! World model: y = tanh(W2 tanh(W1 x + b1) + b2) with EWC-lite locks.
+//! `unroll` rolls the model forward N steps (разворот будущего).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -13,12 +12,11 @@ use crate::error::{KengaError, Result};
 const DEFAULT_THRESHOLD: f64 = 0.15;
 const DEFAULT_EP_CAP: usize = 64;
 const DEFAULT_CORE_CAP: usize = 32;
-const DEFAULT_LR: f64 = 0.08;
+const DEFAULT_LR: f64 = 0.06;
 
 #[derive(Debug, Clone)]
 pub struct Episode {
     pub pattern: Vec<f64>,
-    /// Optional next-state target for world-model training
     pub target: Option<Vec<f64>>,
     pub surprise: f64,
     pub ts_ms: u64,
@@ -31,115 +29,184 @@ pub struct CoreTrace {
     pub replays: u64,
 }
 
-/// Linear world model: y ≈ tanh(W x + b)
+/// Two-layer MLP world model with EWC locks.
 #[derive(Debug, Clone)]
 pub struct WorldModel {
     pub dim: usize,
-    /// row-major dim*dim
-    pub w: Vec<f64>,
-    pub b: Vec<f64>,
-    /// Fisher-ish importance per weight (EWC)
-    pub w_lock: Vec<f64>,
-    pub b_lock: Vec<f64>,
+    pub hidden: usize,
+    /// W1: hidden x dim (row-major)
+    pub w1: Vec<f64>,
+    pub b1: Vec<f64>,
+    /// W2: dim x hidden
+    pub w2: Vec<f64>,
+    pub b2: Vec<f64>,
+    pub w1_lock: Vec<f64>,
+    pub b1_lock: Vec<f64>,
+    pub w2_lock: Vec<f64>,
+    pub b2_lock: Vec<f64>,
     pub steps: u64,
+}
+
+fn hidden_for(dim: usize) -> usize {
+    (dim * 3).max(8).min(64)
+}
+
+fn xavier(fan_in: usize, fan_out: usize, i: usize) -> f64 {
+    let s = (6.0 / (fan_in + fan_out) as f64).sqrt();
+    // deterministic pseudo-noise from index
+    let u = ((i * 1103515245 + 12345) % 10000) as f64 / 10000.0;
+    (u * 2.0 - 1.0) * s
+}
+
+struct Fwd {
+    h: Vec<f64>,
+    y: Vec<f64>,
 }
 
 impl WorldModel {
     pub fn new(dim: usize) -> Self {
-        let n = dim * dim;
-        // Small identity-ish init
-        let mut w = vec![0.0; n];
-        for i in 0..dim {
-            w[i * dim + i] = 0.2;
-        }
-        Self {
+        let dim = dim.max(1);
+        let h = hidden_for(dim);
+        let mut m = Self {
             dim,
-            w,
-            b: vec![0.0; dim],
-            w_lock: vec![0.0; n],
-            b_lock: vec![0.0; dim],
+            hidden: h,
+            w1: vec![0.0; h * dim],
+            b1: vec![0.0; h],
+            w2: vec![0.0; dim * h],
+            b2: vec![0.0; dim],
+            w1_lock: vec![0.0; h * dim],
+            b1_lock: vec![0.0; h],
+            w2_lock: vec![0.0; dim * h],
+            b2_lock: vec![0.0; dim],
             steps: 0,
+        };
+        m.init_weights();
+        m
+    }
+
+    fn init_weights(&mut self) {
+        let (d, h) = (self.dim, self.hidden);
+        for i in 0..(h * d) {
+            self.w1[i] = xavier(d, h, i);
+        }
+        for i in 0..(d * h) {
+            self.w2[i] = xavier(h, d, i + 17);
+        }
+        // mild residual identity in output path via bias zero + small diag through hidden average
+        for i in 0..d.min(h) {
+            self.w2[i * h + i] += 0.15;
         }
     }
 
     pub fn ensure_dim(&mut self, dim: usize) {
+        let dim = dim.max(1);
         if dim <= self.dim {
             return;
         }
-        let old = self.dim;
-        let mut nw = vec![0.0; dim * dim];
-        let mut nw_lock = vec![0.0; dim * dim];
-        for r in 0..old {
-            for c in 0..old {
-                nw[r * dim + c] = self.w[r * old + c];
-                nw_lock[r * dim + c] = self.w_lock[r * old + c];
+        // Grow: rebuild with larger dims, copy overlapping block
+        let old = self.clone();
+        *self = WorldModel::new(dim);
+        let od = old.dim;
+        let oh = old.hidden;
+        let nh = self.hidden;
+        for r in 0..oh.min(nh) {
+            for c in 0..od {
+                if r * self.dim + c < self.w1.len() && r * od + c < old.w1.len() {
+                    self.w1[r * self.dim + c] = old.w1[r * od + c];
+                    self.w1_lock[r * self.dim + c] = old.w1_lock[r * od + c];
+                }
             }
-            if r < dim {
-                nw[r * dim + r] = nw[r * dim + r].max(0.2);
+            self.b1[r] = old.b1[r];
+            self.b1_lock[r] = old.b1_lock[r];
+        }
+        for r in 0..od {
+            for c in 0..oh.min(nh) {
+                self.w2[r * nh + c] = old.w2[r * oh + c];
+                self.w2_lock[r * nh + c] = old.w2_lock[r * oh + c];
             }
+            self.b2[r] = old.b2[r];
+            self.b2_lock[r] = old.b2_lock[r];
         }
-        for i in old..dim {
-            nw[i * dim + i] = 0.2;
-        }
-        let mut nb = vec![0.0; dim];
-        let mut nb_lock = vec![0.0; dim];
-        nb[..old].copy_from_slice(&self.b);
-        nb_lock[..old].copy_from_slice(&self.b_lock);
-        self.dim = dim;
-        self.w = nw;
-        self.w_lock = nw_lock;
-        self.b = nb;
-        self.b_lock = nb_lock;
+        self.steps = old.steps;
     }
 
-    fn forward(&self, x: &[f64]) -> Vec<f64> {
-        let d = self.dim;
+    fn forward_act(&self, x: &[f64]) -> Fwd {
+        let (d, h) = (self.dim, self.hidden);
+        let mut hh = vec![0.0; h];
+        for r in 0..h {
+            let mut s = self.b1[r];
+            for c in 0..d {
+                s += self.w1[r * d + c] * x.get(c).copied().unwrap_or(0.0);
+            }
+            hh[r] = s.tanh();
+        }
         let mut y = vec![0.0; d];
         for r in 0..d {
-            let mut s = self.b[r];
-            for c in 0..d {
-                let xv = x.get(c).copied().unwrap_or(0.0);
-                s += self.w[r * d + c] * xv;
+            let mut s = self.b2[r];
+            for c in 0..h {
+                s += self.w2[r * h + c] * hh[c];
             }
             y[r] = s.tanh();
         }
-        y
+        Fwd { h: hh, y }
     }
 
-    /// Delta rule with EWC penalty on locked weights.
+    pub fn forward(&self, x: &[f64]) -> Vec<f64> {
+        self.forward_act(x).y
+    }
+
     pub fn train_step(&mut self, x: &[f64], target: &[f64], lr: f64) -> f64 {
         let d = x.len().max(target.len()).max(1);
         self.ensure_dim(d);
-        let pred = self.forward(x);
-        let mut loss = 0.0;
-        let mut delta = vec![0.0; self.dim];
-        for i in 0..self.dim {
-            let t = target.get(i).copied().unwrap_or(0.0);
-            // Map target into tanh range softly
-            let t = t.tanh();
-            let y = pred[i];
-            let err = t - y;
-            loss += err * err;
-            // d(tanh)/dz = 1 - y^2
-            delta[i] = err * (1.0 - y * y);
-        }
-        loss /= self.dim as f64;
+        let act = self.forward_act(x);
+        let (d, h) = (self.dim, self.hidden);
 
-        for r in 0..self.dim {
-            for c in 0..self.dim {
-                let xv = x.get(c).copied().unwrap_or(0.0);
-                let idx = r * self.dim + c;
-                let lock = self.w_lock[idx];
-                let eff_lr = lr / (1.0 + lock);
-                self.w[idx] += eff_lr * delta[r] * xv;
-                // accumulate importance ~ |grad|
-                self.w_lock[idx] += 0.05 * (delta[r] * xv).abs();
-            }
-            let lock = self.b_lock[r];
-            let eff_lr = lr / (1.0 + lock);
-            self.b[r] += eff_lr * delta[r];
-            self.b_lock[r] += 0.05 * delta[r].abs();
+        let mut loss = 0.0;
+        let mut dy = vec![0.0; d];
+        for i in 0..d {
+            let t = target.get(i).copied().unwrap_or(0.0).tanh();
+            let err = t - act.y[i];
+            loss += err * err;
+            dy[i] = err * (1.0 - act.y[i] * act.y[i]);
         }
+        loss /= d as f64;
+
+        let mut dh = vec![0.0; h];
+        for c in 0..h {
+            let mut s = 0.0;
+            for r in 0..d {
+                s += self.w2[r * h + c] * dy[r];
+            }
+            dh[c] = s * (1.0 - act.h[c] * act.h[c]);
+        }
+
+        for r in 0..d {
+            for c in 0..h {
+                let idx = r * h + c;
+                let g = dy[r] * act.h[c];
+                let eff = lr / (1.0 + self.w2_lock[idx]);
+                self.w2[idx] += eff * g;
+                self.w2_lock[idx] += 0.04 * g.abs();
+            }
+            let eff = lr / (1.0 + self.b2_lock[r]);
+            self.b2[r] += eff * dy[r];
+            self.b2_lock[r] += 0.04 * dy[r].abs();
+        }
+
+        for r in 0..h {
+            for c in 0..d {
+                let idx = r * d + c;
+                let xv = x.get(c).copied().unwrap_or(0.0);
+                let g = dh[r] * xv;
+                let eff = lr / (1.0 + self.w1_lock[idx]);
+                self.w1[idx] += eff * g;
+                self.w1_lock[idx] += 0.04 * g.abs();
+            }
+            let eff = lr / (1.0 + self.b1_lock[r]);
+            self.b1[r] += eff * dh[r];
+            self.b1_lock[r] += 0.04 * dh[r].abs();
+        }
+
         self.steps += 1;
         loss
     }
@@ -230,7 +297,6 @@ fn cmp_f64(a: f64, b: f64) -> std::cmp::Ordering {
     a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
 }
 
-/// Euclidean distance, length-normalized.
 pub fn surprise_score(a: &[f64], b: &[f64]) -> f64 {
     let n = a.len().max(b.len()).max(1) as f64;
     let mut sum = 0.0;
@@ -264,8 +330,7 @@ fn blend_core(mem: &ProphetMemory, obs: &[f64]) -> Option<Vec<f64>> {
         .enumerate()
         .map(|(i, c)| {
             let d = surprise_score(&c.pattern, obs);
-            let w = 1.0 / (0.05 + d);
-            (i, w * (1.0 + c.importance))
+            (i, (1.0 / (0.05 + d)) * (1.0 + c.importance))
         })
         .collect();
     weights.sort_by(|a, b| cmp_f64(b.1, a.1));
@@ -290,22 +355,17 @@ fn blend_core(mem: &ProphetMemory, obs: &[f64]) -> Option<Vec<f64>> {
     Some(out)
 }
 
-/// Neural prediction from world model weights.
 pub fn predict(mem: &ProphetMemory, obs: &[f64]) -> Vec<f64> {
-    let mut m = mem.model.clone();
-    m.ensure_dim(obs.len().max(1));
-    // Use forward on a temp ensure — but model is behind & — so reimplement read-only:
-    let d = mem.model.dim.max(obs.len()).max(1);
-    // If dims mismatch, pad locally
-    if d == mem.model.dim {
-        return mem.model.forward(obs);
-    }
     let mut tmp = mem.model.clone();
-    tmp.ensure_dim(d);
-    tmp.forward(obs)
+    tmp.ensure_dim(obs.len().max(1));
+    // Use ensured model without mutating original when dims match after clone
+    if mem.model.dim >= obs.len().max(1) {
+        mem.model.forward(obs)
+    } else {
+        tmp.forward(obs)
+    }
 }
 
-/// Hybrid foresee: neural predict blended with core traces.
 pub fn foresee(mem: &ProphetMemory, obs: &[f64]) -> Vec<f64> {
     let neural = predict(mem, obs);
     match blend_core(mem, obs) {
@@ -319,17 +379,42 @@ pub fn foresee(mem: &ProphetMemory, obs: &[f64]) -> Vec<f64> {
         Some(core) => {
             let dim = neural.len().max(core.len()).max(obs.len());
             let mut out = vec![0.0; dim];
-            let nw = if mem.model.steps > 0 { 0.55 } else { 0.15 };
+            let nw = if mem.model.steps > 0 { 0.6 } else { 0.15 };
             let cw = 1.0 - nw;
             for i in 0..dim {
                 let n = neural.get(i).copied().unwrap_or(0.0);
                 let c = core.get(i).copied().unwrap_or(0.0);
                 let o = obs.get(i).copied().unwrap_or(0.0);
-                out[i] = nw * n + cw * c * 0.85 + o * 0.15;
+                out[i] = nw * n + cw * c * 0.8 + o * 0.2;
             }
             out
         }
     }
+}
+
+/// Multi-step future unroll (neural dynamics).
+/// Returns list of states for t+1 .. t+steps.
+pub fn unroll(mem: &ProphetMemory, obs: &[f64], steps: usize) -> Vec<Vec<f64>> {
+    let steps = steps.clamp(1, 64);
+    let mut cur = obs.to_vec();
+    let mut out = Vec::with_capacity(steps);
+    for _ in 0..steps {
+        cur = predict(mem, &cur);
+        out.push(cur.clone());
+    }
+    out
+}
+
+/// Hybrid multi-step (foresee each step).
+pub fn foresee_n(mem: &ProphetMemory, obs: &[f64], steps: usize) -> Vec<Vec<f64>> {
+    let steps = steps.clamp(1, 64);
+    let mut cur = obs.to_vec();
+    let mut out = Vec::with_capacity(steps);
+    for _ in 0..steps {
+        cur = foresee(mem, &cur);
+        out.push(cur.clone());
+    }
+    out
 }
 
 pub fn remember(
@@ -351,7 +436,8 @@ pub fn remember_pair(
     if surprise < mem.threshold {
         return false;
     }
-    mem.model.ensure_dim(pattern.len().max(target.as_ref().map(|t| t.len()).unwrap_or(0)));
+    mem.model
+        .ensure_dim(pattern.len().max(target.as_ref().map(|t| t.len()).unwrap_or(0)));
     mem.episodic.push(Episode {
         pattern,
         target,
@@ -372,22 +458,24 @@ pub fn remember_pair(
     true
 }
 
-/// Explicit supervised step on world weights.
 pub fn learn(mem: &mut ProphetMemory, x: &[f64], y: &[f64]) -> f64 {
     mem.model.ensure_dim(x.len().max(y.len()).max(1));
     mem.model.train_step(x, y, mem.lr)
 }
 
-/// Sleep / consolidate: core fold + world-model replay training.
 pub fn consolidate(mem: &mut ProphetMemory) -> i64 {
     let mut folded = 0i64;
     let episodes = std::mem::take(&mut mem.episodic);
     for ep in &episodes {
         folded += 1;
-        // Train world model: target = next state or self-pattern
         let target = ep.target.as_ref().unwrap_or(&ep.pattern);
         mem.model.ensure_dim(ep.pattern.len().max(target.len()));
+        // primary transition + one extra replay scaled by surprise
         mem.model.train_step(&ep.pattern, target, mem.lr);
+        if ep.surprise > 0.4 {
+            mem.model
+                .train_step(&ep.pattern, target, mem.lr * 0.5);
+        }
 
         if let Some((idx, dist)) = nearest_core(mem, &ep.pattern) {
             if dist < 0.35 {
@@ -412,10 +500,9 @@ pub fn consolidate(mem: &mut ProphetMemory) -> i64 {
         });
     }
 
-    // Extra dream replays on core (stabilize locks)
     let core_snap: Vec<Vec<f64>> = mem.core.iter().map(|c| c.pattern.clone()).collect();
     for p in core_snap {
-        mem.model.train_step(&p, &p, mem.lr * 0.5);
+        mem.model.train_step(&p, &p, mem.lr * 0.35);
     }
 
     if mem.core.len() > mem.core_cap {
@@ -450,5 +537,6 @@ pub fn stats(mem: &ProphetMemory) -> Value {
         Value::I64(locked),
         Value::I64(mem.model.steps as i64),
         Value::I64(mem.model.dim as i64),
+        Value::I64(mem.model.hidden as i64),
     ])
 }
