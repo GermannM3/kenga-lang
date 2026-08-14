@@ -43,5 +43,16 @@ jobs:
           cargo run --quiet -- run examples/prophet_loop.kenga
           cargo run --quiet -- run examples/train.kenga
           cargo run --quiet -- run examples/unroll.kenga
+          cargo run --quiet -- run examples/native_struct.kenga
+          cargo run --quiet -- run examples/stdlib_demo.kenga
           cargo run --quiet -- emit-c examples/native_hello.kenga -o native_hello.c
           cargo run --quiet -- emit-c examples/native_lists.kenga -o native_lists.c
+          cargo run --quiet -- emit-c examples/native_struct.kenga -o native_struct.c
+
+      - name: Native build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cargo run --quiet -- build examples/native_lists.kenga -o /tmp/kenga_native_lists
+          /tmp/kenga_native_lists
+          cargo run --quiet -- build examples/native_struct.kenga -o /tmp/kenga_native_struct
+          /tmp/kenga_native_struct

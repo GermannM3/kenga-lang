@@ -26,11 +26,16 @@ fn load_recursive(path: &Path, visiting: &mut HashSet<PathBuf>) -> Result<Progra
         ));
     }
 
+    let label = path.display().to_string();
     let src = fs::read_to_string(path).map_err(|e| {
         KengaError::new(format!("cannot read {}: {e}", path.display()), None)
     })?;
-    let tokens = Lexer::new(&src).tokenize()?;
-    let mut program = Parser::new(tokens).parse()?;
+    let tokens = Lexer::new(&src)
+        .tokenize()
+        .map_err(|e| e.with_path(&label))?;
+    let mut program = Parser::new(tokens)
+        .parse()
+        .map_err(|e| e.with_path(&label))?;
 
     let base = path.parent().unwrap_or_else(|| Path::new("."));
     let imports = program.imports.clone();

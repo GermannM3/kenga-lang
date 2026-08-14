@@ -1,4 +1,4 @@
-// Stdlib math helpers — import "stdlib/math.kenga"
+//! Shared i64 helpers.
 
 fn abs(n: i64) -> i64 {
     if n < 0 {
@@ -23,4 +23,14 @@ fn max(a: i64, b: i64) -> i64 {
 
 fn clamp(x: i64, lo: i64, hi: i64) -> i64 {
     return min(max(x, lo), hi);
+}
+
+fn pow_i(base: i64, exp: i64) -> i64 {
+    let r: i64 = 1;
+    let e: i64 = exp;
+    while e > 0 {
+        r = r * base;
+        e = e - 1;
+    }
+    return r;
 }

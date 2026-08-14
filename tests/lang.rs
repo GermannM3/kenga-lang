@@ -1,4 +1,7 @@
+use std::path::PathBuf;
+
 use kenga::compiler::compile;
+use kenga::driver::{compile_file, parse_file};
 use kenga::lexer::Lexer;
 use kenga::parser::Parser;
 use kenga::vm::interpret;
@@ -143,4 +146,18 @@ fn prophet_unroll() {
         "#,
     );
     assert!(matches!(v, kenga::bytecode::Value::I64(4)));
+}
+
+#[test]
+fn import_stdlib_and_struct() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let path = root.join("examples/native_struct.kenga");
+    let program = parse_file(&path).expect("parse import");
+    assert!(program
+        .items
+        .iter()
+        .any(|i| matches!(i, kenga::ast::Item::Function(f) if f.name == "sum")));
+    let module = compile_file(&path).expect("compile");
+    let v = interpret(module).expect("run");
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
 }

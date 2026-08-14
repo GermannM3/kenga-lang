@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 
+use kenga::build::{build, BuildOptions};
 use kenga::bytecode::dump_ir;
 use kenga::codegen::emit_c;
 use kenga::compiler::compile;
@@ -60,20 +61,32 @@ fn real_main() -> Result<()> {
             })?;
             let program = parse_file(&PathBuf::from(path))?;
             let c = emit_c(&program)?;
-            let out_path = args
-                .windows(2)
-                .find(|w| w[0] == "-o")
-                .map(|w| w[1].clone())
-                .unwrap_or_else(|| {
-                    PathBuf::from(path)
-                        .with_extension("c")
-                        .to_string_lossy()
-                        .into_owned()
-                });
+            let out_path = flag_value(&args, "-o").unwrap_or_else(|| {
+                PathBuf::from(path)
+                    .with_extension("c")
+                    .to_string_lossy()
+                    .into_owned()
+            });
             fs::write(&out_path, &c).map_err(|e| {
                 KengaError::new(format!("cannot write {out_path}: {e}"), None)
             })?;
             println!("wrote {out_path}");
+        }
+        "build" => {
+            let path = args.first().ok_or_else(|| {
+                KengaError::new(
+                    "usage: kenga build <file.kenga> [-o out] [--keep-c]",
+                    None,
+                )
+            })?;
+            let out = flag_value(&args, "-o").map(PathBuf::from);
+            let keep_c = args.iter().any(|a| a == "--keep-c");
+            let bin = build(BuildOptions {
+                input: PathBuf::from(path),
+                output: out,
+                keep_c,
+            })?;
+            println!("built {}", bin.display());
         }
         "eval" => {
             let src = args.join(" ");
@@ -91,7 +104,7 @@ fn real_main() -> Result<()> {
             interpret(module)?;
         }
         "version" | "--version" | "-V" => {
-            println!("kenga {} (bootstrap)", env!("CARGO_PKG_VERSION"));
+            println!("kenga {} (bootstrap complete)", env!("CARGO_PKG_VERSION"));
         }
         "help" | "--help" | "-h" => print_usage(),
         other => {
@@ -108,19 +121,27 @@ fn real_main() -> Result<()> {
     Ok(())
 }
 
+fn flag_value(args: &[String], flag: &str) -> Option<String> {
+    args.windows(2)
+        .find(|w| w[0] == flag)
+        .map(|w| w[1].clone())
+}
+
 fn print_usage() {
     eprintln!(
-        "\x20Kenga — язык для живого ИИ
+        "Kenga — язык для живого ИИ
 
-Установка и запуск:
-  kenga run <file.kenga>
-  kenga parse <file.kenga>
-  kenga compile <file.kenga>
+Команды:
+  kenga run <file.kenga>              VM
+  kenga parse|compile <file.kenga>    AST / IR
   kenga emit-c <file.kenga> [-o out.c]
-  kenga eval 'println(1+1);'
-  kenga <file.kenga>
+  kenga build <file.kenga> [-o out] [--keep-c]
+  kenga eval '<code>'
+  kenga version
 
-Rust-бинарник — временный bootstrap. Цель: self-host на самой Kenga.
-Сайт установки: https://github.com/GermannM3/kenga-lang"
+Установка:
+  cargo install --git https://github.com/GermannM3/kenga-lang --locked
+
+https://github.com/GermannM3/kenga-lang"
     );
 }

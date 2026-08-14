@@ -22,6 +22,7 @@ impl fmt::Display for Span {
 pub struct KengaError {
     pub message: String,
     pub span: Option<Span>,
+    pub path: Option<String>,
 }
 
 impl KengaError {
@@ -29,19 +30,27 @@ impl KengaError {
         Self {
             message: message.into(),
             span,
+            path: None,
         }
     }
 
     pub fn at(message: impl Into<String>, span: Span) -> Self {
         Self::new(message, Some(span))
     }
+
+    pub fn with_path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
 }
 
 impl fmt::Display for KengaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.span {
-            Some(s) => write!(f, "error at {}: {}", s, self.message),
-            None => write!(f, "error: {}", self.message),
+        match (&self.path, &self.span) {
+            (Some(p), Some(s)) => write!(f, "error at {p}:{s}: {}", self.message),
+            (Some(p), None) => write!(f, "error in {p}: {}", self.message),
+            (None, Some(s)) => write!(f, "error at {s}: {}", self.message),
+            (None, None) => write!(f, "error: {}", self.message),
         }
     }
 }

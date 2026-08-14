@@ -1,4 +1,7 @@
+use std::path::PathBuf;
+
 use kenga::codegen::emit_c;
+use kenga::driver::parse_file;
 use kenga::lexer::Lexer;
 use kenga::parser::Parser;
 
@@ -39,4 +42,31 @@ fn emit_c_lists_for() {
     assert!(c.contains("KList"));
     assert!(c.contains("klist_push"));
     assert!(c.contains("for ("));
+}
+
+#[test]
+fn emit_c_struct() {
+    let src = r#"
+        struct Point { x: i64, y: i64 }
+        fn main() -> i64 {
+            let p: Point = Point { x: 3, y: 4 };
+            return p.x * p.x + p.y * p.y;
+        }
+    "#;
+    let tokens = Lexer::new(src).tokenize().unwrap();
+    let program = Parser::new(tokens).parse().unwrap();
+    let c = emit_c(&program).unwrap();
+    assert!(c.contains("typedef struct"));
+    assert!(c.contains("K_Point"));
+    assert!(c.contains("k_x"));
+}
+
+#[test]
+fn emit_c_from_imported_example() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let program = parse_file(&root.join("examples/native_struct.kenga")).unwrap();
+    let c = emit_c(&program).unwrap();
+    assert!(c.contains("K_Point"));
+    assert!(c.contains("k_sum"));
+    assert!(c.contains("k_dist2"));
 }

@@ -1,0 +1,26 @@
+import "../stdlib/list.kenga";
+
+struct Point {
+    x: i64,
+    y: i64
+}
+
+fn dist2(p: Point) -> i64 {
+    return p.x * p.x + p.y * p.y;
+}
+
+fn main() -> i64 {
+    println("bootstrap complete");
+
+    let p: Point = Point { x: 3, y: 4 };
+    println(dist2(p));
+
+    let xs: list = [2, 3, 5];
+    println(sum(xs));
+    println(product(xs));
+    println(max_of(xs));
+
+    p.x = 6;
+    println(dist2(p));
+    return 0;
+}

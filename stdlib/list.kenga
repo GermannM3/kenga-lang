@@ -1,0 +1,27 @@
+// Shared list helpers for import demos
+
+fn sum(xs: list) -> i64 {
+    let s: i64 = 0;
+    for v in xs {
+        s = s + v;
+    }
+    return s;
+}
+
+fn product(xs: list) -> i64 {
+    let p: i64 = 1;
+    for v in xs {
+        p = p * v;
+    }
+    return p;
+}
+
+fn max_of(xs: list) -> i64 {
+    let m: i64 = xs[0];
+    for v in xs {
+        if v > m {
+            m = v;
+        }
+    }
+    return m;
+}

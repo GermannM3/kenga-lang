@@ -1,5 +1,7 @@
 # Язык Kenga (кратко)
 
+Bootstrap **1.0**: VM + `emit-c` + `kenga build`.
+
 ## Память Пророка
 
 ```kenga
@@ -19,20 +21,21 @@ on "tick"(n: i64) { if n < 5 { emit("tick", n + 1); } }
 fn main() { emit("tick", 0); pump(32); }
 ```
 
-## Native backend (`emit-c`)
+## Native backend (`emit-c` / `build`)
 
-Подмножество, которое уже уходит в C99:
+Подмножество в C99:
 
-- `i64`, `list`, строки в `println`
-- `let` / assign / index assign
+- `i64`, `list`, `struct` (поля get/set), строки в `println`
+- `let` / assign / index assign / field assign
 - `if/else`, `while`, `for` (`0..n` и `for x in list`)
 - `break` / `continue`
-- `len` / `push`, вызовы функций
+- `len` / `push`, вызовы функций, `import` (мержится в один Program)
 - `println` для i64 / str / list
 
 ```bash
-kenga emit-c examples/native_lists.kenga -o lists.c
-gcc lists.c -o lists && ./lists
+kenga emit-c examples/native_struct.kenga -o ns.c
+kenga build examples/native_lists.kenga -o native_lists
+# нужен gcc / clang / MSVC cl
 ```
 
-Пока нет: struct, Memory/Prophet, event `on`, float-математика как first-class.
+Пока нет в C: Memory/Prophet, event `on`, Tensor, float как first-class.

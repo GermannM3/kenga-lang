@@ -22,7 +22,7 @@
 
 **Kenga** проектируется как язык, где тензор, время жизни памяти (`ttl`), консолидация и агентный цикл — не библиотеки, а часть семантики.
 
-Сейчас в репозитории — **рабочий bootstrap**: свой синтаксис → AST → bytecode IR → VM.  
+Сейчас в репозитории — **bootstrap 1.0**: синтаксис → AST → bytecode → VM, плюс `emit-c` / `kenga build` в C99.  
 Rust здесь только временный хост (как C у раннего Go). Цель — self-host: компилятор на самой Kenga.
 
 <p align="center">
@@ -82,8 +82,8 @@ kenga run examples/prophet.kenga
 kenga run examples/train.kenga
 kenga run examples/unroll.kenga
 kenga emit-c examples/native_lists.kenga -o native_lists.c
-# gcc native_lists.c -o native_lists && ./native_lists
-kenga compile examples/living.kenga   # bytecode IR
+kenga build examples/native_struct.kenga   # emit-c + gcc/clang
+kenga compile examples/living.kenga        # bytecode IR
 kenga eval "println(2 + 2);"
 ```
 
@@ -163,7 +163,8 @@ fn main() {
 | Память Пророка: `memory` / `remember` / `consolidate` | ✅ |
 | World model: `learn` / `predict` / `remember_next` | ✅ |
 | MLP + `unroll` / `foresee_n` (разворот будущего) | ✅ |
-| `emit-c`: i64, lists, for/while/break, fn | ✅ |
+| `emit-c`: i64, lists, structs, for/while, fn, import | ✅ |
+| `kenga build` (emit-c + системный C-компилятор) | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |
 | Bytecode IR (`kenga compile`) | ✅ |
 | Полный LLVM / self-host | 🚧 next |
@@ -177,11 +178,11 @@ fn main() {
 ## Команды CLI
 
 ```
-kenga run <file.kenga>       выполнить
-kenga parse <file.kenga>     AST
-kenga compile <file.kenga>   IR
-kenga emit-c <file.kenga>    C99 (MVP native)
-kenga eval '<code>'          однострочник
+kenga run <file.kenga>              VM
+kenga parse|compile <file.kenga>    AST / IR
+kenga emit-c <file.kenga> [-o out.c]
+kenga build <file.kenga> [-o out] [--keep-c]
+kenga eval '<code>'
 kenga version
 ```
 
@@ -192,9 +193,10 @@ kenga version
 ```
 kenga-lang/
 ├── src/           # bootstrap: lexer → parser → compiler → VM
-├── examples/      # hello, living, showcase
-├── stdlib/        # math и дальше
+├── examples/      # hello, living, showcase, prophet, native_*
+├── stdlib/        # math, list, agent
 ├── tests/         # интеграционные тесты языка
+├── docs/          # LANGUAGE.md
 ├── assets/        # баннер и схемы для README
 └── .github/       # CI + release builds
 ```
@@ -203,10 +205,11 @@ kenga-lang/
 
 ## Roadmap
 
-1. **Стабильный язык 0.x** — модули, ошибки с подсказками, больше stdlib  
-2. **Расширение emit-c → LLVM** — полный нативный бэкенд  
-3. **Self-host** — компилятор Kenga на Kenga  
-4. **Сайт + пакетные менеджеры**
+Bootstrap 1.0 закрыт (VM + native C + Prophet memory + events). Дальше:
+
+1. LLVM / полноценный нативный бэкенд  
+2. Self-host — компилятор Kenga на Kenga  
+3. Пакетные менеджеры и отдельный сайт
 
 
 Связанные проекты автора: [KengaAI_Engine](https://github.com/GermannM3/KengaAI_Engine), [The-Prophet](https://github.com/GermannM3/The-Prophet), [kengarust](https://github.com/GermannM3/kengarust).

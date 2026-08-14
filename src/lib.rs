@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod build;
 pub mod bytecode;
 pub mod codegen;
 pub mod compiler;

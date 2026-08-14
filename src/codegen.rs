@@ -1,5 +1,4 @@
-//! C99 backend for a practical Kenga subset.
-//! Supports: i64, lists, ranges, for/while/break/continue, if, fn calls, println.
+//! C99 backend: i64, lists, structs, for/while, imports (via merged Program).
 
 use std::collections::HashMap;
 
@@ -8,27 +7,27 @@ use crate::ast::{
 };
 use crate::error::{KengaError, Result};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum CTy {
     I64,
     List,
     Str,
     Void,
+    Struct(String),
 }
 
-struct EmitCtx {
+struct StructInfo {
+    fields: Vec<(String, CTy)>,
+}
+
+struct EmitCtx<'a> {
     vars: HashMap<String, CTy>,
+    structs: &'a HashMap<String, StructInfo>,
+    sigs: &'a HashMap<String, (CTy, Vec<CTy>)>,
     tmp: usize,
 }
 
-impl EmitCtx {
-    fn new() -> Self {
-        Self {
-            vars: HashMap::new(),
-            tmp: 0,
-        }
-    }
-
+impl<'a> EmitCtx<'a> {
     fn fresh(&mut self, prefix: &str) -> String {
         let n = self.tmp;
         self.tmp += 1;
@@ -37,79 +36,137 @@ impl EmitCtx {
 }
 
 pub fn emit_c(program: &Program) -> Result<String> {
-    let mut fns = String::new();
-    let mut has_main = false;
-    let mut fn_sigs: HashMap<String, (CTy, Vec<CTy>)> = HashMap::new();
+    let mut structs: HashMap<String, StructInfo> = HashMap::new();
+    for item in &program.items {
+        if let Item::Struct(s) = item {
+            let fields = s
+                .fields
+                .iter()
+                .map(|p| Ok((p.name.clone(), map_type(&p.ty, &structs)?)))
+                .collect::<Result<Vec<_>>>()?;
+            for (_, ty) in &fields {
+                if matches!(ty, CTy::Struct(_)) {
+                    return Err(KengaError::at(
+                        "emit-c: nested structs not supported yet",
+                        s.span.clone(),
+                    ));
+                }
+            }
+            structs.insert(s.name.clone(), StructInfo { fields });
+        }
+    }
 
+    let mut sigs: HashMap<String, (CTy, Vec<CTy>)> = HashMap::new();
+    let mut has_main = false;
     for item in &program.items {
         if let Item::Function(f) = item {
-            let ret = map_ret(&f.ret);
-            let params: Vec<CTy> = f
+            let ret = map_type(&f.ret, &structs)?;
+            let params = f
                 .params
                 .iter()
-                .map(|p| map_type(&p.ty))
-                .collect();
-            fn_sigs.insert(f.name.clone(), (ret, params));
+                .map(|p| map_type(&p.ty, &structs))
+                .collect::<Result<Vec<_>>>()?;
+            sigs.insert(f.name.clone(), (ret, params));
             if f.name == "main" {
                 has_main = true;
             }
         }
     }
-
     if !has_main {
         return Err(KengaError::new("emit-c requires fn main()", None));
     }
 
+    let mut body = String::new();
+    let mut names: Vec<_> = structs.keys().cloned().collect();
+    names.sort();
+    for name in names {
+        let info = &structs[&name];
+        body.push_str("typedef struct {\n");
+        for (fname, fty) in &info.fields {
+            body.push_str(&format!("  {} {};\n", c_type(fty), c_ident(fname)));
+        }
+        body.push_str(&format!("}} {};\n\n", struct_c_name(&name)));
+    }
+
     for item in &program.items {
-        match item {
-            Item::Function(f) => {
-                fns.push_str(&emit_function(f, &fn_sigs)?);
-                fns.push('\n');
-            }
-            Item::Struct(_) | Item::Intrinsic(_) | Item::EventHandler(_) => {}
+        if let Item::Function(f) = item {
+            body.push_str(&emit_function(f, &structs, &sigs)?);
+            body.push('\n');
         }
     }
 
     let mut out = String::new();
     out.push_str(RUNTIME);
-    out.push_str(&fns);
+    out.push_str(&body);
     Ok(out)
 }
 
-fn map_ret(t: &Type) -> CTy {
-    match t {
+fn map_type(t: &Type, structs: &HashMap<String, StructInfo>) -> Result<CTy> {
+    Ok(match t {
         Type::Void => CTy::Void,
         Type::List => CTy::List,
         Type::Str => CTy::Str,
-        _ => CTy::I64,
-    }
+        Type::I64 | Type::F64 | Type::Bool | Type::Tensor | Type::Memory => CTy::I64,
+        Type::Named(n) => {
+            if structs.contains_key(n) {
+                CTy::Struct(n.clone())
+            } else {
+                CTy::I64
+            }
+        }
+    })
 }
 
-fn map_type(t: &Type) -> CTy {
+fn c_type(t: &CTy) -> String {
     match t {
-        Type::List => CTy::List,
-        Type::Str => CTy::Str,
-        Type::Void => CTy::Void,
-        _ => CTy::I64,
+        CTy::I64 => "int64_t".into(),
+        CTy::List => "KList".into(),
+        CTy::Str => "const char*".into(),
+        CTy::Void => "void".into(),
+        CTy::Struct(n) => struct_c_name(n),
     }
 }
 
-fn c_type(t: CTy) -> &'static str {
-    match t {
-        CTy::I64 => "int64_t",
-        CTy::List => "KList",
-        CTy::Str => "const char*",
-        CTy::Void => "void",
+fn struct_c_name(name: &str) -> String {
+    format!("K_{name}")
+}
+
+fn c_ident(name: &str) -> String {
+    if name == "main" {
+        "main".into()
+    } else {
+        format!("k_{name}")
     }
 }
 
-fn emit_function(f: &Function, sigs: &HashMap<String, (CTy, Vec<CTy>)>) -> Result<String> {
+fn escape_c(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn indent_pre(pre: &str, indent: usize) -> String {
+    if pre.is_empty() {
+        return String::new();
+    }
+    let pad = "  ".repeat(indent);
+    pre.lines().map(|l| format!("{pad}{l}\n")).collect()
+}
+
+fn emit_function(
+    f: &Function,
+    structs: &HashMap<String, StructInfo>,
+    sigs: &HashMap<String, (CTy, Vec<CTy>)>,
+) -> Result<String> {
     let (ret, _) = sigs
         .get(&f.name)
         .cloned()
-        .unwrap_or((map_ret(&f.ret), Vec::new()));
-    let mut ctx = EmitCtx::new();
-    let mut s = format!("{} {}(", c_type(ret), c_ident(&f.name));
+        .ok_or_else(|| KengaError::at("internal: missing sig", f.span.clone()))?;
+    let mut ctx = EmitCtx {
+        vars: HashMap::new(),
+        structs,
+        sigs,
+        tmp: 0,
+    };
+    let mut s = format!("{} {}(", c_type(&ret), c_ident(&f.name));
     if f.params.is_empty() {
         s.push_str("void");
     } else {
@@ -117,14 +174,14 @@ fn emit_function(f: &Function, sigs: &HashMap<String, (CTy, Vec<CTy>)>) -> Resul
             if i > 0 {
                 s.push_str(", ");
             }
-            let ty = map_type(&p.ty);
-            ctx.vars.insert(p.name.clone(), ty);
-            s.push_str(&format!("{} {}", c_type(ty), c_ident(&p.name)));
+            let ty = map_type(&p.ty, structs)?;
+            ctx.vars.insert(p.name.clone(), ty.clone());
+            s.push_str(&format!("{} {}", c_type(&ty), c_ident(&p.name)));
         }
     }
     s.push_str(") {\n");
     for stmt in &f.body.stmts {
-        s.push_str(&emit_stmt(stmt, 1, &mut ctx, sigs)?);
+        s.push_str(&emit_stmt(stmt, 1, &mut ctx)?);
     }
     if ret == CTy::I64
         && !f
@@ -139,64 +196,89 @@ fn emit_function(f: &Function, sigs: &HashMap<String, (CTy, Vec<CTy>)>) -> Resul
     Ok(s)
 }
 
-fn emit_stmt(
-    stmt: &Stmt,
-    indent: usize,
-    ctx: &mut EmitCtx,
-    sigs: &HashMap<String, (CTy, Vec<CTy>)>,
-) -> Result<String> {
+fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String> {
     let pad = "  ".repeat(indent);
     match stmt {
-        Stmt::Let { name, value, ty, .. } => {
-            let inferred = infer_expr(value, ctx, sigs)?;
-            let cty = ty.as_ref().map(map_type).unwrap_or(inferred);
-            ctx.vars.insert(name.clone(), cty);
-            let (pre, expr) = emit_expr(value, ctx, sigs)?;
+        Stmt::Let {
+            name, value, ty, ..
+        } => {
+            let inferred = infer_expr(value, ctx)?;
+            let cty = if let Some(t) = ty {
+                map_type(t, ctx.structs)?
+            } else {
+                inferred
+            };
+            ctx.vars.insert(name.clone(), cty.clone());
+            let (pre, expr) = emit_expr(value, ctx)?;
             Ok(format!(
-                "{pre}{pad}{} {} = {};\n",
-                c_type(cty),
+                "{}{pad}{} {} = {};\n",
+                indent_pre(&pre, indent),
+                c_type(&cty),
                 c_ident(name),
                 expr
             ))
         }
-        Stmt::Assign { target, value, .. } => match target {
+        Stmt::Assign { target, value, span } => match target {
             AssignTarget::Name(name) => {
-                let (pre, expr) = emit_expr(value, ctx, sigs)?;
-                Ok(format!("{pre}{pad}{} = {};\n", c_ident(name), expr))
-            }
-            AssignTarget::Index { target, index } => {
-                let (pre_t, t_expr) = emit_expr(target, ctx, sigs)?;
-                let (pre_i, i_expr) = emit_expr(index, ctx, sigs)?;
-                let (pre_v, v_expr) = emit_expr(value, ctx, sigs)?;
-                // list set returns new list conceptually; mutate in place in C
-                let tmp = ctx.fresh("lst");
+                let (pre, expr) = emit_expr(value, ctx)?;
                 Ok(format!(
-                    "{pre_t}{pre_i}{pre_v}{pad}KList {tmp} = {t_expr};\n{pad}klist_set(&{tmp}, {i_expr}, {v_expr});\n{pad}{assign}\n",
-                    assign = if let Expr::Ident(n, _) = target {
-                        format!("{} = {};", c_ident(n), tmp)
-                    } else {
-                        format!("(void){tmp};")
-                    }
+                    "{}{pad}{} = {};\n",
+                    indent_pre(&pre, indent),
+                    c_ident(name),
+                    expr
                 ))
             }
-            AssignTarget::Field { .. } => Err(KengaError::new(
-                "emit-c: struct field assign not supported yet",
-                None,
-            )),
+            AssignTarget::Index { target, index } => {
+                let (pt, te) = emit_expr(target, ctx)?;
+                let (pi, ie) = emit_expr(index, ctx)?;
+                let (pv, ve) = emit_expr(value, ctx)?;
+                let tmp = ctx.fresh("lst");
+                let assign = if let Expr::Ident(n, _) = target {
+                    format!("{pad}{} = {tmp};\n", c_ident(n))
+                } else {
+                    String::new()
+                };
+                Ok(format!(
+                    "{}{}{}{pad}KList {tmp} = {te};\n{pad}klist_set(&{tmp}, {ie}, {ve});\n{assign}",
+                    indent_pre(&pt, indent),
+                    indent_pre(&pi, indent),
+                    indent_pre(&pv, indent),
+                ))
+            }
+            AssignTarget::Field { target, field } => {
+                let (pv, ve) = emit_expr(value, ctx)?;
+                if let Expr::Ident(n, _) = target {
+                    Ok(format!(
+                        "{}{pad}{}.{} = {};\n",
+                        indent_pre(&pv, indent),
+                        c_ident(n),
+                        c_ident(field),
+                        ve
+                    ))
+                } else {
+                    Err(KengaError::at(
+                        "emit-c: field assign only on named vars",
+                        span.clone(),
+                    ))
+                }
+            }
         },
         Stmt::Expr { expr, .. } => {
             if let Expr::Call { callee, args, .. } = expr {
                 if callee == "println" && args.len() == 1 {
-                    return emit_println(&args[0], indent, ctx, sigs);
+                    return emit_println(&args[0], indent, ctx);
                 }
             }
-            let (pre, e) = emit_expr(expr, ctx, sigs)?;
-            Ok(format!("{pre}{pad}(void)({e});\n"))
+            let (pre, e) = emit_expr(expr, ctx)?;
+            Ok(format!("{}{pad}(void)({e});\n", indent_pre(&pre, indent)))
         }
         Stmt::Return { value, .. } => match value {
             Some(e) => {
-                let (pre, expr) = emit_expr(e, ctx, sigs)?;
-                Ok(format!("{pre}{pad}return {expr};\n"))
+                let (pre, expr) = emit_expr(e, ctx)?;
+                Ok(format!(
+                    "{}{pad}return {expr};\n",
+                    indent_pre(&pre, indent)
+                ))
             }
             None => Ok(format!("{pad}return;\n")),
         },
@@ -206,16 +288,16 @@ fn emit_stmt(
             else_block,
             ..
         } => {
-            let (pre, c) = emit_expr(cond, ctx, sigs)?;
-            let mut s = format!("{pre}{pad}if ({c}) {{\n");
+            let (pre, c) = emit_expr(cond, ctx)?;
+            let mut s = format!("{}{pad}if ({c}) {{\n", indent_pre(&pre, indent));
             for st in &then_block.stmts {
-                s.push_str(&emit_stmt(st, indent + 1, ctx, sigs)?);
+                s.push_str(&emit_stmt(st, indent + 1, ctx)?);
             }
             s.push_str(&format!("{pad}}}"));
             if let Some(eb) = else_block {
                 s.push_str(" else {\n");
                 for st in &eb.stmts {
-                    s.push_str(&emit_stmt(st, indent + 1, ctx, sigs)?);
+                    s.push_str(&emit_stmt(st, indent + 1, ctx)?);
                 }
                 s.push_str(&format!("{pad}}}\n"));
             } else {
@@ -224,28 +306,19 @@ fn emit_stmt(
             Ok(s)
         }
         Stmt::While { cond, body, .. } => {
-            let (pre, c) = emit_expr(cond, ctx, sigs)?;
-            // hoist precondition temps once; recompute cond in loop header via while(1)+if break
-            let mut s = format!("{pre}{pad}while (1) {{\n");
-            let (pre2, c2) = emit_expr(cond, ctx, sigs)?;
-            s.push_str(&pre2);
-            s.push_str(&format!(
-                "{}if (!({c2})) break;\n",
-                "  ".repeat(indent + 1)
-            ));
+            let mut s = format!("{pad}while (1) {{\n");
+            let (pre, c) = emit_expr(cond, ctx)?;
+            s.push_str(&indent_pre(&pre, indent + 1));
+            s.push_str(&format!("{}if (!({c})) break;\n", "  ".repeat(indent + 1)));
             for st in &body.stmts {
-                s.push_str(&emit_stmt(st, indent + 1, ctx, sigs)?);
+                s.push_str(&emit_stmt(st, indent + 1, ctx)?);
             }
             s.push_str(&format!("{pad}}}\n"));
-            let _ = c; // initial pre already emitted
             Ok(s)
         }
         Stmt::For {
-            var,
-            iter,
-            body,
-            ..
-        } => emit_for(var, iter, body, indent, ctx, sigs),
+            var, iter, body, ..
+        } => emit_for(var, iter, body, indent, ctx),
         Stmt::Break(_) => Ok(format!("{pad}break;\n")),
         Stmt::Continue(_) => Ok(format!("{pad}continue;\n")),
     }
@@ -256,30 +329,33 @@ fn emit_for(
     iter: &Expr,
     body: &crate::ast::Block,
     indent: usize,
-    ctx: &mut EmitCtx,
-    sigs: &HashMap<String, (CTy, Vec<CTy>)>,
+    ctx: &mut EmitCtx<'_>,
 ) -> Result<String> {
     let pad = "  ".repeat(indent);
     let ip = "  ".repeat(indent + 1);
-
     if let Expr::Range { start, end, .. } = iter {
-        let (pre_a, a) = emit_expr(start, ctx, sigs)?;
-        let (pre_b, b) = emit_expr(end, ctx, sigs)?;
+        let (pa, a) = emit_expr(start, ctx)?;
+        let (pb, b) = emit_expr(end, ctx)?;
         ctx.vars.insert(var.to_string(), CTy::I64);
-        let mut s = format!("{pre_a}{pre_b}{pad}for (int64_t {} = {a}; {} < {b}; {}++) {{\n", c_ident(var), c_ident(var), c_ident(var));
+        let mut s = format!(
+            "{}{}{pad}for (int64_t {} = {a}; {} < {b}; {}++) {{\n",
+            indent_pre(&pa, indent),
+            indent_pre(&pb, indent),
+            c_ident(var),
+            c_ident(var),
+            c_ident(var)
+        );
         for st in &body.stmts {
-            s.push_str(&emit_stmt(st, indent + 1, ctx, sigs)?);
+            s.push_str(&emit_stmt(st, indent + 1, ctx)?);
         }
         s.push_str(&format!("{pad}}}\n"));
         return Ok(s);
     }
-
-    // for x in list
-    let (pre, list_e) = emit_expr(iter, ctx, sigs)?;
+    let (pre, list_e) = emit_expr(iter, ctx)?;
     let lst = ctx.fresh("iter");
     let idx = ctx.fresh("i");
     ctx.vars.insert(var.to_string(), CTy::I64);
-    let mut s = format!("{pre}{pad}KList {lst} = {list_e};\n");
+    let mut s = format!("{}{pad}KList {lst} = {list_e};\n", indent_pre(&pre, indent));
     s.push_str(&format!(
         "{pad}for (size_t {idx} = 0; {idx} < {lst}.len; {idx}++) {{\n"
     ));
@@ -288,100 +364,113 @@ fn emit_for(
         c_ident(var)
     ));
     for st in &body.stmts {
-        s.push_str(&emit_stmt(st, indent + 1, ctx, sigs)?);
+        s.push_str(&emit_stmt(st, indent + 1, ctx)?);
     }
     s.push_str(&format!("{pad}}}\n"));
     Ok(s)
 }
 
-fn emit_println(
-    arg: &Expr,
-    indent: usize,
-    ctx: &mut EmitCtx,
-    sigs: &HashMap<String, (CTy, Vec<CTy>)>,
-) -> Result<String> {
+fn emit_println(arg: &Expr, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String> {
     let pad = "  ".repeat(indent);
-    match arg {
-        Expr::Str(s, _) => Ok(format!(
+    if let Expr::Str(s, _) = arg {
+        return Ok(format!(
             "{pad}kenga_println_str(\"{}\");\n",
             escape_c(s)
-        )),
-        other => {
-            let ty = infer_expr(other, ctx, sigs)?;
-            let (pre, e) = emit_expr(other, ctx, sigs)?;
-            match ty {
-                CTy::List => Ok(format!("{pre}{pad}kenga_println_list({e});\n")),
-                CTy::Str => Ok(format!("{pre}{pad}kenga_println_str({e});\n")),
-                _ => Ok(format!("{pre}{pad}kenga_println_i64({e});\n")),
-            }
-        }
+        ));
     }
+    let ty = infer_expr(arg, ctx)?;
+    let (pre, e) = emit_expr(arg, ctx)?;
+    let call = match &ty {
+        CTy::List => format!("kenga_println_list({e})"),
+        CTy::Str => format!("kenga_println_str({e})"),
+        CTy::Struct(n) => format!("kenga_println_str(\"<struct {n}>\")"),
+        _ => format!("kenga_println_i64({e})"),
+    };
+    Ok(format!("{}{pad}{call};\n", indent_pre(&pre, indent)))
 }
 
-fn infer_expr(
-    expr: &Expr,
-    ctx: &EmitCtx,
-    sigs: &HashMap<String, (CTy, Vec<CTy>)>,
-) -> Result<CTy> {
+fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
     Ok(match expr {
         Expr::Int(_, _) | Expr::Bool(_, _) | Expr::Float(_, _) => CTy::I64,
         Expr::Str(_, _) => CTy::Str,
         Expr::List(_, _) | Expr::Range { .. } => CTy::List,
-        Expr::Ident(name, _) => *ctx.vars.get(name).unwrap_or(&CTy::I64),
+        Expr::Ident(name, span) => ctx.vars.get(name).cloned().ok_or_else(|| {
+            KengaError::at(format!("unknown variable '{name}'"), span.clone())
+        })?,
         Expr::Index { .. } => CTy::I64,
         Expr::Unary { .. } | Expr::Binary { .. } => CTy::I64,
-        Expr::Call { callee, .. } => {
-            if callee == "len" || callee == "push" {
-                if callee == "push" {
-                    CTy::List
-                } else {
-                    CTy::I64
+        Expr::Field {
+            target,
+            field,
+            span,
+        } => {
+            let t = infer_expr(target, ctx)?;
+            match t {
+                CTy::Struct(n) => {
+                    let info = ctx.structs.get(&n).ok_or_else(|| {
+                        KengaError::at(format!("unknown struct '{n}'"), span.clone())
+                    })?;
+                    info.fields
+                        .iter()
+                        .find(|(f, _)| f == field)
+                        .map(|(_, ty)| ty.clone())
+                        .ok_or_else(|| {
+                            KengaError::at(format!("unknown field '{field}'"), span.clone())
+                        })?
                 }
-            } else if let Some((ret, _)) = sigs.get(callee) {
-                *ret
+                _ => {
+                    return Err(KengaError::at(
+                        "field access on non-struct",
+                        span.clone(),
+                    ))
+                }
+            }
+        }
+        Expr::StructLit { name, span, .. } => {
+            if ctx.structs.contains_key(name) {
+                CTy::Struct(name.clone())
+            } else {
+                return Err(KengaError::at(
+                    format!("unknown struct '{name}'"),
+                    span.clone(),
+                ));
+            }
+        }
+        Expr::Call { callee, .. } => {
+            if callee == "len" {
+                CTy::I64
+            } else if callee == "push" {
+                CTy::List
+            } else if let Some((ret, _)) = ctx.sigs.get(callee) {
+                ret.clone()
             } else {
                 CTy::I64
             }
         }
-        Expr::Field { .. } | Expr::StructLit { .. } => {
-            return Err(KengaError::new(
-                "emit-c: structs not supported yet",
-                None,
-            ));
-        }
     })
 }
 
-/// Returns (prelude_statements, expression_code)
-fn emit_expr(
-    expr: &Expr,
-    ctx: &mut EmitCtx,
-    sigs: &HashMap<String, (CTy, Vec<CTy>)>,
-) -> Result<(String, String)> {
+fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
     match expr {
         Expr::Int(n, _) => Ok((String::new(), n.to_string())),
         Expr::Float(n, _) => Ok((String::new(), format!("{}", *n as i64))),
-        Expr::Bool(true, _) => Ok((String::new(), "1".into())),
-        Expr::Bool(false, _) => Ok((String::new(), "0".into())),
+        Expr::Bool(b, _) => Ok((String::new(), if *b { "1" } else { "0" }.into())),
         Expr::Str(s, _) => Ok((String::new(), format!("\"{}\"", escape_c(s)))),
         Expr::Ident(name, _) => Ok((String::new(), c_ident(name))),
         Expr::List(elems, _) => {
             let tmp = ctx.fresh("list");
             let mut pre = format!("KList {tmp} = klist_new();\n");
-            // need indent? callers prefix pad only on final lines — prelude without pad is ok if we add spaces at use sites
-            // Better: emit prelude with no pad; stmt emitter will place it before pad lines.
             for e in elems {
-                let (p, v) = emit_expr(e, ctx, sigs)?;
+                let (p, v) = emit_expr(e, ctx)?;
                 pre.push_str(&p);
                 pre.push_str(&format!("klist_push(&{tmp}, {v});\n"));
             }
             Ok((pre, tmp))
         }
         Expr::Range { start, end, .. } => {
-            // Materialize range as list for generality
             let tmp = ctx.fresh("range");
-            let (pa, a) = emit_expr(start, ctx, sigs)?;
-            let (pb, b) = emit_expr(end, ctx, sigs)?;
+            let (pa, a) = emit_expr(start, ctx)?;
+            let (pb, b) = emit_expr(end, ctx)?;
             let i = ctx.fresh("r");
             let mut pre = format!("{pa}{pb}KList {tmp} = klist_new();\n");
             pre.push_str(&format!(
@@ -390,12 +479,43 @@ fn emit_expr(
             Ok((pre, tmp))
         }
         Expr::Index { target, index, .. } => {
-            let (pt, t) = emit_expr(target, ctx, sigs)?;
-            let (pi, i) = emit_expr(index, ctx, sigs)?;
+            let (pt, t) = emit_expr(target, ctx)?;
+            let (pi, i) = emit_expr(index, ctx)?;
             Ok((format!("{pt}{pi}"), format!("klist_get({t}, {i})")))
         }
+        Expr::Field { target, field, .. } => {
+            let (p, t) = emit_expr(target, ctx)?;
+            Ok((p, format!("{}.{}", t, c_ident(field))))
+        }
+        Expr::StructLit { name, fields, span } => {
+            let info = ctx.structs.get(name).ok_or_else(|| {
+                KengaError::at(format!("unknown struct '{name}'"), span.clone())
+            })?;
+            let field_defs = info.fields.clone();
+            let mut pre = String::new();
+            let mut parts = Vec::new();
+            for (fname, _) in &field_defs {
+                let val = fields
+                    .iter()
+                    .find(|(n, _)| n == fname)
+                    .map(|(_, e)| e)
+                    .ok_or_else(|| {
+                        KengaError::at(
+                            format!("missing field '{fname}' in {name} literal"),
+                            span.clone(),
+                        )
+                    })?;
+                let (p, e) = emit_expr(val, ctx)?;
+                pre.push_str(&p);
+                parts.push(format!(".{} = {e}", c_ident(fname)));
+            }
+            Ok((
+                pre,
+                format!("({}){{ {} }}", struct_c_name(name), parts.join(", ")),
+            ))
+        }
         Expr::Unary { op, expr, .. } => {
-            let (p, e) = emit_expr(expr, ctx, sigs)?;
+            let (p, e) = emit_expr(expr, ctx)?;
             let o = match op {
                 UnaryOp::Neg => "-",
                 UnaryOp::Not => "!",
@@ -405,16 +525,17 @@ fn emit_expr(
         Expr::Binary {
             op, left, right, ..
         } => {
-            let (pl, l) = emit_expr(left, ctx, sigs)?;
-            let (pr, r) = emit_expr(right, ctx, sigs)?;
-            // string concat not supported; list concat via klist_concat
+            let (pl, l) = emit_expr(left, ctx)?;
+            let (pr, r) = emit_expr(right, ctx)?;
             if *op == BinaryOp::Add {
-                let lt = infer_expr(left, ctx, sigs)?;
-                let rt = infer_expr(right, ctx, sigs)?;
+                let lt = infer_expr(left, ctx)?;
+                let rt = infer_expr(right, ctx)?;
                 if lt == CTy::List && rt == CTy::List {
                     let tmp = ctx.fresh("cat");
-                    let pre = format!("{pl}{pr}KList {tmp} = klist_concat({l}, {r});\n");
-                    return Ok((pre, tmp));
+                    return Ok((
+                        format!("{pl}{pr}KList {tmp} = klist_concat({l}, {r});\n"),
+                        tmp,
+                    ));
                 }
             }
             let o = match op {
@@ -434,33 +555,35 @@ fn emit_expr(
             };
             Ok((format!("{pl}{pr}"), format!("({l} {o} {r})")))
         }
-        Expr::Call { callee, args, .. } => match callee.as_str() {
-            "println" => Err(KengaError::new(
-                "println must be used as a statement",
-                None,
+        Expr::Call { callee, args, span } => match callee.as_str() {
+            "println" => Err(KengaError::at(
+                "println must be a statement",
+                span.clone(),
             )),
             "len" => {
                 if args.len() != 1 {
-                    return Err(KengaError::new("len takes 1 arg", None));
+                    return Err(KengaError::at("len takes 1 arg", span.clone()));
                 }
-                let (p, e) = emit_expr(&args[0], ctx, sigs)?;
+                let (p, e) = emit_expr(&args[0], ctx)?;
                 Ok((p, format!("((int64_t){e}.len)")))
             }
             "push" => {
                 if args.len() != 2 {
-                    return Err(KengaError::new("push takes 2 args", None));
+                    return Err(KengaError::at("push takes 2 args", span.clone()));
                 }
-                let (pl, l) = emit_expr(&args[0], ctx, sigs)?;
-                let (pv, v) = emit_expr(&args[1], ctx, sigs)?;
+                let (pl, l) = emit_expr(&args[0], ctx)?;
+                let (pv, v) = emit_expr(&args[1], ctx)?;
                 let tmp = ctx.fresh("push");
-                let pre = format!("{pl}{pv}KList {tmp} = {l};\nklist_push(&{tmp}, {v});\n");
-                Ok((pre, tmp))
+                Ok((
+                    format!("{pl}{pv}KList {tmp} = {l};\nklist_push(&{tmp}, {v});\n"),
+                    tmp,
+                ))
             }
             other => {
                 let mut pre = String::new();
                 let mut parts = Vec::new();
                 for a in args {
-                    let (p, e) = emit_expr(a, ctx, sigs)?;
+                    let (p, e) = emit_expr(a, ctx)?;
                     pre.push_str(&p);
                     parts.push(e);
                 }
@@ -470,25 +593,10 @@ fn emit_expr(
                 ))
             }
         },
-        Expr::Field { .. } | Expr::StructLit { .. } => Err(KengaError::new(
-            "emit-c: structs not supported yet",
-            None,
-        )),
     }
 }
 
-fn c_ident(name: &str) -> String {
-    if name == "main" {
-        return "main".into();
-    }
-    format!("k_{name}")
-}
-
-fn escape_c(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-const RUNTIME: &str = r#"/* Generated by Kenga emit-c - bootstrap native backend */
+const RUNTIME: &str = r#"/* Generated by Kenga emit-c */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -501,41 +609,31 @@ typedef struct {
 } KList;
 
 static KList klist_new(void) {
-  KList l;
-  l.data = NULL;
-  l.len = 0;
-  l.cap = 0;
-  return l;
+  KList l; l.data = NULL; l.len = 0; l.cap = 0; return l;
 }
-
 static void klist_push(KList *l, int64_t v) {
   if (l->len + 1 > l->cap) {
     size_t ncap = l->cap ? l->cap * 2 : 8;
     int64_t *nd = (int64_t *)realloc(l->data, ncap * sizeof(int64_t));
     if (!nd) { fprintf(stderr, "oom\n"); exit(1); }
-    l->data = nd;
-    l->cap = ncap;
+    l->data = nd; l->cap = ncap;
   }
   l->data[l->len++] = v;
 }
-
 static int64_t klist_get(KList l, int64_t i) {
   if (i < 0 || (size_t)i >= l.len) { fprintf(stderr, "index oob\n"); exit(1); }
   return l.data[i];
 }
-
 static void klist_set(KList *l, int64_t i, int64_t v) {
   if (i < 0 || (size_t)i >= l->len) { fprintf(stderr, "index oob\n"); exit(1); }
   l->data[i] = v;
 }
-
 static KList klist_concat(KList a, KList b) {
   KList o = klist_new();
   for (size_t i = 0; i < a.len; i++) klist_push(&o, a.data[i]);
   for (size_t i = 0; i < b.len; i++) klist_push(&o, b.data[i]);
   return o;
 }
-
 static void kenga_println_i64(int64_t v) { printf("%lld\n", (long long)v); }
 static void kenga_println_str(const char *s) { puts(s); }
 static void kenga_println_list(KList l) {
