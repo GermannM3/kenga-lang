@@ -1,0 +1,36 @@
+// Surprise-gated memory: store only what the world-model didn't expect.
+
+fn main() -> i64 {
+    println("=== ML: surprise gate ===");
+    let mind: Memory = memory_config(15, 32, 16);
+
+    // teach calm pattern
+    for i in 0..6 {
+        let x = [i, 0, 1];
+        let y = [i + 1, 0, 1];
+        learn(mind, x, y);
+        remember_next(mind, x, y, 30);
+    }
+    consolidate(mind);
+
+    let calm = [2, 0, 1];
+    let pred = foresee(mind, calm);
+    let s0 = surprise(pred, [3, 0, 1]);
+    println("expected transition surprise");
+    println(s0);
+
+    let weird = [9, 9, 9];
+    let pred2 = foresee(mind, weird);
+    let s1 = surprise(pred2, weird);
+    println("weird obs surprise");
+    println(s1);
+
+    if s1 > 0.3 {
+        remember(mind, weird, s1);
+        println("stored surprising episode");
+    }
+    consolidate(mind);
+    println(mem_stats(mind));
+    println("surprise_gate ok");
+    return 0;
+}

@@ -3,6 +3,7 @@ pub mod build;
 pub mod bytecode;
 pub mod codegen;
 pub mod compiler;
+pub mod demo;
 pub mod driver;
 pub mod error;
 pub mod lexer;

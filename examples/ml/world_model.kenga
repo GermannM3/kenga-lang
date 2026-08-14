@@ -1,0 +1,77 @@
+// Clean ML demo for friends: residual world-model learns agent physics.
+// State [pos, vel, fuel] → next frame. Metrics + unroll. Pure Kenga.
+
+fn step(pos: i64, vel: i64, fuel: i64) -> list {
+    return [pos + vel, vel, fuel - 1];
+}
+
+fn train(mind: Memory) -> f64 {
+    let loss: f64 = 0.0;
+    let n: i64 = 0;
+    for pos in 0..12 {
+        for vel in 0..3 {
+            let v = vel - 1;
+            let x = [pos, v, 8];
+            let y = step(pos, v, 8);
+            remember_next(mind, x, y, 45);
+            loss = loss + learn(mind, x, y);
+            n = n + 1;
+        }
+    }
+    return loss / n;
+}
+
+fn main() -> i64 {
+    println("=== ML: world-model on pure Kenga ===");
+    let mind: Memory = memory_config(5, 96, 32);
+
+    let e: i64 = 0;
+    while e < 8 {
+        let loss = train(mind);
+        println(loss);
+        e = e + 1;
+    }
+    consolidate(mind);
+
+    let x = [5, 1, 6];
+    let y = step(5, 1, 6);
+    let p = predict(mind, x);
+    println("obs / want / pred / round");
+    println(x);
+    println(y);
+    println(p);
+    println(round(p));
+    assert(surprise(p, y) < 0.4);
+
+    let hits: i64 = 0;
+    let total: i64 = 0;
+    for pos in 1..10 {
+        for vel in 0..3 {
+            let v = vel - 1;
+            let want = step(pos, v, 7);
+            let got = round(predict(mind, [pos, v, 7]));
+            total = total + 1;
+            if got[0] == want[0] {
+                if got[1] == want[1] {
+                    if got[2] == want[2] {
+                        hits = hits + 1;
+                    }
+                }
+            }
+        }
+    }
+    println("accuracy");
+    println(hits);
+    println(total);
+    assert(hits >= 20);
+
+    println("unroll 4");
+    let traj = unroll(mind, [2, 1, 10], 4);
+    println(round(traj[0]));
+    println(round(traj[3]));
+
+    save_mind(mind, "minds/demo.km");
+    println("saved minds/demo.km");
+    println("world_model ok");
+    return 0;
+}

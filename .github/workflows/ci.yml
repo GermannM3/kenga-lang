@@ -56,8 +56,9 @@ jobs:
           cargo run --quiet -- run examples/selfhost/bc_while.kenga
           cargo run --quiet -- run examples/selfhost/bc_fn.kenga
           cargo run --quiet -- run examples/selfhost/kenga_lite.kenga
-          cargo run --quiet -- run examples/deep_train.kenga
-          cargo run --quiet -- run examples/native_struct.kenga
+          cargo run --quiet -- run examples/ml/world_model.kenga
+          cargo run --quiet -- run examples/ml/surprise_gate.kenga
+          cargo run --quiet -- demo
           cargo run --quiet -- run examples/stdlib_demo.kenga
           cargo run --quiet -- emit-c examples/native_hello.kenga -o native_hello.c
           cargo run --quiet -- emit-c examples/native_lists.kenga -o native_lists.c

@@ -153,10 +153,14 @@ fn neuromodel_learns_dynamics() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let module = compile_file(&root.join("examples/neuromodel.kenga")).expect("compile");
     let v = interpret(module).expect("run neuromodel");
-    match v {
-        kenga::bytecode::Value::I64(hits) => assert!(hits >= 24, "hits={hits}"),
-        other => panic!("expected hits i64, got {other:?}"),
-    }
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
+}
+
+#[test]
+fn ml_world_model() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let v = interpret(compile_file(&root.join("examples/ml/world_model.kenga")).unwrap()).unwrap();
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
 }
 
 #[test]

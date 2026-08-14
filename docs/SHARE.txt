@@ -1,0 +1,16 @@
+# Copy-paste для знакомых
+
+```
+Kenga 2.0 — язык для живого ИИ (не LLM-обёртка).
+
+git clone https://github.com/GermannM3/kenga-lang.git
+cd kenga-lang
+cargo install --path . --force --locked
+kenga demo
+
+Что внутри: свой язык + VM, Prophet memory/world-model, chat с mind,
+self-host ladder (Kenga-lite на чистой Kenga). Python не нужен.
+
+Честно: это не ChatGPT и не PyTorch. Это другой слой — семантика
+живого агента. Письмо: docs/FOR_FRIENDS.md
+```

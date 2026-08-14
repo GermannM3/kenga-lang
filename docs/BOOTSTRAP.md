@@ -1,8 +1,11 @@
-# Bootstrap 1.7
+# Bootstrap 2.0 — friends-ready
 
-Self-host milestone: **Kenga-lite компилируется в свой bytecode и выполняется** (всё написано на Kenga).
+Можно давать знакомым ML-щикам:
 
-| | |
-|---|---|
-| kenga_lite → VM | ✅ |
-| заменить Rust bootstrap | 🚧 |
+```bash
+git clone https://github.com/GermannM3/kenga-lang.git
+cd kenga-lang && cargo install --path . --force
+kenga demo
+```
+
+См. `docs/FOR_FRIENDS.md`.

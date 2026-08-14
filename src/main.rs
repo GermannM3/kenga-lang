@@ -7,6 +7,7 @@ use kenga::build::{build, BuildOptions};
 use kenga::bytecode::dump_ir;
 use kenga::codegen::emit_c;
 use kenga::compiler::compile;
+use kenga::demo::{run_about, run_demo, which_kenga};
 use kenga::driver::{compile_file, parse_file};
 use kenga::error::{KengaError, Result};
 use kenga::lexer::Lexer;
@@ -105,6 +106,9 @@ fn real_main() -> Result<()> {
             };
             run_talk(mind, script.as_deref())?;
         }
+        "demo" | "tour" => run_demo()?,
+        "about" => run_about(),
+        "which" => which_kenga()?,
         "eval" => {
             let src = args.join(" ");
             if src.is_empty() {
@@ -121,7 +125,7 @@ fn real_main() -> Result<()> {
             interpret(module)?;
         }
         "version" | "--version" | "-V" => {
-            println!("kenga {}", env!("CARGO_PKG_VERSION"));
+            println!("kenga {} (friends-ready)", env!("CARGO_PKG_VERSION"));
         }
         "help" | "--help" | "-h" => print_usage(),
         other => {
@@ -146,20 +150,22 @@ fn flag_value(args: &[String], flag: &str) -> Option<String> {
 
 fn print_usage() {
     eprintln!(
-        "Kenga — язык для живого ИИ
+        "Kenga — язык для живого ИИ (friends-ready)
+
+Быстрый тур для знакомых:
+  git clone https://github.com/GermannM3/kenga-lang.git
+  cd kenga-lang && cargo install --path . --force
+  kenga demo
 
 Команды:
-  kenga run <file.kenga>              VM
-  kenga talk|chat [mind.km] [--script f]  диалог с world-model
-  kenga parse|compile <file.kenga>
-  kenga emit-c / build
-  kenga eval '<code>'
-  kenga version
+  kenga demo|tour                  тур 5–6 минут
+  kenga about                       что это / что нет
+  kenga run <file.kenga>
+  kenga chat [mind.km]              диалог с world-model
+  kenga eval / compile / emit-c / build
+  kenga which | version
 
-Важно: компилятор пока bootstrap на Rust. Программы .kenga и mind — уже твои.
-Self-host seed: examples/selfhost/arith.kenga
-Python не нужен.
-
+Документация: docs/FOR_FRIENDS.md
 https://github.com/GermannM3/kenga-lang"
     );
 }
