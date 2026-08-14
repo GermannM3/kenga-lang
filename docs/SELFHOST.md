@@ -1,7 +1,7 @@
 # Self-host
 
-Лестница `examples/selfhost/` на чистом Kenga дошла до **bytecode functions**:
+На чистом Kenga уже есть **Kenga-lite → bytecode VM**:
 
-arith → vars → if → while/fn → VM+emit → bc while → **bc fn (CALL/RET)**
+`let` / `while` / `if-else` / `fn` / `return` / вызовы — см. `examples/selfhost/kenga_lite.kenga`.
 
-Следующий шаг: кормить VM подмножеством настоящего синтаксиса `.kenga`.
+До полного chicken-egg осталось: подключить этот пайплайн как `kenga run` для подмножества, расширить синтаксис (struct, import, Memory).

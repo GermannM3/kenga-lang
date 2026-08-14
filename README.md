@@ -179,6 +179,7 @@ fn main() {
 | Self-host if/cmp: `examples/selfhost/iffy.kenga` | ✅ |
 | Self-host while+fn / bytecode VM | ✅ |
 | Self-host bytecode functions | ✅ |
+| Self-host Kenga-lite (`let`/`while`/`fn`) | ✅ |
 | `to_str` / `input` / `ord` | ✅ |
 | `emit-c`: i64, lists, structs, for/while, fn, import | ✅ |
 | `kenga build` (emit-c + системный C-компилятор) | ✅ |
