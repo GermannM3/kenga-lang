@@ -82,10 +82,13 @@ kenga run examples/prophet.kenga
 kenga run examples/train.kenga
 kenga run examples/unroll.kenga
 kenga run examples/neuromodel.kenga   # чистая нейромодель на Kenga
-kenga run examples/persist_mind.kenga # обучить и сохранить minds/agent.km
-kenga talk minds/agent.km             # поговорить с world-model
+kenga run examples/deep_train.kenga   # доучить mind
+kenga run examples/persist_mind.kenga
+kenga chat minds/agent.km             # смотри / что будет завтра?
 kenga chat minds/agent.km --script examples/chat_session.txt
-kenga run examples/selfhost/arith.kenga  # self-host seed
+kenga run examples/selfhost/arith.kenga
+kenga run examples/selfhost/mini.kenga
+kenga run examples/selfhost/iffy.kenga
 kenga emit-c examples/native_lists.kenga -o native_lists.c
 kenga build examples/native_struct.kenga   # emit-c + gcc/clang
 kenga compile examples/living.kenga        # bytecode IR

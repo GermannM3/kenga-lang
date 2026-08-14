@@ -160,6 +160,22 @@ fn neuromodel_learns_dynamics() {
 }
 
 #[test]
+fn selfhost_arith_seed() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let module = compile_file(&root.join("examples/selfhost/arith.kenga")).expect("compile");
+    let v = interpret(module).expect("run arith");
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
+}
+
+#[test]
+fn selfhost_mini_vars() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let module = compile_file(&root.join("examples/selfhost/mini.kenga")).expect("compile");
+    let v = interpret(module).expect("run mini");
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
+}
+
+#[test]
 fn selfhost_iffy() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let module = compile_file(&root.join("examples/selfhost/iffy.kenga")).expect("compile");
