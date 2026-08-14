@@ -172,6 +172,9 @@ fn main() {
 | Пример `examples/neuromodel.kenga` (train→sleep→predict) | ✅ |
 | `save_mind` / `load_mind` + `kenga talk`/`chat` | ✅ |
 | Self-host seed: `examples/selfhost/arith.kenga` | ✅ |
+| Self-host mini vars: `examples/selfhost/mini.kenga` | ✅ |
+| Self-host if/cmp: `examples/selfhost/iffy.kenga` | ✅ |
+| `to_str` / `input` / `ord` | ✅ |
 | `emit-c`: i64, lists, structs, for/while, fn, import | ✅ |
 | `kenga build` (emit-c + системный C-компилятор) | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |

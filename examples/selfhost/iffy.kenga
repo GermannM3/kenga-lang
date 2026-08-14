@@ -1,0 +1,272 @@
+// Self-host step 3: if / comparisons in mini-language.
+// "x=3; if x>2 then 10 else 20" → 10
+
+fn is_space(ch: str) -> i64 {
+    if ch == " " { return 1; }
+    if ch == "\t" { return 1; }
+    return 0;
+}
+
+fn is_digit(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+
+fn is_alpha(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 122 { return 1; } }
+    if c >= 65 { if c <= 90 { return 1; } }
+    if ch == "_" { return 1; }
+    return 0;
+}
+
+fn skip(s: str, i: i64) -> i64 {
+    while i < len(s) {
+        if is_space(s[i]) == 0 { break; }
+        i = i + 1;
+    }
+    return i;
+}
+
+fn starts_with(s: str, i: i64, word: str) -> i64 {
+    let j: i64 = 0;
+    while j < len(word) {
+        if i + j >= len(s) { return 0; }
+        if s[i + j] != word[j] { return 0; }
+        j = j + 1;
+    }
+    return 1;
+}
+
+fn parse_number(s: str, i: i64) -> list {
+    i = skip(s, i);
+    let v: i64 = 0;
+    let got: i64 = 0;
+    while i < len(s) {
+        if is_digit(s[i]) == 0 { break; }
+        v = v * 10 + (ord(s[i]) - 48);
+        i = i + 1;
+        got = 1;
+    }
+    assert(got == 1);
+    return [v, i];
+}
+
+fn parse_ident(s: str, i: i64) -> list {
+    i = skip(s, i);
+    let name: str = "";
+    assert(is_alpha(s[i]) == 1);
+    while i < len(s) {
+        let ch: str = s[i];
+        if is_alpha(ch) == 0 {
+            if is_digit(ch) == 0 { break; }
+        }
+        name = name + ch;
+        i = i + 1;
+    }
+    return [name, i];
+}
+
+fn env_get(names: list, vals: list, key: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(names) {
+        if names[i] == key { return vals[i]; }
+        i = i + 1;
+    }
+    assert(0 == 1);
+    return 0;
+}
+
+fn env_set(names: list, vals: list, key: str, v: i64) -> list {
+    let i: i64 = 0;
+    while i < len(names) {
+        if names[i] == key {
+            vals[i] = v;
+            return [names, vals];
+        }
+        i = i + 1;
+    }
+    return [push(names, key), push(vals, v)];
+}
+
+fn parse_factor(s: str, i: i64, names: list, vals: list) -> list {
+    i = skip(s, i);
+    if i < len(s) {
+        if s[i] == "(" {
+            let e = parse_expr(s, i + 1, names, vals);
+            let j: i64 = skip(s, e[1]);
+            assert(s[j] == ")");
+            return [e[0], j + 1, e[2], e[3]];
+        }
+        if s[i] == "-" {
+            let f = parse_factor(s, i + 1, names, vals);
+            return [0 - f[0], f[1], f[2], f[3]];
+        }
+        if is_alpha(s[i]) == 1 {
+            let id = parse_ident(s, i);
+            // keywords handled in parse_if
+            let v: i64 = env_get(names, vals, id[0]);
+            return [v, id[1], names, vals];
+        }
+    }
+    let n = parse_number(s, i);
+    return [n[0], n[1], names, vals];
+}
+
+fn parse_term(s: str, i: i64, names: list, vals: list) -> list {
+    let left = parse_factor(s, i, names, vals);
+    let v: i64 = left[0];
+    let j: i64 = left[1];
+    names = left[2];
+    vals = left[3];
+    while true {
+        j = skip(s, j);
+        if j >= len(s) { break; }
+        let op: str = s[j];
+        if op == "*" {
+            let r = parse_factor(s, j + 1, names, vals);
+            v = v * r[0]; j = r[1]; names = r[2]; vals = r[3];
+        } else {
+            if op == "/" {
+                let r = parse_factor(s, j + 1, names, vals);
+                v = v / r[0]; j = r[1]; names = r[2]; vals = r[3];
+            } else { break; }
+        }
+    }
+    return [v, j, names, vals];
+}
+
+fn parse_sum(s: str, i: i64, names: list, vals: list) -> list {
+    let left = parse_term(s, i, names, vals);
+    let v: i64 = left[0];
+    let j: i64 = left[1];
+    names = left[2];
+    vals = left[3];
+    while true {
+        j = skip(s, j);
+        if j >= len(s) { break; }
+        let op: str = s[j];
+        if op == "+" {
+            let r = parse_term(s, j + 1, names, vals);
+            v = v + r[0]; j = r[1]; names = r[2]; vals = r[3];
+        } else {
+            if op == "-" {
+                let r = parse_term(s, j + 1, names, vals);
+                v = v - r[0]; j = r[1]; names = r[2]; vals = r[3];
+            } else { break; }
+        }
+    }
+    return [v, j, names, vals];
+}
+
+fn parse_cmp(s: str, i: i64, names: list, vals: list) -> list {
+    let left = parse_sum(s, i, names, vals);
+    let v: i64 = left[0];
+    let j: i64 = left[1];
+    names = left[2];
+    vals = left[3];
+    j = skip(s, j);
+    if j >= len(s) { return [v, j, names, vals]; }
+    if starts_with(s, j, ">=") == 1 {
+        let r = parse_sum(s, j + 2, names, vals);
+        let ok: i64 = 0;
+        if v >= r[0] { ok = 1; }
+        return [ok, r[1], r[2], r[3]];
+    }
+    if starts_with(s, j, "<=") == 1 {
+        let r = parse_sum(s, j + 2, names, vals);
+        let ok: i64 = 0;
+        if v <= r[0] { ok = 1; }
+        return [ok, r[1], r[2], r[3]];
+    }
+    if starts_with(s, j, "==") == 1 {
+        let r = parse_sum(s, j + 2, names, vals);
+        let ok: i64 = 0;
+        if v == r[0] { ok = 1; }
+        return [ok, r[1], r[2], r[3]];
+    }
+    if s[j] == ">" {
+        let r = parse_sum(s, j + 1, names, vals);
+        let ok: i64 = 0;
+        if v > r[0] { ok = 1; }
+        return [ok, r[1], r[2], r[3]];
+    }
+    if s[j] == "<" {
+        let r = parse_sum(s, j + 1, names, vals);
+        let ok: i64 = 0;
+        if v < r[0] { ok = 1; }
+        return [ok, r[1], r[2], r[3]];
+    }
+    return [v, j, names, vals];
+}
+
+fn parse_expr(s: str, i: i64, names: list, vals: list) -> list {
+    i = skip(s, i);
+    if starts_with(s, i, "if") == 1 {
+        // if COND then A else B
+        let c = parse_cmp(s, i + 2, names, vals);
+        let j: i64 = skip(s, c[1]);
+        assert(starts_with(s, j, "then") == 1);
+        let a = parse_expr(s, j + 4, c[2], c[3]);
+        j = skip(s, a[1]);
+        assert(starts_with(s, j, "else") == 1);
+        let b = parse_expr(s, j + 4, a[2], a[3]);
+        if c[0] != 0 {
+            return [a[0], b[1], b[2], b[3]];
+        }
+        return [b[0], b[1], b[2], b[3]];
+    }
+    return parse_cmp(s, i, names, vals);
+}
+
+fn run_program(src: str) -> i64 {
+    let names: list = [];
+    let vals: list = [];
+    let i: i64 = 0;
+    let last: i64 = 0;
+    while i < len(src) {
+        i = skip(src, i);
+        if i >= len(src) { break; }
+        let save: i64 = i;
+        if is_alpha(src[i]) == 1 {
+            if starts_with(src, i, "if") == 0 {
+                let id = parse_ident(src, i);
+                let j: i64 = skip(src, id[1]);
+                if j < len(src) {
+                    if src[j] == "=" {
+                        let e = parse_expr(src, j + 1, names, vals);
+                        let env = env_set(e[2], e[3], id[0], e[0]);
+                        names = env[0];
+                        vals = env[1];
+                        last = e[0];
+                        i = e[1];
+                        i = skip(src, i);
+                        if i < len(src) { if src[i] == ";" { i = i + 1; } }
+                        continue;
+                    }
+                }
+            }
+        }
+        let e = parse_expr(src, save, names, vals);
+        last = e[0];
+        names = e[2];
+        vals = e[3];
+        i = e[1];
+        i = skip(src, i);
+        if i < len(src) { if src[i] == ";" { i = i + 1; } }
+    }
+    return last;
+}
+
+fn main() -> i64 {
+    println("self-host if/cmp");
+    assert(run_program("2+3*4") == 14);
+    assert(run_program("x=3; if x>2 then 10 else 20") == 10);
+    assert(run_program("x=1; if x>2 then 10 else 20") == 20);
+    assert(run_program("a=5; b=if a>=5 then a*2 else 0; b") == 10);
+    assert(run_program("n=4; if n==4 then 1 else 0") == 1);
+    println(run_program("x=7; if x<10 then x+1 else x-1"));
+    println("if ok");
+    return 0;
+}

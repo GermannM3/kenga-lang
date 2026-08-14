@@ -1,3 +1,4 @@
+use std::io;
 use std::collections::{HashMap, VecDeque};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -757,6 +758,20 @@ impl Vm {
                     }
                 };
                 self.stack.push(Value::I64(code));
+            }
+            Op::ToStr => {
+                let v = self.pop()?;
+                self.stack.push(Value::Str(v.display()));
+            }
+            Op::Input => {
+                let mut line = String::new();
+                io::stdin()
+                    .read_line(&mut line)
+                    .map_err(|e| KengaError::new(format!("input failed: {e}"), None))?;
+                while line.ends_with('\n') || line.ends_with('\r') {
+                    line.pop();
+                }
+                self.stack.push(Value::Str(line));
             }
             Op::SaveMind => {
                 let path = match self.pop()? {

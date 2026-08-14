@@ -1,0 +1,63 @@
+// Более жёсткая тренировка world-model + проверка accuracy, save mind.
+
+fn step(pos: i64, vel: i64, fuel: i64) -> list {
+    return [pos + vel, vel, fuel - 1];
+}
+
+fn train_grid(mind: Memory) -> f64 {
+    let loss: f64 = 0.0;
+    let n: i64 = 0;
+    for pos in 0..16 {
+        for vel in 0..5 {
+            let v = vel - 2;
+            for fuel in 5..12 {
+                let x = [pos, v, fuel];
+                let y = step(pos, v, fuel);
+                remember_next(mind, x, y, 40);
+                loss = loss + learn(mind, x, y);
+                n = n + 1;
+            }
+        }
+    }
+    return loss / n;
+}
+
+fn accuracy(mind: Memory) -> i64 {
+    let hits: i64 = 0;
+    let total: i64 = 0;
+    for pos in 1..12 {
+        for vel in 0..5 {
+            let v = vel - 2;
+            let y = step(pos, v, 8);
+            let p = round(predict(mind, [pos, v, 8]));
+            total = total + 1;
+            if p[0] == y[0] {
+                if p[1] == y[1] {
+                    if p[2] == y[2] {
+                        hits = hits + 1;
+                    }
+                }
+            }
+        }
+    }
+    println(hits);
+    println(total);
+    return hits;
+}
+
+fn main() -> i64 {
+    let mind: Memory = memory_config(5, 160, 64);
+    println("deep train");
+    let e: i64 = 0;
+    while e < 12 {
+        println(train_grid(mind));
+        e = e + 1;
+    }
+    consolidate(mind);
+    let hits = accuracy(mind);
+    assert(hits >= 40);
+    save_mind(mind, "minds/agent.km");
+    println("saved minds/agent.km");
+    println(to_str(hits) + " hits");
+    return 0;
+}

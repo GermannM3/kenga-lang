@@ -465,6 +465,15 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                     compile_expr(&args[0], ops)?;
                     ops.push(Op::Ord);
                 }
+                "to_str" => {
+                    expect_argc("to_str", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::ToStr);
+                }
+                "input" => {
+                    expect_argc("input", args, 0, span)?;
+                    ops.push(Op::Input);
+                }
                 "listen" => {
                     expect_argc("listen", args, 2, span)?;
                     compile_expr(&args[0], ops)?;

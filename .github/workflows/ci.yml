@@ -47,7 +47,11 @@ jobs:
           cargo run --quiet -- run examples/persist_mind.kenga
           cargo run --quiet -- talk minds/agent.km --script examples/talk_session.txt
           cargo run --quiet -- chat minds/agent.km --script examples/chat_session.txt
+          cargo run --quiet -- chat minds/agent.km --script examples/chat_fix.txt
           cargo run --quiet -- run examples/selfhost/arith.kenga
+          cargo run --quiet -- run examples/selfhost/mini.kenga
+          cargo run --quiet -- run examples/selfhost/iffy.kenga
+          cargo run --quiet -- run examples/deep_train.kenga
           cargo run --quiet -- run examples/native_struct.kenga
           cargo run --quiet -- run examples/stdlib_demo.kenga
           cargo run --quiet -- emit-c examples/native_hello.kenga -o native_hello.c

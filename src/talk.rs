@@ -65,6 +65,7 @@ fn dispatch(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
 
 fn normalize_line(line: &str) -> String {
     let lower = line.to_lowercase();
+    let trimmed = lower.trim();
     let nums = extract_numbers(line);
 
     if matches_any(&lower, &["quit", "exit", "выход", "пока"]) {
@@ -73,7 +74,13 @@ fn normalize_line(line: &str) -> String {
     if matches_any(&lower, &["привет", "hello", "hi", "здравств", "hey"]) {
         return "greet".into();
     }
-    if matches_any(&lower, &["help", "помощь", "?"]) {
+    // "?" alone / help words — NOT every question mark in a sentence
+    if trimmed == "?"
+        || trimmed == "help"
+        || trimmed == "помощь"
+        || trimmed.starts_with("help ")
+        || trimmed.starts_with("помощь")
+    {
         return "help".into();
     }
     if matches_any(&lower, &["status", "статус", "как дела", "stats"]) {
@@ -94,7 +101,8 @@ fn normalize_line(line: &str) -> String {
         return format!("train {n}");
     }
 
-    if matches_any(
+    // «завтра» / «скоро» ≈ 1 шаг; «через N» берём из чисел
+    let futureish = matches_any(
         &lower,
         &[
             "future",
@@ -103,9 +111,18 @@ fn normalize_line(line: &str) -> String {
             "что будет",
             "разверн",
             "unroll",
-            "предскажи будущее",
+            "предскажи",
+            "завтра",
+            "скоро",
+            "дальше",
         ],
-    ) {
+    );
+    if futureish {
+        let default_steps = if lower.contains("завтра") || lower.contains("скоро") {
+            1
+        } else {
+            4
+        };
         if nums.len() >= 4 {
             let steps = nums[nums.len() - 1] as i64;
             let obs: Vec<String> = nums[..nums.len() - 1]
@@ -114,14 +131,15 @@ fn normalize_line(line: &str) -> String {
                 .collect();
             return format!("future {} {steps}", obs.join(" "));
         }
-        if nums.len() == 1 {
+        if nums.len() == 1 && !lower.contains("смотри") && !lower.contains("сейчас") {
+            // «через 4» or lone step count
             return format!("future {}", nums[0] as i64);
         }
         if nums.len() >= 3 {
             let obs: Vec<String> = nums.iter().map(|n| format!("{n}")).collect();
-            return format!("future {} 4", obs.join(" "));
+            return format!("future {} {default_steps}", obs.join(" "));
         }
-        return "future 4".into();
+        return format!("future {default_steps}");
     }
 
     if matches_any(
@@ -287,7 +305,7 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
                 let obs = LAST_OBS.with(|c| c.borrow().clone());
                 if obs.is_empty() {
                     return Err(KengaError::new(
-                        "сначала «смотри …», или: что будет 5 1 6 через 4",
+                        "сначала скажи состояние: «смотри 5 1 6», потом «что будет завтра?»",
                         None,
                     ));
                 }

@@ -1,24 +1,20 @@
-# Bootstrap 1.3
+# Bootstrap 1.4
 
-## Что уже «твоё»
+## Свежее
 
-- Программы на `.kenga` (включая нейромодель)
-- Обученный mind в `minds/*.km`
-- `kenga chat` — русский диалог с world-model
-- Self-host seed: арифметика на чистом Kenga
+- Chat: «что будет завтра?» больше не путается с help (`?`)
+- Self-host mini: переменные `x=2+3; y=x*4; y` на чистом Kenga
+- Builtins: `to_str`, `input`, `ord`
+- Self-host if/cmp: `examples/selfhost/iffy.kenga`
+- Deep train 55/55 → `minds/agent.km`
 
-## Что ещё bootstrap
-
-Компилятор/VM хостятся на **Rust**. Python не нужен.
+## Статус
 
 | Слой | Статус |
 |---|---|
-| Язык + VM | ✅ |
-| Prophet residual MLP | ✅ |
-| Pure-Kenga neuromodel | ✅ |
-| save/load + chat | ✅ |
-| Self-host seed (arith) | ✅ |
+| Язык + VM (Rust host) | ✅ |
+| Prophet + chat | ✅ |
+| Self-host arith + mini vars | ✅ |
 | Полный self-host | 🚧 |
-| LLM-чат «как GPT» | ❌ не эта модель |
 
-См. `docs/SELFHOST.md`.
+Python не нужен. Компилятор пока на Rust.
