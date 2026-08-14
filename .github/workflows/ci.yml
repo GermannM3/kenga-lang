@@ -41,3 +41,5 @@ jobs:
           cargo run --quiet -- run examples/agent.kenga
           cargo run --quiet -- run examples/prophet.kenga
           cargo run --quiet -- run examples/prophet_loop.kenga
+          cargo run --quiet -- run examples/train.kenga
+          cargo run --quiet -- emit-c examples/native_hello.kenga -o native_hello.c

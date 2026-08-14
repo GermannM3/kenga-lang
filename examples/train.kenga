@@ -1,0 +1,32 @@
+// Trainable Prophet: world-model weights + surprise + sleep
+
+fn main() -> i64 {
+    let mind: Memory = memory_config(5, 64, 16);
+    println("train world model");
+
+    // Teach transition x -> x+1 style patterns
+    for i in 0..8 {
+        let x = [i, i + 1, i + 2];
+        let y = [i + 1, i + 2, i + 3];
+        remember_next(mind, x, y, 50);
+        let loss = learn(mind, x, y);
+        println(loss);
+    }
+
+    let folded = consolidate(mind);
+    println(folded);
+    println(mem_stats(mind)); // [ep, core, locked, steps, dim]
+
+    // Neural predict vs hybrid foresee
+    let q = [3, 4, 5];
+    println(predict(mind, q));
+    println(foresee(mind, q));
+
+    // After training, calm transitions are less surprising
+    let pred = foresee(mind, [4, 5, 6]);
+    let s = surprise(pred, [5, 6, 7]);
+    println(s);
+
+    println("train ok");
+    return 0;
+}

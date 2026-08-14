@@ -605,6 +605,62 @@ impl Vm {
                     _ => return Err(KengaError::new("foresee expects Memory", None)),
                 }
             }
+            Op::Predict => {
+                let obs = self.pop()?;
+                let mem = self.pop()?;
+                let pattern = crate::memory::value_to_pattern(&obs)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let pred = crate::memory::predict(&h.borrow(), &pattern);
+                        self.stack.push(crate::memory::pattern_to_list(&pred));
+                    }
+                    _ => return Err(KengaError::new("predict expects Memory", None)),
+                }
+            }
+            Op::Learn => {
+                let y = self.pop()?;
+                let x = self.pop()?;
+                let mem = self.pop()?;
+                let px = crate::memory::value_to_pattern(&x)?;
+                let py = crate::memory::value_to_pattern(&y)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let loss = crate::memory::learn(&mut h.borrow_mut(), &px, &py);
+                        self.stack.push(Value::F64(loss));
+                    }
+                    _ => return Err(KengaError::new("learn expects Memory", None)),
+                }
+            }
+            Op::RememberNext => {
+                let surprise = match self.pop()? {
+                    Value::F64(n) => n,
+                    Value::I64(n) => n as f64 / 100.0,
+                    _ => {
+                        return Err(KengaError::new(
+                            "remember_next surprise must be number",
+                            None,
+                        ))
+                    }
+                };
+                let next = self.pop()?;
+                let obs = self.pop()?;
+                let mem = self.pop()?;
+                let pattern = crate::memory::value_to_pattern(&obs)?;
+                let target = crate::memory::value_to_pattern(&next)?;
+                match mem {
+                    Value::Memory(h) => {
+                        let kept = crate::memory::remember_pair(
+                            &mut h.borrow_mut(),
+                            pattern,
+                            Some(target),
+                            surprise,
+                            Self::now_ms(),
+                        );
+                        self.stack.push(Value::Bool(kept));
+                    }
+                    _ => return Err(KengaError::new("remember_next expects Memory", None)),
+                }
+            }
             Op::Consolidate => match self.pop()? {
                 Value::Memory(h) => {
                     let n = crate::memory::consolidate(&mut h.borrow_mut());

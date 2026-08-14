@@ -1,8 +1,10 @@
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 use std::process;
 
 use kenga::bytecode::dump_ir;
+use kenga::codegen::emit_c;
 use kenga::compiler::compile;
 use kenga::driver::{compile_file, parse_file};
 use kenga::error::{KengaError, Result};
@@ -52,6 +54,27 @@ fn real_main() -> Result<()> {
                 _ => unreachable!(),
             }
         }
+        "emit-c" => {
+            let path = args.first().ok_or_else(|| {
+                KengaError::new("usage: kenga emit-c <file.kenga> [-o out.c]", None)
+            })?;
+            let program = parse_file(&PathBuf::from(path))?;
+            let c = emit_c(&program)?;
+            let out_path = args
+                .windows(2)
+                .find(|w| w[0] == "-o")
+                .map(|w| w[1].clone())
+                .unwrap_or_else(|| {
+                    PathBuf::from(path)
+                        .with_extension("c")
+                        .to_string_lossy()
+                        .into_owned()
+                });
+            fs::write(&out_path, &c).map_err(|e| {
+                KengaError::new(format!("cannot write {out_path}: {e}"), None)
+            })?;
+            println!("wrote {out_path}");
+        }
         "eval" => {
             let src = args.join(" ");
             if src.is_empty() {
@@ -93,6 +116,7 @@ fn print_usage() {
   kenga run <file.kenga>
   kenga parse <file.kenga>
   kenga compile <file.kenga>
+  kenga emit-c <file.kenga> [-o out.c]
   kenga eval 'println(1+1);'
   kenga <file.kenga>
 

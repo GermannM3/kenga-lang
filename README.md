@@ -79,6 +79,8 @@ kenga run examples/hello.kenga
 kenga run examples/showcase.kenga
 kenga run examples/agent.kenga
 kenga run examples/prophet.kenga
+kenga run examples/train.kenga
+kenga emit-c examples/native_hello.kenga -o /tmp/hello.c
 kenga compile examples/living.kenga   # bytecode IR
 kenga eval "println(2 + 2);"
 ```
@@ -134,10 +136,11 @@ fn main() -> i64 {
 ```kenga
 fn main() {
     let mind = memory();
-    remember(mind, [9, 0, 9], 80);   // только surprise
-    consolidate(mind);               // сон / консолидация
-    println(foresee(mind, [9, 0, 0]));
-    println(recall(mind, [9, 0, 9], 2));
+    remember_next(mind, [1, 2, 3], [2, 3, 4], 50);
+    learn(mind, [1, 2, 3], [2, 3, 4]);
+    consolidate(mind);                 // сон: core + веса W
+    println(predict(mind, [1, 2, 3])); // нейропредсказание
+    println(foresee(mind, [1, 2, 3])); // hybrid: веса + core
 }
 ```
 
@@ -156,9 +159,11 @@ fn main() {
 | Living types: `ttl 5s`, `sweep` | ✅ |
 | Event loop: `on` / `emit` / `pump` | ✅ |
 | Память Пророка: `memory` / `remember` / `consolidate` | ✅ |
+| World model: `learn` / `predict` / `remember_next` | ✅ |
+| `emit-c` (нативный C MVP) | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |
 | Bytecode IR (`kenga compile`) | ✅ |
-| Нативный LLVM / self-host | 🚧 next |
+| Полный LLVM / self-host | 🚧 next |
 
 <p align="center">
   <img src="assets/logo.png" alt="Kenga mark" width="96"/>
@@ -172,6 +177,7 @@ fn main() {
 kenga run <file.kenga>       выполнить
 kenga parse <file.kenga>     AST
 kenga compile <file.kenga>   IR
+kenga emit-c <file.kenga>    C99 (MVP native)
 kenga eval '<code>'          однострочник
 kenga version
 ```
@@ -195,9 +201,10 @@ kenga-lang/
 ## Roadmap
 
 1. **Стабильный язык 0.x** — модули, ошибки с подсказками, больше stdlib  
-2. **Нативный бэкенд** — LLVM или C-emit, без интерпретатора в hot path  
-3. **Self-host** — компилятор Kenga на Kenga, отрезаем Rust-пуповину  
-4. **Сайт + пакетные менеджеры** — когда язык перестанет быть «лабораторией»
+2. **Расширение emit-c → LLVM** — полный нативный бэкенд  
+3. **Self-host** — компилятор Kenga на Kenga  
+4. **Сайт + пакетные менеджеры**
+
 
 Связанные проекты автора: [KengaAI_Engine](https://github.com/GermannM3/KengaAI_Engine), [The-Prophet](https://github.com/GermannM3/The-Prophet), [kengarust](https://github.com/GermannM3/kengarust).
 

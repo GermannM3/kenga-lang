@@ -92,6 +92,7 @@ fn prophet_memory_consolidate() {
             let st = mem_stats(m);
             assert(st[0] == 0);
             assert(st[1] == 2);
+            assert(st[3] > 0);
             let hits = recall(m, [9, 0, 9], 1);
             assert(len(hits) == 1);
             return st[1];
@@ -99,4 +100,26 @@ fn prophet_memory_consolidate() {
         "#,
     );
     assert!(matches!(v, kenga::bytecode::Value::I64(2)));
+}
+
+#[test]
+fn prophet_learn_predict() {
+    let v = run(
+        r#"
+        fn main() -> i64 {
+            let m = memory();
+            learn(m, [1, 0, 0], [0, 1, 0]);
+            learn(m, [0, 1, 0], [0, 0, 1]);
+            let p = predict(m, [1, 0, 0]);
+            assert(typeof(p) == "list");
+            let st = mem_stats(m);
+            assert(st[3] >= 2);
+            return st[3];
+        }
+        "#,
+    );
+    match v {
+        kenga::bytecode::Value::I64(n) => assert!(n >= 2),
+        _ => panic!("expected i64"),
+    }
 }

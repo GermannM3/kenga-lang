@@ -7,3 +7,5 @@
 dist/
 *.exe
 *.pdb
+examples/*.c
+/native_hello.c

@@ -1,31 +1,5 @@
 # Язык Kenga (кратко)
 
-## Синтаксис
-
-```kenga
-import "stdlib/math.kenga";
-
-struct User { id: i64, name: str }
-
-fn greet(u: User) {
-    println("hi " + u.name);
-}
-
-fn main() -> i64 {
-    let xs: list = [10, 20, 30];
-    xs[1] = 99;
-
-    for i in 0..3 {
-        if i == 1 { continue; }
-        println(xs[i]);
-    }
-
-    let mem: Tensor ttl 1s = tensor(4);
-    sweep();
-    return 0;
-}
-```
-
 ## Builtins
 
 - `print` / `println`
@@ -33,50 +7,45 @@ fn main() -> i64 {
 - `tensor` / `sweep` / `now_ms` / `sleep_ms`
 - `assert` / `typeof`
 - `listen` / `emit` / `pump` / `pending`
-- Prophet: `memory` / `memory_config` / `remember` / `surprise` / `foresee` / `consolidate` / `recall` / `mem_stats`
+- Prophet memory:
+  - `memory` / `memory_config`
+  - `remember` / `remember_next`
+  - `surprise` / `foresee` / `predict` / `learn`
+  - `consolidate` / `recall` / `mem_stats`
+
+`mem_stats` → `[episodic, core, locked, model_steps, model_dim]`
+
+## Память Пророка + веса
+
+```kenga
+let mind = memory();
+
+// переход obs -> next с surprise-гейтом
+remember_next(mind, [1, 2, 3], [2, 3, 4], 50);
+
+// явный шаг обучения world-model (tanh(Wx+b), EWC-locks)
+learn(mind, [1, 2, 3], [2, 3, 4]);
+
+consolidate(mind); // сон: core-fold + replay в веса
+
+predict(mind, [1, 2, 3]); // только нейросеть
+foresee(mind, [1, 2, 3]); // hybrid: сеть + core traces
+```
 
 ## Event loop
 
 ```kenga
 on "tick"(n: i64) {
-    println(n);
     if n < 5 { emit("tick", n + 1); }
 }
-
-fn main() {
-    emit("tick", 0);
-    pump(32);
-}
+fn main() { emit("tick", 0); pump(32); }
 ```
 
-Обработчики `on` регистрируются автоматически. `pump(n)` снимает до `n` событий из очереди и вызывает хендлеры.
+## Native backend (MVP)
 
-## Память Пророка
-
-Два слоя:
-
-1. **Episodic** — короткоживущий буфер сюрпризов (то, что сломало ожидание)
-2. **Core** — сжатые «законы мира» с importance-lock (EWC-lite), чтобы новый опыт не стирал старый
-
-```kenga
-let mind: Memory = memory_config(10, 32, 16); // threshold=0.10
-
-let pred = foresee(mind, obs);
-let s = surprise(pred, obs);
-remember(mind, obs, s);   // false, если s < threshold
-
-consolidate(mind);         // сон: replay → core + locks
-recall(mind, query, 3);    // ближайшие следы
-mem_stats(mind);           // [episodic, core, locked]
+```bash
+kenga emit-c examples/native_hello.kenga -o hello.c
+# gcc hello.c -o hello && ./hello
 ```
 
-`i64` surprise в `remember` / `memory_config` трактуется как проценты (`80` → `0.80`).
-
-## Living memory (TTL)
-
-```kenga
-let flash: Tensor ttl 5s = tensor(8, 8);
-sweep(); // выкинуть просроченные слоты
-```
-
-Значение с `ttl` становится недоступным после дедлайна (ошибка `expired`).
+Поддерживается подмножество: `i64`, `let`, `if/else`, `while`, `println`, арифметика.
