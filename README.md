@@ -178,6 +178,7 @@ fn main() {
 | Self-host mini vars: `examples/selfhost/mini.kenga` | ✅ |
 | Self-host if/cmp: `examples/selfhost/iffy.kenga` | ✅ |
 | Self-host while+fn / bytecode VM | ✅ |
+| Self-host bytecode functions | ✅ |
 | `to_str` / `input` / `ord` | ✅ |
 | `emit-c`: i64, lists, structs, for/while, fn, import | ✅ |
 | `kenga build` (emit-c + системный C-компилятор) | ✅ |

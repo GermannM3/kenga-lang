@@ -8,11 +8,10 @@
 | 4 | `loopfn.kenga` | while + fn |
 | 5 | `bytecode.kenga` | stack VM + emit assign/expr |
 | 6 | `bc_while.kenga` | bytecode while via JMP/JMPF |
+| 7 | `bc_fn.kenga` | **bytecode functions** CALL/RET |
 
 ```bash
-kenga run examples/selfhost/loopfn.kenga
-kenga run examples/selfhost/bytecode.kenga
-kenga run examples/selfhost/bc_while.kenga
+kenga run examples/selfhost/bc_fn.kenga
 ```
 
-Next: functions on bytecode, then emit real `.kenga` subset → chicken-egg.
+Next: compile a real subset of `.kenga` syntax onto this VM → chicken-egg.

@@ -196,6 +196,13 @@ fn selfhost_bc_while() {
     assert!(matches!(v, kenga::bytecode::Value::I64(0)));
 }
 
+#[test]
+fn selfhost_bc_fn() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let v = interpret(compile_file(&root.join("examples/selfhost/bc_fn.kenga")).unwrap()).unwrap();
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
+}
+
 
 #[test]
 fn str_builtin() {

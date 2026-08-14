@@ -1,11 +1,8 @@
-# Bootstrap 1.5
+# Bootstrap 1.6
 
-Self-host ladder до bytecode while на чистом Kenga.
-Chat/mind/Prophet без регрессий.
+Self-host: stack VM с while и **функциями** (CALL/RET), всё на Kenga.
 
 | | |
 |---|---|
-| while+fn treewalk | ✅ `loopfn.kenga` |
-| bytecode VM+emit | ✅ `bytecode.kenga` |
-| bytecode while | ✅ `bc_while.kenga` |
-| полный self-host | 🚧 next: bc functions |
+| `bc_fn.kenga` | ✅ |
+| chicken-egg полный | 🚧 |

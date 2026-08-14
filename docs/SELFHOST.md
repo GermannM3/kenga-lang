@@ -1,9 +1,7 @@
 # Self-host
 
-Лестница в `examples/selfhost/` — всё на чистом Kenga:
+Лестница `examples/selfhost/` на чистом Kenga дошла до **bytecode functions**:
 
-1. ~~arith~~ → ~~mini vars~~ → ~~if~~ → ~~while/fn~~  
-2. ~~stack bytecode VM + emit~~ → ~~bytecode while~~  
-3. **next:** bytecode functions, затем компиляция подмножества настоящего `.kenga`
+arith → vars → if → while/fn → VM+emit → bc while → **bc fn (CALL/RET)**
 
-Rust-bootstrap остаётся хостом до закрытия chicken-egg.
+Следующий шаг: кормить VM подмножеством настоящего синтаксиса `.kenga`.
