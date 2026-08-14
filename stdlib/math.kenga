@@ -1,0 +1,26 @@
+// Stdlib math helpers — import "stdlib/math.kenga"
+
+fn abs(n: i64) -> i64 {
+    if n < 0 {
+        return 0 - n;
+    }
+    return n;
+}
+
+fn min(a: i64, b: i64) -> i64 {
+    if a < b {
+        return a;
+    }
+    return b;
+}
+
+fn max(a: i64, b: i64) -> i64 {
+    if a > b {
+        return a;
+    }
+    return b;
+}
+
+fn clamp(x: i64, lo: i64, hi: i64) -> i64 {
+    return min(max(x, lo), hi);
+}

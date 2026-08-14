@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="280" viewBox="0 0 900 280" role="img" aria-label="Kenga architecture">
+  <rect width="900" height="280" rx="20" fill="#0f1217"/>
+  <text x="32" y="42" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#8b97a8">pipeline</text>
+
+  <rect x="32" y="70" width="150" height="70" rx="12" fill="#1a2130" stroke="#2ee6d6" stroke-width="2"/>
+  <text x="107" y="100" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#f4f7fb">.kenga</text>
+  <text x="107" y="122" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#8b97a8">source</text>
+
+  <path d="M190 105 H230" stroke="#5b9dff" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="230" y="70" width="150" height="70" rx="12" fill="#1a2130" stroke="#5b9dff" stroke-width="2"/>
+  <text x="305" y="100" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#f4f7fb">Lexer / Parser</text>
+  <text x="305" y="122" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#8b97a8">AST</text>
+
+  <path d="M388 105 H428" stroke="#5b9dff" stroke-width="3"/>
+
+  <rect x="428" y="70" width="150" height="70" rx="12" fill="#1a2130" stroke="#5b9dff" stroke-width="2"/>
+  <text x="503" y="100" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#f4f7fb">Compiler</text>
+  <text x="503" y="122" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#8b97a8">bytecode IR</text>
+
+  <path d="M586 105 H626" stroke="#5b9dff" stroke-width="3"/>
+
+  <rect x="626" y="70" width="150" height="70" rx="12" fill="#1a2130" stroke="#2ee6d6" stroke-width="2"/>
+  <text x="701" y="100" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#f4f7fb">VM / Runtime</text>
+  <text x="701" y="122" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#8b97a8">living memory</text>
+
+  <rect x="32" y="180" width="250" height="64" rx="12" fill="#151b24" stroke="#334055"/>
+  <text x="157" y="208" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#f4f7fb">ttl · tensor · sweep</text>
+  <text x="157" y="228" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#8b97a8">?0<OBL @>@>:0</text>
+
+  <rect x="310" y="180" width="250" height="64" rx="12" fill="#151b24" stroke="#334055"/>
+  <text x="435" y="208" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#f4f7fb">arrays · structs · import</text>
+  <text x="435" y="228" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#8b97a8">O7K: :0: A8AB5<0</text>
+
+  <rect x="588" y="180" width="250" height="64" rx="12" fill="#151b24" stroke="#334055"/>
+  <text x="713" y="208" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#f4f7fb">self-host next</text>
+  <text x="713" y="228" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#8b97a8">:><?8;OB>@ =0 Kenga</text>
+</svg>

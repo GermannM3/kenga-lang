@@ -1,0 +1,49 @@
+// Kenga language showcase
+
+import "../stdlib/math.kenga";
+
+struct Point {
+    x: i64,
+    y: i64
+}
+
+fn sum_list(xs: list) -> i64 {
+    let total: i64 = 0;
+    for v in xs {
+        total = total + v;
+    }
+    return total;
+}
+
+fn main() -> i64 {
+    println("=== Kenga showcase ===");
+
+    let nums: list = [1, 2, 3, 4, 5];
+    nums[0] = 10;
+    println(nums);
+    println(sum_list(nums));
+
+    let p: Point = Point { x: 3, y: 4 };
+    println(p);
+    println(p.x * p.x + p.y * p.y);
+
+    let acc: i64 = 0;
+    for i in 0..5 {
+        if i == 3 {
+            continue;
+        }
+        acc = acc + i;
+    }
+    println(acc);
+
+    assert(abs(0 - 7) == 7);
+    assert(clamp(100, 0, 10) == 10);
+    println(typeof(nums));
+
+    let flash: Tensor ttl 2s = tensor(2, 2);
+    println(flash);
+    sweep();
+
+    println("showcase ok");
+    return 0;
+}

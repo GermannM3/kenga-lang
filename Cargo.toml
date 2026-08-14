@@ -1,0 +1,22 @@
+[package]
+name = "kenga"
+version = "0.1.0"
+edition = "2021"
+description = "Kenga — programming language for living AI (bootstrap compiler)"
+authors = ["Kenga AI <https://github.com/GermannM3>"]
+license = "MIT"
+repository = "https://github.com/GermannM3/kenga-lang"
+homepage = "https://github.com/GermannM3/kenga-lang"
+readme = "README.md"
+keywords = ["language", "compiler", "ai", "vm", "kenga"]
+categories = ["compilers", "command-line-utilities"]
+
+[[bin]]
+name = "kenga"
+path = "src/main.rs"
+
+[lib]
+name = "kenga"
+path = "src/lib.rs"
+
+[dependencies]

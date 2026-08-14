@@ -1,0 +1,83 @@
+use crate::error::Span;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenKind {
+    // keywords
+    Fn,
+    Let,
+    Return,
+    If,
+    Else,
+    While,
+    For,
+    In,
+    Break,
+    Continue,
+    Struct,
+    Import,
+    True,
+    False,
+    Ttl,
+    Intrinsic,
+
+    // types
+    TypeI64,
+    TypeF64,
+    TypeBool,
+    TypeStr,
+    TypeTensor,
+    TypeList,
+
+    // literals / idents
+    Ident(String),
+    Int(i64),
+    Float(f64),
+    Str(String),
+
+    // symbols
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
+    Comma,
+    Colon,
+    Semicolon,
+    Arrow,
+    Assign,
+    Dot,
+    DotDot,
+    At,
+
+    // operators
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    Not,
+
+    DurationMs(u64),
+    Eof,
+}
+
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+impl Token {
+    pub fn new(kind: TokenKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+}

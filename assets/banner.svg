@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160" role="img" aria-label="Kenga">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#12151a"/>
+      <stop offset="100%" stop-color="#1c222b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2ee6d6"/>
+      <stop offset="100%" stop-color="#5b9dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="160" rx="24" fill="url(#bg)"/>
+  <g transform="translate(36,28)">
+    <path d="M20 8 L20 96 M20 52 L72 8 M20 52 L78 96" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="20" cy="52" r="6" fill="#2ee6d6"/>
+    <circle cx="72" cy="8" r="4" fill="#5b9dff"/>
+    <circle cx="78" cy="96" r="4" fill="#5b9dff"/>
+  </g>
+  <text x="140" y="78" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="52" font-weight="700" fill="#f4f7fb">Kenga</text>
+  <text x="140" y="112" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#8b97a8">O7K: 4;O 682>3>  · bootstrap 0.1</text>
+</svg>
