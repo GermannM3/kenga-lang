@@ -51,6 +51,9 @@ jobs:
           cargo run --quiet -- run examples/selfhost/arith.kenga
           cargo run --quiet -- run examples/selfhost/mini.kenga
           cargo run --quiet -- run examples/selfhost/iffy.kenga
+          cargo run --quiet -- run examples/selfhost/loopfn.kenga
+          cargo run --quiet -- run examples/selfhost/bytecode.kenga
+          cargo run --quiet -- run examples/selfhost/bc_while.kenga
           cargo run --quiet -- run examples/deep_train.kenga
           cargo run --quiet -- run examples/native_struct.kenga
           cargo run --quiet -- run examples/stdlib_demo.kenga

@@ -176,10 +176,23 @@ fn selfhost_mini_vars() {
 }
 
 #[test]
-fn selfhost_iffy() {
+fn selfhost_loopfn() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let module = compile_file(&root.join("examples/selfhost/iffy.kenga")).expect("compile");
-    let v = interpret(module).expect("run iffy");
+    let v = interpret(compile_file(&root.join("examples/selfhost/loopfn.kenga")).unwrap()).unwrap();
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
+}
+
+#[test]
+fn selfhost_bytecode() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let v = interpret(compile_file(&root.join("examples/selfhost/bytecode.kenga")).unwrap()).unwrap();
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
+}
+
+#[test]
+fn selfhost_bc_while() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let v = interpret(compile_file(&root.join("examples/selfhost/bc_while.kenga")).unwrap()).unwrap();
     assert!(matches!(v, kenga::bytecode::Value::I64(0)));
 }
 
