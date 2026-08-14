@@ -1,6 +1,7 @@
 //! Prophet memory: episodic + core + MLP world model + multi-step unroll.
 //!
-//! World model: y = tanh(W2 tanh(W1 x + b1) + b2) with EWC-lite locks.
+//! World model (residual): y = x + W2·tanh(W1·x + b1) + b2, EWC-lite locks.
+//! Linear residual head so dynamics like x→x+1 actually learn (no output tanh).
 //! `unroll` rolls the model forward N steps (разворот будущего).
 
 use std::cell::RefCell;
@@ -12,7 +13,7 @@ use crate::error::{KengaError, Result};
 const DEFAULT_THRESHOLD: f64 = 0.15;
 const DEFAULT_EP_CAP: usize = 64;
 const DEFAULT_CORE_CAP: usize = 32;
-const DEFAULT_LR: f64 = 0.06;
+const DEFAULT_LR: f64 = 0.08;
 
 #[derive(Debug, Clone)]
 pub struct Episode {
@@ -89,12 +90,9 @@ impl WorldModel {
         for i in 0..(h * d) {
             self.w1[i] = xavier(d, h, i);
         }
+        // small delta head — residual starts near identity
         for i in 0..(d * h) {
-            self.w2[i] = xavier(h, d, i + 17);
-        }
-        // mild residual identity in output path via bias zero + small diag through hidden average
-        for i in 0..d.min(h) {
-            self.w2[i * h + i] += 0.15;
+            self.w2[i] = xavier(h, d, i + 17) * 0.25;
         }
     }
 
@@ -140,13 +138,14 @@ impl WorldModel {
             }
             hh[r] = s.tanh();
         }
+        // residual: prediction = input + learned delta
         let mut y = vec![0.0; d];
         for r in 0..d {
-            let mut s = self.b2[r];
+            let mut delta = self.b2[r];
             for c in 0..h {
-                s += self.w2[r * h + c] * hh[c];
+                delta += self.w2[r * h + c] * hh[c];
             }
-            y[r] = s.tanh();
+            y[r] = x.get(r).copied().unwrap_or(0.0) + delta;
         }
         Fwd { h: hh, y }
     }
@@ -164,10 +163,11 @@ impl WorldModel {
         let mut loss = 0.0;
         let mut dy = vec![0.0; d];
         for i in 0..d {
-            let t = target.get(i).copied().unwrap_or(0.0).tanh();
+            let t = target.get(i).copied().unwrap_or(0.0);
             let err = t - act.y[i];
             loss += err * err;
-            dy[i] = err * (1.0 - act.y[i] * act.y[i]);
+            // linear residual head: dL/ddelta = -(t - y)
+            dy[i] = err;
         }
         loss /= d as f64;
 
@@ -186,11 +186,11 @@ impl WorldModel {
                 let g = dy[r] * act.h[c];
                 let eff = lr / (1.0 + self.w2_lock[idx]);
                 self.w2[idx] += eff * g;
-                self.w2_lock[idx] += 0.04 * g.abs();
+                self.w2_lock[idx] += 0.02 * g.abs();
             }
             let eff = lr / (1.0 + self.b2_lock[r]);
             self.b2[r] += eff * dy[r];
-            self.b2_lock[r] += 0.04 * dy[r].abs();
+            self.b2_lock[r] += 0.02 * dy[r].abs();
         }
 
         for r in 0..h {
@@ -200,11 +200,11 @@ impl WorldModel {
                 let g = dh[r] * xv;
                 let eff = lr / (1.0 + self.w1_lock[idx]);
                 self.w1[idx] += eff * g;
-                self.w1_lock[idx] += 0.04 * g.abs();
+                self.w1_lock[idx] += 0.02 * g.abs();
             }
             let eff = lr / (1.0 + self.b1_lock[r]);
             self.b1[r] += eff * dh[r];
-            self.b1_lock[r] += 0.04 * dh[r].abs();
+            self.b1_lock[r] += 0.02 * dh[r].abs();
         }
 
         self.steps += 1;
@@ -228,7 +228,7 @@ impl Default for ProphetMemory {
         Self {
             episodic: Vec::new(),
             core: Vec::new(),
-            model: WorldModel::new(4),
+            model: WorldModel::new(1),
             threshold: DEFAULT_THRESHOLD,
             ep_cap: DEFAULT_EP_CAP,
             core_cap: DEFAULT_CORE_CAP,
@@ -253,7 +253,7 @@ pub fn new_memory_config(threshold: f64, ep_cap: i64, core_cap: i64) -> Result<M
     Ok(Rc::new(RefCell::new(ProphetMemory {
         episodic: Vec::new(),
         core: Vec::new(),
-        model: WorldModel::new(4),
+        model: WorldModel::new(1),
         threshold,
         ep_cap: ep_cap as usize,
         core_cap: core_cap as usize,
@@ -498,11 +498,6 @@ pub fn consolidate(mem: &mut ProphetMemory) -> i64 {
             importance: ep.surprise,
             replays: 1,
         });
-    }
-
-    let core_snap: Vec<Vec<f64>> = mem.core.iter().map(|c| c.pattern.clone()).collect();
-    for p in core_snap {
-        mem.model.train_step(&p, &p, mem.lr * 0.35);
     }
 
     if mem.core.len() > mem.core_cap {

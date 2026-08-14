@@ -10,7 +10,12 @@ predict(mind, x);
 unroll(mind, x, 5);
 foresee_n(mind, x, 5);
 consolidate(mind);
+round(predict(mind, x)); // i64 / list i64
 ```
+
+World-model: residual MLP `y = x + W2·tanh(W1·x)` (без tanh на выходе — динамика x→x+Δ реально учится).
+
+Полный прогон: `kenga run examples/neuromodel.kenga`
 
 `mem_stats` → `[episodic, core, locked, steps, dim, hidden]`
 

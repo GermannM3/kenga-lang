@@ -1,0 +1,122 @@
+// Чистая Kenga-нейромодель (Prophet residual MLP).
+// Учит физику агента [pos, vel, fuel] → следующий кадр.
+// Потом: sleep / predict / unroll / live surprise / events — всё на .kenga.
+
+fn state(pos: i64, vel: i64, fuel: i64) -> list {
+    return [pos, vel, fuel];
+}
+
+fn step_world(pos: i64, vel: i64, fuel: i64) -> list {
+    return [pos + vel, vel, fuel - 1];
+}
+
+fn train_pair(mind: Memory, pos: i64, vel: i64, fuel: i64) -> f64 {
+    let x = state(pos, vel, fuel);
+    let y = step_world(pos, vel, fuel);
+    remember_next(mind, x, y, 50);
+    return learn(mind, x, y);
+}
+
+fn train_pass(mind: Memory) -> f64 {
+    let loss: f64 = 0.0;
+    let n: i64 = 0;
+    for pos in 0..14 {
+        for vel in 0..3 {
+            let v = vel - 1;
+            loss = loss + train_pair(mind, pos, v, 9);
+            n = n + 1;
+        }
+    }
+    return loss / n;
+}
+
+fn check_hit(mind: Memory, pos: i64, vel: i64, fuel: i64) -> i64 {
+    let y = step_world(pos, vel, fuel);
+    let p = round(predict(mind, state(pos, vel, fuel)));
+    if p[0] == y[0] {
+        if p[1] == y[1] {
+            if p[2] == y[2] {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+fn score(mind: Memory) -> i64 {
+    let hits: i64 = 0;
+    let total: i64 = 0;
+    for pos in 1..11 {
+        for vel in 0..3 {
+            let v = vel - 1;
+            hits = hits + check_hit(mind, pos, v, 7);
+            total = total + 1;
+        }
+    }
+    println("accuracy hits/total");
+    println(hits);
+    println(total);
+    return hits;
+}
+
+fn main() -> i64 {
+    println("=== Kenga neuromodel (pure) ===");
+    let mind: Memory = memory_config(5, 128, 48);
+
+    println("epoch losses");
+    let e: i64 = 0;
+    while e < 10 {
+        println(train_pass(mind));
+        e = e + 1;
+    }
+
+    let folded = consolidate(mind);
+    println("sleep folded episodes");
+    println(folded);
+    println(mem_stats(mind));
+
+    let x = state(5, 1, 6);
+    let y = step_world(5, 1, 6);
+    let pred = predict(mind, x);
+    println("x / want / pred / round(pred)");
+    println(x);
+    println(y);
+    println(pred);
+    println(round(pred));
+
+    let err = surprise(pred, y);
+    println("rmse");
+    println(err);
+    assert(err < 0.35);
+
+    let hits = score(mind);
+    assert(hits >= 24);
+
+    println("unroll 4 steps from [2,1,12]");
+    let traj = unroll(mind, state(2, 1, 12), 4);
+    println(round(traj[0]));
+    println(round(traj[1]));
+    println(round(traj[2]));
+    println(round(traj[3]));
+
+    // live: странное наблюдение → surprise gate → sleep
+    let odd = [40, 0, 3];
+    let s = surprise(foresee(mind, odd), odd);
+    println("live surprise on [40,0,3]");
+    println(s);
+    if s > 0.25 {
+        remember(mind, odd, s);
+        consolidate(mind);
+        println("stored odd episode");
+    }
+
+    emit("done", hits);
+    pump(2);
+    println("neuromodel ok");
+    return hits;
+}
+
+on "done"(n: i64) {
+    println("event done");
+    println(n);
+}

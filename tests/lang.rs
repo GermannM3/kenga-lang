@@ -149,6 +149,17 @@ fn prophet_unroll() {
 }
 
 #[test]
+fn neuromodel_learns_dynamics() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let module = compile_file(&root.join("examples/neuromodel.kenga")).expect("compile");
+    let v = interpret(module).expect("run neuromodel");
+    match v {
+        kenga::bytecode::Value::I64(hits) => assert!(hits >= 24, "hits={hits}"),
+        other => panic!("expected hits i64, got {other:?}"),
+    }
+}
+
+#[test]
 fn import_stdlib_and_struct() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let path = root.join("examples/native_struct.kenga");

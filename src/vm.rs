@@ -736,6 +736,10 @@ impl Vm {
                 }
                 _ => return Err(KengaError::new("mem_stats expects Memory", None)),
             },
+            Op::Round => {
+                let v = self.pop()?;
+                self.stack.push(round_value(v)?);
+            }
             Op::BreakPlaceholder | Op::ContinuePlaceholder => {
                 return Err(KengaError::new(
                     "internal: unpatched break/continue",
@@ -791,6 +795,25 @@ fn values_eq(a: &Value, b: &Value) -> bool {
             x.len() == y.len() && x.iter().zip(y).all(|(a, b)| values_eq(a, b))
         }
         _ => false,
+    }
+}
+
+fn round_value(v: Value) -> Result<Value> {
+    match v {
+        Value::I64(n) => Ok(Value::I64(n)),
+        Value::F64(n) => Ok(Value::I64(n.round() as i64)),
+        Value::Bool(b) => Ok(Value::I64(if b { 1 } else { 0 })),
+        Value::List(xs) => {
+            let mut out = Vec::with_capacity(xs.len());
+            for x in xs {
+                out.push(round_value(x)?);
+            }
+            Ok(Value::List(out))
+        }
+        _ => Err(KengaError::new(
+            "round expects number or list of numbers",
+            None,
+        )),
     }
 }
 

@@ -81,6 +81,7 @@ kenga run examples/agent.kenga
 kenga run examples/prophet.kenga
 kenga run examples/train.kenga
 kenga run examples/unroll.kenga
+kenga run examples/neuromodel.kenga   # чистая нейромодель на Kenga
 kenga emit-c examples/native_lists.kenga -o native_lists.c
 kenga build examples/native_struct.kenga   # emit-c + gcc/clang
 kenga compile examples/living.kenga        # bytecode IR
@@ -162,7 +163,9 @@ fn main() {
 | Event loop: `on` / `emit` / `pump` | ✅ |
 | Память Пророка: `memory` / `remember` / `consolidate` | ✅ |
 | World model: `learn` / `predict` / `remember_next` | ✅ |
-| MLP + `unroll` / `foresee_n` (разворот будущего) | ✅ |
+| MLP residual world-model + `unroll` / `foresee_n` | ✅ |
+| `round` (скаляр / list) для eval предсказаний | ✅ |
+| Пример `examples/neuromodel.kenga` (train→sleep→predict) | ✅ |
 | `emit-c`: i64, lists, structs, for/while, fn, import | ✅ |
 | `kenga build` (emit-c + системный C-компилятор) | ✅ |
 | `Tensor`, `typeof`, `assert`, `sleep_ms` | ✅ |

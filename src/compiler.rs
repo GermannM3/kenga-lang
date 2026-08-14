@@ -455,6 +455,11 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                     compile_expr(&args[0], ops)?;
                     ops.push(Op::TypeOf);
                 }
+                "round" => {
+                    expect_argc("round", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::Round);
+                }
                 "listen" => {
                     expect_argc("listen", args, 2, span)?;
                     compile_expr(&args[0], ops)?;
