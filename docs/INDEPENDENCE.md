@@ -8,7 +8,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 |---|---|---|
 | Living runtime | ✅ `kenga-lite` | ❌ C99 host |
 | Word-LM / tape / tensor / Prophet | ✅ | ❌ |
-| Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** (for / elif / struct / import / `xs[i]=`) | ❌ |
+| Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** (for / elif / struct / import / events) | ❌ |
 | Emit на Kenga | ✅ **`c_seed` + `expr_c`** | ❌ gcc |
 | Каталог замены Rust | ✅ **`kenga/`** + `docs/REPLACE_RUST.md` | — |
 | Полный CLI `src/` | 🟡 legacy | — |

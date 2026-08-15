@@ -1,6 +1,7 @@
 // Self-host compiler on Kenga (canonical). Replaces growing slice of src/compiler.rs + vm.rs.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
-// Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, import, types/ttl skip.
+// Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, import,
+//          on/emit/pump/pending, types/ttl skip.
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -30,6 +31,41 @@ fn OP_NE() -> i64 { return 25; }
 fn OP_GE() -> i64 { return 26; }
 fn OP_ORD() -> i64 { return 27; }
 fn OP_SET() -> i64 { return 28; }
+fn OP_EMIT() -> i64 { return 29; }
+fn OP_PUMP() -> i64 { return 30; }
+fn OP_PENDING() -> i64 { return 31; }
+
+fn itoa(n: i64) -> str {
+    let digs: str = "0123456789";
+    if n == 0 { return "0"; }
+    let s: str = "";
+    let x: i64 = n;
+    if x < 0 { x = 0 - x; }
+    while x > 0 {
+        let d: i64 = x - (x / 10) * 10;
+        s = digs[d] + s;
+        x = x / 10;
+    }
+    if n < 0 { return "-" + s; }
+    return s;
+}
+
+fn list_tail(xs: list) -> list {
+    let out: list = [];
+    let i: i64 = 1;
+    while i < len(xs) { out = push(out, xs[i]); i = i + 1; }
+    return out;
+}
+
+fn find_bind(binds: list, ev: str) -> list {
+    // [found, addr, arity]
+    let i: i64 = 0;
+    while i < len(binds) {
+        if binds[i][0] == ev { return [1, binds[i][1], binds[i][2]]; }
+        i = i + 1;
+    }
+    return [0, 0, 0];
+}
 
 fn empty_lctx() -> list {
     // [conts, brkss, contss, tmpn]
@@ -190,18 +226,19 @@ fn ensure_slot(slots: list, si: i64) -> list {
     return slots;
 }
 
-fn vm_exec(code: list) -> i64 {
+fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -> list {
+    // returns [result, evq]
     let stack: list = [];
-    let slots: list = [];
+    let slots: list = init_slots;
     let ret_ips: list = [];
     let slot_bases: list = [];
-    let ip: i64 = 0;
+    let ip: i64 = start_ip;
     let slot_base: i64 = 0;
     while ip < len(code) {
         let op: i64 = code[ip]; ip = ip + 1;
         if op == OP_HALT() {
-            if len(stack) == 0 { return 0; }
-            return stack[len(stack) - 1];
+            if len(stack) == 0 { return [0, evq]; }
+            return [stack[len(stack) - 1], evq];
         }
         if op == OP_CONST() { stack = push(stack, code[ip]); ip = ip + 1; }
         if op == OP_LOAD() {
@@ -246,7 +283,13 @@ fn vm_exec(code: list) -> i64 {
             ip = addr;
         }
         if op == OP_RET() {
-            let p = list_pop(stack); let retv = p[1]; stack = p[0];
+            let retv = 0;
+            if len(stack) > 0 {
+                let p = list_pop(stack); retv = p[1]; stack = p[0];
+            }
+            if len(ret_ips) == 0 {
+                return [retv, evq];
+            }
             let new_slots: list = []; let si: i64 = 0;
             while si < slot_base { new_slots = push(new_slots, slots[si]); si = si + 1; }
             slots = new_slots;
@@ -289,9 +332,48 @@ fn vm_exec(code: list) -> i64 {
         if op == OP_ORD() {
             let p = list_pop(stack); stack = push(p[0], ord(p[1]));
         }
+        if op == OP_EMIT() {
+            let pv = list_pop(stack);
+            let pe = list_pop(pv[0]);
+            stack = pe[0];
+            evq = push(evq, [pe[1], pv[1]]);
+            stack = push(stack, 0);
+        }
+        if op == OP_PENDING() {
+            stack = push(stack, len(evq));
+        }
+        if op == OP_PUMP() {
+            let pm = list_pop(stack); stack = pm[0];
+            let left: i64 = pm[1];
+            let done: i64 = 0;
+            while left > 0 {
+                if len(evq) == 0 { break; }
+                let item = evq[0];
+                evq = list_tail(evq);
+                left = left - 1;
+                let hb = find_bind(binds, item[0]);
+                if hb[0] == 1 {
+                    let init: list = [];
+                    if hb[2] == 1 {
+                        init = push(init, item[1]);
+                    } else {
+                        if hb[2] != 0 { assert(0 == 1); }
+                    }
+                    let hr = vm_run(code, binds, hb[1], init, evq);
+                    evq = hr[1];
+                    done = done + 1;
+                }
+            }
+            stack = push(stack, done);
+        }
     }
-    if len(stack) == 0 { return 0; }
-    return stack[len(stack) - 1];
+    if len(stack) == 0 { return [0, evq]; }
+    return [stack[len(stack) - 1], evq];
+}
+
+fn vm_exec(code: list, binds: list) -> i64 {
+    let r = vm_run(code, binds, 0, [], []);
+    return r[0];
 }
 
 fn is_space(ch: str) -> i64 {
@@ -508,6 +590,28 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                             code = push(code, OP_LIST_PUSH());
                                             i = j;
                                         } else {
+                                            if id[0] == "emit" {
+                                                let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                code = push(code, OP_EMIT());
+                                                i = j;
+                                            } else {
+                                                if id[0] == "pump" {
+                                                    let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                    code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                    j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                    code = push(code, OP_PUMP());
+                                                    i = j;
+                                                } else {
+                                                    if id[0] == "pending" {
+                                                        assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_PENDING());
+                                                        i = j;
+                                                    } else {
                                             let argc: i64 = 0;
                                             if s[j] != ")" {
                                                 while true {
@@ -533,6 +637,9 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                 patches = push(patches, [addr_at, fni]);
                                             }
                                             i = j;
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                     }
@@ -1033,10 +1140,13 @@ fn match_brace(src: str, i: i64) -> i64 {
 }
 
 fn compile_lite(src: str) -> list {
+    // returns [code, binds] where binds = [[event, addr, arity], ...]
     let fnames: list = [];
     let fparams: list = [];
     let fbodies: list = [];
     let stypes: list = [];
+    let binds: list = [];
+    let on_serial: i64 = 0;
     let i: i64 = 0;
     while i < len(src) {
         i = skip(src, i);
@@ -1060,6 +1170,41 @@ fn compile_lite(src: str) -> list {
             }
             assert(src[i] == "}"); i = i + 1;
             stypes = push(stypes, [id[0], fields]);
+            continue;
+        }
+        if starts_kw(src, i, "on") == 1 {
+            i = skip(src, i + 2);
+            assert(src[i] == "\"");
+            let ps = parse_string(src, i);
+            let ev: str = ps[0]; i = ps[1];
+            i = skip(src, i);
+            assert(src[i] == "("); i = i + 1;
+            let params: list = [];
+            i = skip(src, i);
+            if src[i] != ")" {
+                while true {
+                    let pn = parse_ident(src, i);
+                    params = push(params, pn[0]);
+                    i = skip_type_annot(src, pn[1]);
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; continue; }
+                    break;
+                }
+            }
+            assert(src[i] == ")");
+            i = skip(src, i + 1);
+            assert(src[i] == "{");
+            let start: i64 = i;
+            i = match_brace(src, i);
+            let body: str = "";
+            let bi: i64 = start;
+            while bi < i { body = body + src[bi]; bi = bi + 1; }
+            let fname: str = "__on_" + itoa(on_serial);
+            on_serial = on_serial + 1;
+            binds = push(binds, [ev, len(fnames), len(params)]);
+            fnames = push(fnames, fname);
+            fparams = push(fparams, params);
+            fbodies = push(fbodies, body);
             continue;
         }
         assert(starts_kw(src, i, "fn") == 1);
@@ -1127,6 +1272,14 @@ fn compile_lite(src: str) -> list {
     }
     code[1] = len(code);
 
+    let resolved: list = [];
+    let bi2: i64 = 0;
+    while bi2 < len(binds) {
+        let b = binds[bi2];
+        resolved = push(resolved, [b[0], faddrs[b[1]], b[2]]);
+        bi2 = bi2 + 1;
+    }
+
     let mi: i64 = 0; let found: i64 = 0; let maddr: i64 = 0;
     while mi < len(fnames) {
         if fnames[mi] == "main" { found = 1; maddr = faddrs[mi]; assert(fargc[mi] == 0); }
@@ -1135,15 +1288,17 @@ fn compile_lite(src: str) -> list {
     assert(found == 1);
     code = emit3(code, OP_CALL(), maddr, 0);
     code = push(code, OP_HALT());
-    return code;
+    return [code, resolved];
 }
 
 fn run_lite(src: str) -> i64 {
-    return vm_exec(compile_lite(src));
+    let p = compile_lite(src);
+    return vm_exec(p[0], p[1]);
 }
 
 fn run_file(path: str) -> i64 {
-    return vm_exec(compile_lite(resolve_imports(path, 0)));
+    let p = compile_lite(resolve_imports(path, 0));
+    return vm_exec(p[0], p[1]);
 }
 
 fn main() -> i64 {
@@ -1171,6 +1326,8 @@ fn main() -> i64 {
     assert(run_file("examples/selfhost/lists_lite.kenga") == 0);
     assert(run_file("examples/selfhost/struct_lite.kenga") == 0);
     assert(run_lite("fn main() -> i64 { return ahead(41); } fn ahead(x: i64) -> i64 { return x + 1; }") == 42);
+    assert(run_lite("on \"ping\"(x) { emit(\"pong\", x); } on \"pong\"(x) { println(x); } fn main() { emit(\"ping\", 7); assert(pump(8) == 2); assert(pending() == 0); 0 }") == 0);
+    assert(run_file("examples/agent.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
