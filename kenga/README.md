@@ -17,6 +17,7 @@ scripts\freedom-smoke.cmd
 | `compiler/more.kenga` | f64 / lists / str / for / elif / struct / import / events | шире `compiler.rs` + `vm.rs` |
 | `emit/c_seed.kenga` | Kenga пишет `.c` | зародыш `codegen.rs` |
 | `emit/expr_c.kenga` | expr → C99 + self-check | следующий шаг `codegen.rs` |
-| `emit/mini_codegen.kenga` | parse tiny while-prog → C99 | первый настоящий codegen |
+| `emit/mini_codegen.kenga` | alias → `core_c` | — |
+| `emit/core_c.kenga` | parse while/if/for/list → C99 | первый настоящий multi-stmt codegen |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.

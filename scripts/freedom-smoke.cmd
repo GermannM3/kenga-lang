@@ -23,8 +23,8 @@ echo === kenga/emit/control_c.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\control_c.kenga
 if errorlevel 1 exit /b 1
 
-echo === kenga/emit/mini_codegen.kenga ===
-bootstrap\bin\kenga-lite.exe run kenga\emit\mini_codegen.kenga
+echo === kenga/emit/core_c.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\core_c.kenga
 if errorlevel 1 exit /b 1
 
 set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
@@ -42,6 +42,10 @@ if exist "%VCVARS%" (
   if errorlevel 1 exit /b 1
   bootstrap\bin\mini_from_kenga.exe
   if errorlevel 1 exit /b 1
+  cl /nologo /O2 /TC bootstrap\bin\core_from_kenga.c /Fe:bootstrap\bin\core_from_kenga.exe /Fo:bootstrap\bin\core_from_kenga.obj
+  if errorlevel 1 exit /b 1
+  bootstrap\bin\core_from_kenga.exe
+  if errorlevel 1 exit /b 1
 ) else (
   where gcc >nul 2>&1 && (
     gcc -O2 -std=c99 bootstrap\bin\expr_from_kenga.c -o bootstrap\bin\expr_from_kenga.exe
@@ -55,6 +59,10 @@ if exist "%VCVARS%" (
     gcc -O2 -std=c99 bootstrap\bin\mini_from_kenga.c -o bootstrap\bin\mini_from_kenga.exe
     if errorlevel 1 exit /b 1
     bootstrap\bin\mini_from_kenga.exe
+    if errorlevel 1 exit /b 1
+    gcc -O2 -std=c99 bootstrap\bin\core_from_kenga.c -o bootstrap\bin\core_from_kenga.exe
+    if errorlevel 1 exit /b 1
+    bootstrap\bin\core_from_kenga.exe
     if errorlevel 1 exit /b 1
   )
 )
