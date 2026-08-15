@@ -4,6 +4,41 @@
 #include <stdlib.h>
 #include "opcodes.inc.c"
 
+typedef struct { int64_t *d; size_t n, cap; } LObj;
+static LObj gL[256];
+static int gLn = 0;
+
+static int64_t lnew(void) {
+  if (gLn >= 256) { fprintf(stderr, "list heap full\n"); exit(1); }
+  gL[gLn].d = NULL; gL[gLn].n = 0; gL[gLn].cap = 0;
+  return (int64_t)gLn++;
+}
+static void lgrow(int id) {
+  LObj *L = &gL[id];
+  size_t nc = L->cap ? L->cap * 2 : 4;
+  int64_t *nd = (int64_t*)realloc(L->d, nc * sizeof(int64_t));
+  if (!nd) { fprintf(stderr, "oom\n"); exit(1); }
+  L->d = nd; L->cap = nc;
+}
+static void lpush(int64_t id, int64_t v) {
+  LObj *L = &gL[id];
+  if (L->n >= L->cap) lgrow((int)id);
+  L->d[L->n++] = v;
+}
+static int64_t lget(int64_t id, int64_t i) {
+  LObj *L = &gL[id];
+  if (i < 0 || (size_t)i >= L->n) { fprintf(stderr, "index oob\n"); exit(1); }
+  return L->d[i];
+}
+static void lset(int64_t id, int64_t i, int64_t v) {
+  LObj *L = &gL[id];
+  if (i < 0 || (size_t)i >= L->n) { fprintf(stderr, "index oob\n"); exit(1); }
+  L->d[i] = v;
+}
+static int64_t llen(int64_t id) {
+  return (int64_t)gL[id].n;
+}
+
 static int64_t vm_run(const int64_t *code, int64_t n) {
   int64_t stack[256]; int sp = 0;
   int64_t slots[256]; int64_t slot_used = 0;
@@ -24,6 +59,20 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_JMP) { ip = code[ip]; }
     else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=stack[--sp]; if (!c) ip = t; }
     else if (op == OP_PRINTLN) { printf("%lld\n", (long long)stack[--sp]); }
+    else if (op == OP_LIST_NEW) { stack[sp++] = lnew(); }
+    else if (op == OP_LIST_PUSH) {
+      int64_t v = stack[--sp]; int64_t lid = stack[--sp];
+      lpush(lid, v); stack[sp++] = lid;
+    }
+    else if (op == OP_LEN) { int64_t x = stack[--sp]; stack[sp++] = llen(x); }
+    else if (op == OP_GET) {
+      int64_t ix = stack[--sp]; int64_t lid = stack[--sp];
+      stack[sp++] = lget(lid, ix);
+    }
+    else if (op == OP_SET) {
+      int64_t v = stack[--sp]; int64_t ix = stack[--sp]; int64_t lid = stack[--sp];
+      lset(lid, ix, v);
+    }
     else if (op == OP_CALL) {
       int64_t addr = code[ip++]; int64_t argc = code[ip++];
       int64_t args[16]; int64_t ai;

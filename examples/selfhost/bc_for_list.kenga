@@ -1,0 +1,12 @@
+// for-in list via bc_src_c.
+
+fn main() {
+    let xs = [1, 2, 3, 4];
+    xs[0] = 10;
+    let s = 0;
+    for v in xs {
+        s = s + v;
+    }
+    println(s);
+    return 0;
+}
