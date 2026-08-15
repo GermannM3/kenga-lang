@@ -206,6 +206,31 @@ fn runtime_c() -> str {
     s = s + "static KList klist_push_ret(KList L, int64_t v) { klist_push(&L, v); return L; }\n";
     s = s + "static KList klist_of(const int64_t *a, size_t n) {\n";
     s = s + "  KList L = klist_new(); size_t i; for (i=0;i<n;i++) klist_push(&L, a[i]); return L;\n}\n\n";
+    s = s + "typedef void (*KeHandler)(int64_t);\n";
+    s = s + "typedef struct { const char *name; KeHandler fn; int arity; } KeBind;\n";
+    s = s + "static KeBind g_binds[64]; static int g_nbinds = 0;\n";
+    s = s + "#define KE_QMAX 256\n";
+    s = s + "static const char *g_qev[KE_QMAX]; static int64_t g_qval[KE_QMAX]; static int g_qn = 0;\n";
+    s = s + "static void ke_listen(const char *name, KeHandler fn, int arity) {\n";
+    s = s + "  g_binds[g_nbinds].name = name; g_binds[g_nbinds].fn = fn; g_binds[g_nbinds].arity = arity; g_nbinds++;\n}\n";
+    s = s + "static int64_t ke_emit(const char *e, int64_t v) {\n";
+    s = s + "  if (g_qn >= KE_QMAX) abort();\n";
+    s = s + "  g_qev[g_qn] = e; g_qval[g_qn] = v; g_qn++; return 0;\n}\n";
+    s = s + "static int64_t ke_pending(void) { return (int64_t)g_qn; }\n";
+    s = s + "static int64_t ke_pump(int64_t maxn) {\n";
+    s = s + "  int64_t done = 0;\n";
+    s = s + "  while (maxn > 0 && g_qn > 0) {\n";
+    s = s + "    const char *e = g_qev[0]; int64_t v = g_qval[0]; int i;\n";
+    s = s + "    for (i = 1; i < g_qn; i++) { g_qev[i-1]=g_qev[i]; g_qval[i-1]=g_qval[i]; }\n";
+    s = s + "    g_qn--; maxn--;\n";
+    s = s + "    for (i = 0; i < g_nbinds; i++) {\n";
+    s = s + "      if (strcmp(g_binds[i].name, e) == 0) {\n";
+    s = s + "        if (g_binds[i].arity == 1) g_binds[i].fn(v); else g_binds[i].fn(0);\n";
+    s = s + "        done++; break;\n";
+    s = s + "      }\n";
+    s = s + "    }\n";
+    s = s + "  }\n";
+    s = s + "  return done;\n}\n\n";
     return s;
 }
 
@@ -270,6 +295,22 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 let av = lower_cmp(s, j, decls);
                 j = skip(s, av[1]); assert(s[j] == ")"); j = j + 1;
                 return ["klist_push_ret(" + ar[0] + ", " + av[0] + ")", j, 1];
+            }
+            if id[0] == "emit" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let av = lower_cmp(s, j, decls);
+                j = skip(s, av[1]); assert(s[j] == ")"); j = j + 1;
+                return ["ke_emit(" + ar[0] + ", " + av[0] + ")", j, 0];
+            }
+            if id[0] == "pump" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["ke_pump(" + ar[0] + ")", j, 0];
+            }
+            if id[0] == "pending" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["ke_pending()", j, 0];
             }
             // user fn call
             let args: str = "";
@@ -556,10 +597,49 @@ fn lower_program(src: str) -> str {
     let fnames: list = [];
     let fparams: list = [];
     let fbodies: list = [];
+    let fkinds: list = []; // 0=fn, 1=on-handler, 2=main
+    let events: list = []; // [event_name, handler_cname, arity]
+    let on_serial: i64 = 0;
     let i: i64 = 0;
     while i < len(src) {
         i = skip(src, i);
         if i >= len(src) { break; }
+        if starts_kw(src, i, "on") == 1 {
+            i = skip(src, i + 2);
+            assert(src[i] == "\"");
+            let ps = parse_string(src, i);
+            let ev: str = ps[0]; i = ps[1];
+            i = skip(src, i);
+            assert(src[i] == "("); i = i + 1;
+            let params: list = [];
+            i = skip(src, i);
+            if src[i] != ")" {
+                while true {
+                    let pn = parse_ident(src, i);
+                    params = push(params, pn[0]);
+                    i = skip_type_annot(src, pn[1]);
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; continue; }
+                    break;
+                }
+            }
+            assert(src[i] == ")");
+            i = skip(src, i + 1);
+            assert(src[i] == "{");
+            let start: i64 = i;
+            i = match_brace(src, i);
+            let body: str = "";
+            let bi: i64 = start;
+            while bi < i { body = body + src[bi]; bi = bi + 1; }
+            let hname: str = "on_" + itoa(on_serial);
+            on_serial = on_serial + 1;
+            events = push(events, [ev, hname, len(params)]);
+            fnames = push(fnames, hname);
+            fparams = push(fparams, params);
+            fbodies = push(fbodies, body);
+            fkinds = push(fkinds, 1);
+            continue;
+        }
         assert(starts_kw(src, i, "fn") == 1);
         i = skip(src, i + 2);
         let id = parse_ident(src, i);
@@ -594,13 +674,18 @@ fn lower_program(src: str) -> str {
         fnames = push(fnames, id[0]);
         fparams = push(fparams, params);
         fbodies = push(fbodies, body);
+        if id[0] == "main" {
+            fkinds = push(fkinds, 2);
+        } else {
+            fkinds = push(fkinds, 0);
+        }
     }
 
     let out: str = runtime_c();
-    // prototypes
+    // prototypes for regular fns + on handlers
     let fi: i64 = 0;
     while fi < len(fnames) {
-        if fnames[fi] != "main" {
+        if fkinds[fi] == 0 {
             out = out + "static int64_t fn_" + fnames[fi] + "(";
             let pj: i64 = 0;
             while pj < len(fparams[fi]) {
@@ -610,16 +695,33 @@ fn lower_program(src: str) -> str {
             }
             out = out + ");\n";
         }
+        if fkinds[fi] == 1 {
+            out = out + "static void " + fnames[fi] + "(";
+            if len(fparams[fi]) == 1 {
+                out = out + "int64_t " + fparams[fi][0];
+            } else {
+                out = out + "int64_t __unused";
+            }
+            out = out + ");\n";
+        }
         fi = fi + 1;
     }
     out = out + "\n";
 
     fi = 0;
     while fi < len(fnames) {
-        if fnames[fi] == "main" {
+        if fkinds[fi] == 1 {
+            out = out + "static void " + fnames[fi] + "(";
+            if len(fparams[fi]) == 1 {
+                out = out + "int64_t " + fparams[fi][0];
+            } else {
+                out = out + "int64_t __unused";
+            }
+            out = out + ") {\n";
             let body = lower_fn_body(fbodies[fi], fparams[fi]);
-            out = out + "int main(void) {\n" + body[0] + "  return 0;\n}\n\n";
-        } else {
+            out = out + body[0] + "}\n\n";
+        }
+        if fkinds[fi] == 0 {
             out = out + "static int64_t fn_" + fnames[fi] + "(";
             let pj: i64 = 0;
             while pj < len(fparams[fi]) {
@@ -629,6 +731,16 @@ fn lower_program(src: str) -> str {
             }
             out = out + ") {\n";
             let body = lower_fn_body(fbodies[fi], fparams[fi]);
+            out = out + body[0] + "  return 0;\n}\n\n";
+        }
+        if fkinds[fi] == 2 {
+            let body = lower_fn_body(fbodies[fi], fparams[fi]);
+            out = out + "int main(void) {\n";
+            let ei: i64 = 0;
+            while ei < len(events) {
+                out = out + "  ke_listen(\"" + c_escape(events[ei][0]) + "\", " + events[ei][1] + ", " + itoa(events[ei][2]) + ");\n";
+                ei = ei + 1;
+            }
             out = out + body[0] + "  return 0;\n}\n\n";
         }
         fi = fi + 1;
@@ -655,7 +767,13 @@ fn main() -> i64 {
     let hello: str = "fn main() { println(\"hello\"); return 0; }";
     assert(write_file("bootstrap/bin/lower_str.c", lower_program(hello)) == true);
 
-    println("wrote bootstrap/bin/lower_{fact,for,if,fn,list,str}.c");
+    let ping: str = "on \"ping\"(x) { emit(\"pong\", x); } on \"pong\"(x) { println(x); } fn main() { emit(\"ping\", 7); assert(pump(8) == 2); assert(pending() == 0); return 0; }";
+    assert(write_file("bootstrap/bin/lower_events.c", lower_program(ping)) == true);
+
+    let agent = read_file("examples/agent.kenga");
+    assert(write_file("bootstrap/bin/lower_agent.c", lower_program(agent)) == true);
+
+    println("wrote bootstrap/bin/lower_*.c incl events+agent");
     println("lower_c ok");
     return 0;
 }
