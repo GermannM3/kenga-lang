@@ -50,18 +50,12 @@ if exist "%VCVARS%" (
   if errorlevel 1 exit /b 1
   bootstrap\bin\core_from_kenga.exe
   if errorlevel 1 exit /b 1
-  cl /nologo /O2 /TC bootstrap\bin\lower_fact.c /Fe:bootstrap\bin\lower_fact.exe /Fo:bootstrap\bin\lower_fact.obj
-  if errorlevel 1 exit /b 1
-  bootstrap\bin\lower_fact.exe
-  if errorlevel 1 exit /b 1
-  cl /nologo /O2 /TC bootstrap\bin\lower_for.c /Fe:bootstrap\bin\lower_for.exe /Fo:bootstrap\bin\lower_for.obj
-  if errorlevel 1 exit /b 1
-  bootstrap\bin\lower_for.exe
-  if errorlevel 1 exit /b 1
-  cl /nologo /O2 /TC bootstrap\bin\lower_if.c /Fe:bootstrap\bin\lower_if.exe /Fo:bootstrap\bin\lower_if.obj
-  if errorlevel 1 exit /b 1
-  bootstrap\bin\lower_if.exe
-  if errorlevel 1 exit /b 1
+  for %%f in (lower_fact lower_for lower_if lower_fn lower_list lower_str) do (
+    cl /nologo /O2 /TC bootstrap\bin\%%f.c /Fe:bootstrap\bin\%%f.exe /Fo:bootstrap\bin\%%f.obj
+    if errorlevel 1 exit /b 1
+    bootstrap\bin\%%f.exe
+    if errorlevel 1 exit /b 1
+  )
 ) else (
   where gcc >nul 2>&1 && (
     gcc -O2 -std=c99 bootstrap\bin\expr_from_kenga.c -o bootstrap\bin\expr_from_kenga.exe
@@ -80,18 +74,12 @@ if exist "%VCVARS%" (
     if errorlevel 1 exit /b 1
     bootstrap\bin\core_from_kenga.exe
     if errorlevel 1 exit /b 1
-    gcc -O2 -std=c99 bootstrap\bin\lower_fact.c -o bootstrap\bin\lower_fact.exe
-    if errorlevel 1 exit /b 1
-    bootstrap\bin\lower_fact.exe
-    if errorlevel 1 exit /b 1
-    gcc -O2 -std=c99 bootstrap\bin\lower_for.c -o bootstrap\bin\lower_for.exe
-    if errorlevel 1 exit /b 1
-    bootstrap\bin\lower_for.exe
-    if errorlevel 1 exit /b 1
-    gcc -O2 -std=c99 bootstrap\bin\lower_if.c -o bootstrap\bin\lower_if.exe
-    if errorlevel 1 exit /b 1
-    bootstrap\bin\lower_if.exe
-    if errorlevel 1 exit /b 1
+    for %%f in (lower_fact lower_for lower_if lower_fn lower_list lower_str) do (
+      gcc -O2 -std=c99 bootstrap\bin\%%f.c -o bootstrap\bin\%%f.exe
+      if errorlevel 1 exit /b 1
+      bootstrap\bin\%%f.exe
+      if errorlevel 1 exit /b 1
+    )
   )
 )
 

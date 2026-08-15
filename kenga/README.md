@@ -19,6 +19,6 @@ scripts\freedom-smoke.cmd
 | `emit/expr_c.kenga` | expr → C99 + self-check | следующий шаг `codegen.rs` |
 | `emit/mini_codegen.kenga` | alias → `core_c` | — |
 | `emit/core_c.kenga` | parse while/if/for/list → C99 | multi-stmt templates |
-| `emit/lower_c.kenga` | recursive descent → C99 | вытесняет кусок `codegen.rs` |
+| `emit/lower_c.kenga` | recursive descent → C99 (fn/str/list) | вытесняет кусок `codegen.rs` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.
