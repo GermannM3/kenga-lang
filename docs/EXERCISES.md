@@ -1,6 +1,6 @@
 # Exercises
 
-Проверяй через `kenga run`. Ответы не подглядывай в `examples/` сразу — сначала сам.
+Проверяй через `kenga run --lite` (или полный `kenga run`). Ответы не подглядывай в `examples/` сразу — сначала сам.
 
 ## E1. Арифметика
 
@@ -8,32 +8,43 @@
 
 Ожидай: `5050`.
 
+```bat
+kenga run --lite examples\exercises\e01_sum.kenga
+```
+
 ## E2. Список
 
 Список `[3, 1, 4, 1, 5]`, найди максимум циклом, напечатай.
 
+Шпаргалка по диалекту: `examples/selfhost/lists_lite.kenga`.
+
 ## E3. Struct
 
-`struct Vec2 { x, y }` (на полном языке с типами `i64`), функция `len2(v)` = x²+y², проверь на `(3,4)` → `25`.
+`struct Vec2 { x, y }`, функция `len2(v)` = x²+y², проверь на `(3,4)` → `25`.
 
-Lite-вариант: `kenga run --lite` с диалектом без типов полей.
+Lite: `examples/selfhost/struct_lite.kenga`.  
+Бонус: прогони через lowerer — `kenga/emit/lower_c.kenga` уже умеет struct → C.
 
-## E4. Тензор
+## E4. События
+
+Мини-агент: `on "tick"(n) { … }`, `emit` / `pump`. Ожидай цепочку как в `examples/agent.kenga`.
+
+## E5. Тензор
 
 `t_from([2,2], [1,0,0,1])` — unit. Умножь на `t_from([2,1],[3,4])`, проверь результат `[3,4]`.
 
-## E5. SGD
+## E6. SGD
 
 С нулевого `W` выучи отображение `[1,0] → [2]` одним рядом `t_sgd_step` в цикле (см. `train_sgd.kenga` как шпаргалку после попытки).
 
-## E6. Картинка
+## E7. Картинка
 
 `load_ppm("examples/ml/assets/dot.ppm")` → `t_mean` → три числа около `0.5`.
 
-## E7. Fusion
+## E8. Fusion
 
 Сложи image embedding + `t_from([3],[0.1,0.1,0.1])`, получи scalar через `t_matmul` с `[1,1,1]`.
 
 ---
 
-Когда все зелёные — ты уже не «по наитию», а по треку. Дальше: `docs/ROADMAP.md`.
+Когда все зелёные — ты уже не «по наитию», а по треку. Дальше: `docs/ROADMAP.md` · `docs/INDEPENDENCE.md`.

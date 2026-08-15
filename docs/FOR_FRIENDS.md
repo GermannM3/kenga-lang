@@ -4,13 +4,24 @@
 
 ## Одной фразой
 
-Kenga — язык, где **память, surprise и world-model** в семантике, а не в pip-пакетах. Сейчас это рабочий bootstrap: свой синтаксис + VM + Prophet. Python не нужен. Компилятор пока на Rust (как ранний Go на C). Self-host уже в лаборатории (`examples/selfhost/`).
+Kenga — язык, где **память, surprise и world-model** в семантике, а не в pip-пакетах. Сейчас это рабочий bootstrap: свой синтаксис + VM + Prophet. Python не нужен. Компилятор на Rust ещё в Releases, но **канон уже в `kenga/`** — `more.kenga` + `lower_c` пишут native C без cargo.
 
 ## Что показать за 5 минут
 
-```bash
+Без Rust (рекомендуется):
+
+```bat
 git clone https://github.com/GermannM3/kenga-lang.git
 cd kenga-lang
+bootstrap\build.cmd
+kenga run --lite examples\agent.kenga
+kenga run --lite examples\selfhost\struct_lite.kenga
+scripts\freedom-smoke.cmd
+```
+
+С cargo (legacy / полный CLI):
+
+```bash
 cargo install --path . --force --locked
 kenga about
 kenga demo
@@ -19,8 +30,8 @@ kenga demo
 Потом руками:
 
 ```bash
-kenga run examples/ml/world_model.kenga
-kenga chat minds/agent.km
+kenga run --lite examples/ml/world_model.kenga
+kenga chat --lite minds/agent.km
 # «смотри 5 1 6» / «что будет завтра?» / «статус»
 ```
 
@@ -31,7 +42,7 @@ kenga chat minds/agent.km
 | Свой язык + VM | Не LLM-чат из коробки |
 | Living memory + MLP world-model | Не замена PyTorch/JAX |
 | Агентный event loop | Не production CUDA stack |
-| Self-host ladder на Kenga | Полный self-host ещё не закрыт |
+| Self-host ladder + **Kenga→C** (`lower_c`) | Полный self-host (без C host) ещё не закрыт |
 | MIT, открытый репо | Не «AGI в выходные» |
 
 World-model предсказывает динамику векторов состояний (`[pos,vel,fuel]→next`), а не пишет эссе.
@@ -44,12 +55,13 @@ World-model предсказывает динамику векторов сос�
 
 ## Если сломалось
 
-- `kenga version` → должно быть **2.8.x**
+- `kenga version` → **3.12.x** (или `kenga-lite` после `bootstrap\build.cmd`)
 - Linux/Mac/Git Bash: `docs/UNIX.md` · `bash scripts/unix-smoke.sh`
-- `unknown command chat` → старый бинарник: `cargo install --path . --force`
+- `unknown command chat` → старый бинарник: обнови Releases / `cargo install --path . --force`
 - `kenga-lite not built` → `bootstrap\build.cmd` (нужен MSVC/gcc)
 - нет `examples/` → запускай из корня клона
 - `kenga which` — какой exe в PATH
+- учить с нуля: `docs/LEARN.md` · упражнения: `docs/EXERCISES.md`
 
 ## Иконки `.kenga` в Cursor / VS Code
 
