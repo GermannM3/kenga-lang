@@ -27,6 +27,10 @@ echo === kenga/emit/core_c.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\core_c.kenga
 if errorlevel 1 exit /b 1
 
+echo === kenga/emit/lower_c.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
+if errorlevel 1 exit /b 1
+
 set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
 if exist "%VCVARS%" (
   call "%VCVARS%" >nul
@@ -46,6 +50,18 @@ if exist "%VCVARS%" (
   if errorlevel 1 exit /b 1
   bootstrap\bin\core_from_kenga.exe
   if errorlevel 1 exit /b 1
+  cl /nologo /O2 /TC bootstrap\bin\lower_fact.c /Fe:bootstrap\bin\lower_fact.exe /Fo:bootstrap\bin\lower_fact.obj
+  if errorlevel 1 exit /b 1
+  bootstrap\bin\lower_fact.exe
+  if errorlevel 1 exit /b 1
+  cl /nologo /O2 /TC bootstrap\bin\lower_for.c /Fe:bootstrap\bin\lower_for.exe /Fo:bootstrap\bin\lower_for.obj
+  if errorlevel 1 exit /b 1
+  bootstrap\bin\lower_for.exe
+  if errorlevel 1 exit /b 1
+  cl /nologo /O2 /TC bootstrap\bin\lower_if.c /Fe:bootstrap\bin\lower_if.exe /Fo:bootstrap\bin\lower_if.obj
+  if errorlevel 1 exit /b 1
+  bootstrap\bin\lower_if.exe
+  if errorlevel 1 exit /b 1
 ) else (
   where gcc >nul 2>&1 && (
     gcc -O2 -std=c99 bootstrap\bin\expr_from_kenga.c -o bootstrap\bin\expr_from_kenga.exe
@@ -63,6 +79,18 @@ if exist "%VCVARS%" (
     gcc -O2 -std=c99 bootstrap\bin\core_from_kenga.c -o bootstrap\bin\core_from_kenga.exe
     if errorlevel 1 exit /b 1
     bootstrap\bin\core_from_kenga.exe
+    if errorlevel 1 exit /b 1
+    gcc -O2 -std=c99 bootstrap\bin\lower_fact.c -o bootstrap\bin\lower_fact.exe
+    if errorlevel 1 exit /b 1
+    bootstrap\bin\lower_fact.exe
+    if errorlevel 1 exit /b 1
+    gcc -O2 -std=c99 bootstrap\bin\lower_for.c -o bootstrap\bin\lower_for.exe
+    if errorlevel 1 exit /b 1
+    bootstrap\bin\lower_for.exe
+    if errorlevel 1 exit /b 1
+    gcc -O2 -std=c99 bootstrap\bin\lower_if.c -o bootstrap\bin\lower_if.exe
+    if errorlevel 1 exit /b 1
+    bootstrap\bin\lower_if.exe
     if errorlevel 1 exit /b 1
   )
 )
