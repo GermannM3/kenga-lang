@@ -5,11 +5,14 @@ fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
 fn OP_STORE() -> i64 { return 3; }
 fn OP_ADD() -> i64 { return 4; }
+fn OP_SUB() -> i64 { return 5; }
 fn OP_MUL() -> i64 { return 6; }
 fn OP_LT() -> i64 { return 8; }
 fn OP_GT() -> i64 { return 9; }
 fn OP_EQ() -> i64 { return 10; }
 fn OP_NE() -> i64 { return 25; }
+fn OP_LE() -> i64 { return 14; }
+fn OP_GE() -> i64 { return 26; }
 fn OP_JMP() -> i64 { return 11; }
 fn OP_JMPF() -> i64 { return 12; }
 fn OP_HALT() -> i64 { return 13; }
@@ -29,6 +32,49 @@ fn OP_LIST_TAG() -> i64 { return 34; }
 fn OP_EMIT() -> i64 { return 29; }
 fn OP_PUMP() -> i64 { return 30; }
 fn OP_PENDING() -> i64 { return 31; }
+
+fn dirname_of(path: str) -> str {
+    let i: i64 = len(path) - 1;
+    while i >= 0 {
+        if path[i] == "/" { break; }
+        if path[i] == "\\" { break; }
+        i = i - 1;
+    }
+    if i < 0 { return "."; }
+    let out: str = "";
+    let j: i64 = 0;
+    while j < i { out = out + path[j]; j = j + 1; }
+    if len(out) == 0 { return "."; }
+    return out;
+}
+fn join_path(dir: str, rel: str) -> str {
+    if len(dir) == 0 { return rel; }
+    if dir == "." { return rel; }
+    return dir + "/" + rel;
+}
+fn resolve_imports(path: str, depth: i64) -> str {
+    assert(depth < 32);
+    let src: str = read_file(path);
+    let dir: str = dirname_of(path);
+    let i: i64 = 0;
+    let acc: str = "";
+    while true {
+        i = skip(src, i);
+        if starts_kw(src, i, "import") == 0 { break; }
+        i = skip(src, i + 6);
+        assert(src[i] == "\"");
+        let ps = parse_string(src, i);
+        i = ps[1];
+        i = skip(src, i);
+        if i < len(src) { if src[i] == ";" { i = i + 1; } }
+        let dep_path: str = join_path(dir, ps[0]);
+        acc = acc + resolve_imports(dep_path, depth + 1);
+        acc = acc + "\n";
+    }
+    let rest: str = "";
+    while i < len(src) { rest = rest + src[i]; i = i + 1; }
+    return acc + rest;
+}
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -295,6 +341,20 @@ fn field_index_any(stypes: list, name: str) -> i64 {
 
 fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
     i = skip(s, i);
+    if s[i] == "-" {
+        code = emit2(code, OP_CONST(), 0);
+        let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+        code = push(r[0], OP_SUB());
+        return [code, r[1], r[2]];
+    }
+    if s[i] == "(" {
+        let r = emit_cmp(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+        code = r[0]; i = r[1]; vnames = r[2];
+        i = skip(s, i);
+        assert(s[i] == ")");
+        i = i + 1;
+        // fall through to postfix [ / .
+    } else {
     if s[i] == "[" {
         i = i + 1;
         code = push(code, OP_LIST_NEW());
@@ -470,6 +530,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
         }
         }
     }
+    }
     while true {
         i = skip(s, i);
         if i >= len(s) { break; }
@@ -523,7 +584,13 @@ fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
             r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
             code = push(r[0], OP_ADD());
             i = r[1]; vnames = r[2];
-        } else { break; }
+        } else {
+            if s[i] == "-" {
+                r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+                code = push(r[0], OP_SUB());
+                i = r[1]; vnames = r[2];
+            } else { break; }
+        }
     }
     return [code, i, vnames];
 }
@@ -541,6 +608,16 @@ fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     if starts_with(s, i, "!=") == 1 {
         r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_NE());
+        return [code, r[1], r[2]];
+    }
+    if starts_with(s, i, "<=") == 1 {
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+        code = push(r[0], OP_LE());
+        return [code, r[1], r[2]];
+    }
+    if starts_with(s, i, ">=") == 1 {
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+        code = push(r[0], OP_GE());
         return [code, r[1], r[2]];
     }
     if s[i] == "<" {
@@ -1238,9 +1315,12 @@ fn write_c_driver(code: list, strs: list, floats: list, binds: list) -> str {
     s = s + "    else if (op == OP_LOAD) { stack[sp++] = slots[slot_base + code[ip++]]; }\n";
     s = s + "    else if (op == OP_STORE) { int64_t idx=slot_base+code[ip++]; slots[idx]=stack[--sp]; if (idx+1>slot_used) slot_used=idx+1; }\n";
     s = s + "    else if (op == OP_ADD) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b)); else stack[sp++]=Vi(a.i+b.i); }\n";
+    s = s + "    else if (op == OP_SUB) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)-as_f(b)); else stack[sp++]=Vi(a.i-b.i); }\n";
     s = s + "    else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }\n";
     s = s + "    else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }\n";
+    s = s + "    else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }\n";
     s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
+    s = s + "    else if (op == OP_GE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>=as_f(b)); else stack[sp++]=Vi(a.i>=b.i); }\n";
     s = s + "    else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }\n";
     s = s + "    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }\n";
     s = s + "    else if (op == OP_ROUND) { V x=stack[--sp]; stack[sp++]=Vi((int64_t)llround(as_f(x))); }\n";
@@ -1334,60 +1414,53 @@ fn write_c_driver(code: list, strs: list, floats: list, binds: list) -> str {
 }
 
 fn main() -> i64 {
-    let src: str = read_file("examples/selfhost/bc_mini.kenga");
-    let r = compile_src(src);
+    let r = compile_src(resolve_imports("examples/selfhost/bc_mini.kenga", 0));
     assert(len(r[0]) > 10);
     assert(write_file("bootstrap/generated/bc_from_src.c", write_c_driver(r[0], r[1], r[2], r[3])) == true);
 
-    let src2: str = read_file("examples/selfhost/bc_for.kenga");
-    let r2 = compile_src(src2);
+    let r2 = compile_src(resolve_imports("examples/selfhost/bc_for.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_for.c", write_c_driver(r2[0], r2[1], r2[2], r2[3])) == true);
 
-    let src3: str = read_file("examples/selfhost/bc_fn_mini.kenga");
-    let r3 = compile_src(src3);
+    let r3 = compile_src(resolve_imports("examples/selfhost/bc_fn_mini.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_fn.c", write_c_driver(r3[0], r3[1], r3[2], r3[3])) == true);
 
-    let src4: str = read_file("examples/selfhost/bc_lists.kenga");
-    let r4 = compile_src(src4);
+    let r4 = compile_src(resolve_imports("examples/selfhost/bc_lists.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_lists.c", write_c_driver(r4[0], r4[1], r4[2], r4[3])) == true);
 
-    let src5: str = read_file("examples/selfhost/bc_for_list.kenga");
-    let r5 = compile_src(src5);
+    let r5 = compile_src(resolve_imports("examples/selfhost/bc_for_list.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_for_list.c", write_c_driver(r5[0], r5[1], r5[2], r5[3])) == true);
 
-    let src6: str = read_file("examples/selfhost/bc_break.kenga");
-    let r6 = compile_src(src6);
+    let r6 = compile_src(resolve_imports("examples/selfhost/bc_break.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_break.c", write_c_driver(r6[0], r6[1], r6[2], r6[3])) == true);
 
-    let src7: str = read_file("examples/selfhost/for_lite.kenga");
-    let r7 = compile_src(src7);
+    let r7 = compile_src(resolve_imports("examples/selfhost/for_lite.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_for_lite.c", write_c_driver(r7[0], r7[1], r7[2], r7[3])) == true);
 
-    let src8: str = read_file("examples/selfhost/lists_lite.kenga");
-    let r8 = compile_src(src8);
+    let r8 = compile_src(resolve_imports("examples/selfhost/lists_lite.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_lists_lite.c", write_c_driver(r8[0], r8[1], r8[2], r8[3])) == true);
 
-    let src9: str = read_file("examples/selfhost/bc_elif.kenga");
-    let r9 = compile_src(src9);
+    let r9 = compile_src(resolve_imports("examples/selfhost/bc_elif.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_elif.c", write_c_driver(r9[0], r9[1], r9[2], r9[3])) == true);
 
-    let src10: str = read_file("examples/selfhost/elif_lite.kenga");
-    let r10 = compile_src(src10);
+    let r10 = compile_src(resolve_imports("examples/selfhost/elif_lite.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_elif_lite.c", write_c_driver(r10[0], r10[1], r10[2], r10[3])) == true);
 
-    let src11: str = read_file("examples/selfhost/float_lite.kenga");
-    let r11 = compile_src(src11);
+    let r11 = compile_src(resolve_imports("examples/selfhost/float_lite.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_float_lite.c", write_c_driver(r11[0], r11[1], r11[2], r11[3])) == true);
 
-    let src12: str = read_file("examples/selfhost/struct_lite.kenga");
-    let r12 = compile_src(src12);
+    let r12 = compile_src(resolve_imports("examples/selfhost/struct_lite.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_struct_lite.c", write_c_driver(r12[0], r12[1], r12[2], r12[3])) == true);
 
-    let src13: str = read_file("examples/agent.kenga");
-    let r13 = compile_src(src13);
+    let r13 = compile_src(resolve_imports("examples/agent.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_agent.c", write_c_driver(r13[0], r13[1], r13[2], r13[3])) == true);
 
-    println("wrote bootstrap/generated/bc_from_*.c incl agent/for_lite/lists_lite/elif/elif_lite/float_lite/struct_lite");
+    let r14 = compile_src(resolve_imports("examples/selfhost/lower_import.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_import.c", write_c_driver(r14[0], r14[1], r14[2], r14[3])) == true);
+
+    let r15 = compile_src(resolve_imports("examples/selfhost/bc_arith.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_arith.c", write_c_driver(r15[0], r15[1], r15[2], r15[3])) == true);
+
+    println("wrote bootstrap/generated/bc_from_*.c incl agent/import/arith/struct");
     println("bc_src_c ok");
     return 0;
 }

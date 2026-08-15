@@ -1,0 +1,15 @@
+// Arith/cmp extras for bc_src: -, <=, >=, parens.
+
+fn main() -> i64 {
+    let a = 10 - 3;
+    let b = -2;
+    assert(a == 7);
+    assert(b == 0 - 2);
+    assert(a >= 7);
+    assert(a <= 7);
+    assert((1 + 2) * 3 == 9);
+    println(a);
+    println(b);
+    println("arith ok");
+    return 0;
+}
