@@ -32,6 +32,7 @@ enum {
   OP_SET = 28,
   OP_EMIT = 29,
   OP_PUMP = 30,
-  OP_PENDING = 31
+  OP_PENDING = 31,
+  OP_PRINT_STR = 32
 };
 #endif

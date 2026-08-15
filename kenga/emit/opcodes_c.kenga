@@ -37,7 +37,8 @@ fn main() -> i64 {
     s = s + "  OP_SET = 28,\n";
     s = s + "  OP_EMIT = 29,\n";
     s = s + "  OP_PUMP = 30,\n";
-    s = s + "  OP_PENDING = 31\n";
+    s = s + "  OP_PENDING = 31,\n";
+    s = s + "  OP_PRINT_STR = 32\n";
     s = s + "};\n";
     s = s + "#endif\n";
     assert(write_file("bootstrap/generated/opcodes.inc.c", s) == true);

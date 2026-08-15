@@ -39,6 +39,8 @@ static int64_t llen(int64_t id) {
   return (int64_t)gL[id].n;
 }
 
+static const char *g_strs[] = { "" };
+
 static int64_t vm_run(const int64_t *code, int64_t n) {
   int64_t stack[256]; int sp = 0;
   int64_t slots[256]; int64_t slot_used = 0;
@@ -51,7 +53,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     int64_t op = code[ip++];
     if (op == OP_CONST) { stack[sp++] = code[ip++]; }
     else if (op == OP_LOAD) { stack[sp++] = slots[slot_base + code[ip++]]; }
-    else if (op == OP_STORE) { slots[slot_base + code[ip++]] = stack[--sp]; }
+    else if (op == OP_STORE) { int64_t idx=slot_base+code[ip++]; slots[idx]=stack[--sp]; if (idx+1>slot_used) slot_used=idx+1; }
     else if (op == OP_ADD) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a+b; }
     else if (op == OP_MUL) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a*b; }
     else if (op == OP_LT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a<b; }
@@ -60,6 +62,8 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_JMP) { ip = code[ip]; }
     else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=stack[--sp]; if (!c) ip = t; }
     else if (op == OP_PRINTLN) { printf("%lld\n", (long long)stack[--sp]); }
+    else if (op == OP_ASSERT) { if (!stack[--sp]) { fprintf(stderr, "assert failed\n"); exit(1); } }
+    else if (op == OP_PRINT_STR) { puts(g_strs[code[ip++]]); }
     else if (op == OP_LIST_NEW) { stack[sp++] = lnew(); }
     else if (op == OP_LIST_PUSH) {
       int64_t v = stack[--sp]; int64_t lid = stack[--sp];
