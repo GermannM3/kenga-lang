@@ -53,6 +53,29 @@ static int64_t llen(int64_t id) {
   return (int64_t)gL[id].n;
 }
 
+#define EVQ_CAP 256
+static int64_t ev_names[EVQ_CAP];
+static V ev_vals[EVQ_CAP];
+static int ev_head = 0, ev_tail = 0;
+
+typedef struct { int64_t str_idx; int64_t addr; int64_t arity; } EvHandler;
+static const EvHandler g_handlers[] = { {0,0,0} };
+static const int g_nhandlers = 0;
+
+static void ev_enqueue(int64_t name_idx, V val) {
+  if (ev_tail >= EVQ_CAP) { fprintf(stderr, "event queue full\n"); exit(1); }
+  ev_names[ev_tail] = name_idx; ev_vals[ev_tail] = val; ev_tail++;
+}
+static int ev_dequeue(int64_t *name_idx, V *val) {
+  if (ev_head >= ev_tail) return 0;
+  *name_idx = ev_names[ev_head]; *val = ev_vals[ev_head]; ev_head++; return 1;
+}
+static int64_t find_handler(int64_t name_idx) {
+  int i;
+  for (i = 0; i < g_nhandlers; i++) if (g_handlers[i].str_idx == name_idx) return i;
+  return -1;
+}
+
 static const char *g_strs[] = { "" };
 
 static const double g_f64s[] = { 1.5, 2.25, 2.0 };
@@ -64,8 +87,36 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
   int64_t slot_bases[64];
   int64_t slot_base = 0;
   int64_t ip = 0; int i;
+  int pump_active = 0;
+  int64_t pump_left = 0;
+  int64_t pump_done = 0;
+  int64_t pump_ret_ip = 0;
   for (i = 0; i < 256; i++) slots[i] = Vi(0);
   while (ip < n) {
+  vm_step:
+    if (pump_active) {
+      while (pump_left > 0) {
+        int64_t name_idx; V val; int64_t hi, haddr, harity;
+        if (!ev_dequeue(&name_idx, &val)) break;
+        pump_left--;
+        hi = find_handler(name_idx);
+        if (hi < 0) continue;
+        haddr = g_handlers[hi].addr; harity = g_handlers[hi].arity;
+        ret_ips[rsp] = -1; slot_bases[rsp] = slot_base; rsp++;
+        slot_base = slot_used;
+        if (harity == 1) {
+          slots[slot_base] = val;
+          if (slot_base + 1 > slot_used) slot_used = slot_base + 1;
+        } else if (harity != 0) { fprintf(stderr, "bad handler arity\n"); exit(1); }
+        ip = haddr;
+        pump_active = 0;
+        goto vm_step;
+      }
+      pump_active = 0;
+      ip = pump_ret_ip;
+      stack[sp++] = Vi(pump_done);
+      continue;
+    }
     int64_t op = code[ip++];
     if (op == OP_CONST) { stack[sp++] = Vi(code[ip++]); }
     else if (op == OP_CONST_F64) { stack[sp++] = Vf(g_f64s[code[ip++]]); }
@@ -131,8 +182,30 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_RET) {
       V val = sp > 0 ? stack[--sp] : Vi(0);
       if (rsp == 0) return as_i(val);
-      rsp--; slot_base = slot_bases[rsp]; ip = ret_ips[rsp];
+      rsp--;
+      slot_base = slot_bases[rsp];
+      if (ret_ips[rsp] == -1) {
+        pump_done++;
+        stack[sp++] = val;
+        pump_active = 1;
+        continue;
+      }
+      ip = ret_ips[rsp];
       stack[sp++] = val;
+    }
+    else if (op == OP_EMIT) {
+      V val = stack[--sp];
+      int64_t name_idx = as_i(stack[--sp]);
+      ev_enqueue(name_idx, val);
+      stack[sp++] = Vi(0);
+    }
+    else if (op == OP_PENDING) { stack[sp++] = Vi((int64_t)(ev_tail - ev_head)); }
+    else if (op == OP_PUMP) {
+      pump_left = as_i(stack[--sp]);
+      pump_done = 0;
+      pump_ret_ip = ip;
+      pump_active = 1;
+      continue;
     }
     else if (op == OP_HALT) { return 0; }
     else { fprintf(stderr, "bad op %lld\n", (long long)op); exit(1); }

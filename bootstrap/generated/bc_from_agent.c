@@ -59,8 +59,8 @@ static V ev_vals[EVQ_CAP];
 static int ev_head = 0, ev_tail = 0;
 
 typedef struct { int64_t str_idx; int64_t addr; int64_t arity; } EvHandler;
-static const EvHandler g_handlers[] = { {0,0,0} };
-static const int g_nhandlers = 0;
+static const EvHandler g_handlers[] = { {0, 2, 1}, {1, 23, 1}, {2, 32, 1} };
+static const int g_nhandlers = 3;
 
 static void ev_enqueue(int64_t name_idx, V val) {
   if (ev_tail >= EVQ_CAP) { fprintf(stderr, "event queue full\n"); exit(1); }
@@ -76,7 +76,7 @@ static int64_t find_handler(int64_t name_idx) {
   return -1;
 }
 
-static const char *g_strs[] = { "" };
+static const char *g_strs[] = { "sense", "think", "act", "prophet loop" };
 
 static const double g_f64s[] = { 0.0 };
 
@@ -214,7 +214,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 }
 
 int main(void) {
-  static const int64_t code[] = { 11, 2, 1, 0, 3, 0, 1, 1, 3, 1, 1, 6, 3, 2, 2, 1, 2, 2, 8, 12, 37, 2, 0, 2, 1, 4, 3, 0, 2, 1, 1, 1, 4, 3, 1, 11, 14, 2, 0, 17, 1, 0, 16, 13 };
+  static const int64_t code[] = { 11, 50, 2, 0, 17, 2, 0, 1, 3, 8, 12, 22, 1, 1, 2, 0, 1, 1, 4, 29, 11, 22, 16, 1, 2, 2, 0, 1, 2, 6, 29, 16, 2, 0, 17, 2, 0, 1, 8, 8, 12, 49, 1, 0, 2, 0, 29, 11, 49, 16, 32, 3, 1, 0, 1, 0, 29, 1, 32, 30, 3, 0, 2, 0, 17, 31, 1, 0, 10, 18, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

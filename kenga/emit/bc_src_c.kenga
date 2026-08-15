@@ -26,6 +26,9 @@ fn OP_LEN() -> i64 { return 23; }
 fn OP_GET() -> i64 { return 24; }
 fn OP_SET() -> i64 { return 28; }
 fn OP_LIST_TAG() -> i64 { return 34; }
+fn OP_EMIT() -> i64 { return 29; }
+fn OP_PUMP() -> i64 { return 30; }
+fn OP_PENDING() -> i64 { return 31; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -265,6 +268,16 @@ fn field_index(fields: list, name: str) -> i64 {
     assert(0 == 1);
     return 0;
 }
+fn str_in_pool(strs: list, s: str) -> list {
+    let i: i64 = 0;
+    while i < len(strs) {
+        if strs[i] == s { return [i, strs]; }
+        i = i + 1;
+    }
+    strs = push(strs, s);
+    return [len(strs) - 1, strs];
+}
+
 fn field_index_any(stypes: list, name: str) -> i64 {
     let si: i64 = 0;
     while si < len(stypes) {
@@ -299,6 +312,13 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
         assert(s[i] == "]");
         i = i + 1;
     } else {
+        if s[i] == "\"" {
+            let ps = parse_string(s, i);
+            let sip = str_in_pool(strbox[0], ps[0]);
+            strbox[0] = sip[1];
+            code = emit2(code, OP_CONST(), sip[0]);
+            i = ps[1];
+        } else {
         if is_alpha(s[i]) == 1 {
             let id = parse_ident(s, i);
             let j: i64 = skip(s, id[1]);
@@ -337,6 +357,36 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 code = push(code, OP_LIST_PUSH());
                                 i = j;
                             } else {
+                                if id[0] == "emit" {
+                                    let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
+                                    code = ar[0]; j = ar[1]; vnames = ar[2];
+                                    j = skip(s, j);
+                                    assert(s[j] == ",");
+                                    j = j + 1;
+                                    ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
+                                    code = ar[0]; j = ar[1]; vnames = ar[2];
+                                    j = skip(s, j);
+                                    assert(s[j] == ")");
+                                    j = j + 1;
+                                    code = push(code, OP_EMIT());
+                                    i = j;
+                                } else {
+                                    if id[0] == "pump" {
+                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
+                                        code = ar[0]; j = ar[1]; vnames = ar[2];
+                                        j = skip(s, j);
+                                        assert(s[j] == ")");
+                                        j = j + 1;
+                                        code = push(code, OP_PUMP());
+                                        i = j;
+                                    } else {
+                                        if id[0] == "pending" {
+                                            j = skip(s, j);
+                                            assert(s[j] == ")");
+                                            j = j + 1;
+                                            code = push(code, OP_PENDING());
+                                            i = j;
+                                        } else {
                                 let argc: i64 = 0;
                                 j = skip(s, j);
                                 if s[j] != ")" {
@@ -356,6 +406,9 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 assert(fargc[fi] == argc);
                                 code = emit3(code, OP_CALL(), faddrs[fi], argc);
                                 i = j;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -414,6 +467,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                 code = emit2(code, OP_CONST(), n[1]);
             }
             i = n[2];
+        }
         }
     }
     while true {
@@ -849,6 +903,9 @@ fn compile_src(src: str) -> list {
     let fparams: list = [];
     let fbodies: list = [];
     let stypes: list = [];
+    let binds: list = [];
+    let on_serial: i64 = 0;
+    let strbox: list = [[], [], stypes];
     let i: i64 = 0;
     while i < len(src) {
         i = skip(src, i);
@@ -879,6 +936,51 @@ fn compile_src(src: str) -> list {
             }
             assert(src[i] == "}"); i = i + 1;
             stypes = push(stypes, [id[0], fields]);
+            strbox[2] = stypes;
+            continue;
+        }
+        if starts_kw(src, i, "on") == 1 {
+            i = skip(src, i + 2);
+            assert(src[i] == "\"");
+            let ps = parse_string(src, i);
+            let ev: str = ps[0]; i = ps[1];
+            i = skip(src, i);
+            assert(src[i] == "("); i = i + 1;
+            let params: list = [];
+            i = skip(src, i);
+            if src[i] != ")" {
+                while true {
+                    let pn = parse_ident(src, i);
+                    params = push(params, pn[0]);
+                    i = skip(src, pn[1]);
+                    if i < len(src) {
+                        if src[i] == ":" {
+                            i = i + 1;
+                            let ty = parse_ident(src, i);
+                            i = ty[1];
+                        }
+                    }
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; continue; }
+                    break;
+                }
+            }
+            assert(src[i] == ")");
+            i = skip(src, i + 1);
+            assert(src[i] == "{");
+            let start: i64 = i;
+            i = match_brace(src, i);
+            let body: str = "";
+            let bi: i64 = start;
+            while bi < i { body = body + src[bi]; bi = bi + 1; }
+            let sip = str_in_pool(strbox[0], ev);
+            strbox[0] = sip[1];
+            let fname: str = "__on_" + itoa(on_serial);
+            on_serial = on_serial + 1;
+            binds = push(binds, [sip[0], len(fnames), len(params)]);
+            fnames = push(fnames, fname);
+            fparams = push(fparams, params);
+            fbodies = push(fbodies, body);
             continue;
         }
         assert(starts_kw(src, i, "fn") == 1);
@@ -934,7 +1036,6 @@ fn compile_src(src: str) -> list {
 
     let code: list = emit2([], OP_JMP(), 0);
     let faddrs: list = [];
-    let strbox: list = [[], [], stypes];
     fi = 0;
     while fi < len(fnames) {
         if fnames[fi] != "main" {
@@ -954,6 +1055,14 @@ fn compile_src(src: str) -> list {
         fi = fi + 1;
     }
 
+    let resolved: list = [];
+    let bi2: i64 = 0;
+    while bi2 < len(binds) {
+        let b = binds[bi2];
+        resolved = push(resolved, [b[0], faddrs[b[1]], b[2]]);
+        bi2 = bi2 + 1;
+    }
+
     let main_ip: i64 = len(code);
     code[1] = main_ip;
 
@@ -963,7 +1072,7 @@ fn compile_src(src: str) -> list {
     let bl = compile_body(fbodies[mi], 0, code, vnames, fnames, faddrs, fargc, [], strbox);
     code = bl[0];
     code = push(code, OP_HALT());
-    return [code, strbox[0], strbox[1]];
+    return [code, strbox[0], strbox[1], resolved];
 }
 
 fn emit_strs_table(strs: list) -> str {
@@ -996,7 +1105,27 @@ fn emit_f64s_table(floats: list) -> str {
     return s;
 }
 
-fn write_c_driver(code: list, strs: list, floats: list) -> str {
+fn emit_handlers_table(binds: list) -> str {
+    let s: str = "typedef struct { int64_t str_idx; int64_t addr; int64_t arity; } EvHandler;\n";
+    if len(binds) == 0 {
+        s = s + "static const EvHandler g_handlers[] = { {0,0,0} };\n";
+        s = s + "static const int g_nhandlers = 0;\n\n";
+        return s;
+    }
+    s = s + "static const EvHandler g_handlers[] = { ";
+    let i: i64 = 0;
+    while i < len(binds) {
+        if i > 0 { s = s + ", "; }
+        let b: list = binds[i];
+        s = s + "{" + itoa(b[0]) + ", " + itoa(b[1]) + ", " + itoa(b[2]) + "}";
+        i = i + 1;
+    }
+    s = s + " };\n";
+    s = s + "static const int g_nhandlers = " + itoa(len(binds)) + ";\n\n";
+    return s;
+}
+
+fn write_c_driver(code: list, strs: list, floats: list, binds: list) -> str {
     let s: str = "";
     s = s + "/* GENERATED by kenga/emit/bc_src_c.kenga — parsed source → bytecode */\n";
     s = s + "#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n#include <math.h>\n";
@@ -1046,6 +1175,24 @@ fn write_c_driver(code: list, strs: list, floats: list) -> str {
     s = s + "static int64_t llen(int64_t id) {\n";
     s = s + "  return (int64_t)gL[id].n;\n";
     s = s + "}\n\n";
+    s = s + "#define EVQ_CAP 256\n";
+    s = s + "static int64_t ev_names[EVQ_CAP];\n";
+    s = s + "static V ev_vals[EVQ_CAP];\n";
+    s = s + "static int ev_head = 0, ev_tail = 0;\n\n";
+    s = s + emit_handlers_table(binds);
+    s = s + "static void ev_enqueue(int64_t name_idx, V val) {\n";
+    s = s + "  if (ev_tail >= EVQ_CAP) { fprintf(stderr, \"event queue full\\n\"); exit(1); }\n";
+    s = s + "  ev_names[ev_tail] = name_idx; ev_vals[ev_tail] = val; ev_tail++;\n";
+    s = s + "}\n";
+    s = s + "static int ev_dequeue(int64_t *name_idx, V *val) {\n";
+    s = s + "  if (ev_head >= ev_tail) return 0;\n";
+    s = s + "  *name_idx = ev_names[ev_head]; *val = ev_vals[ev_head]; ev_head++; return 1;\n";
+    s = s + "}\n";
+    s = s + "static int64_t find_handler(int64_t name_idx) {\n";
+    s = s + "  int i;\n";
+    s = s + "  for (i = 0; i < g_nhandlers; i++) if (g_handlers[i].str_idx == name_idx) return i;\n";
+    s = s + "  return -1;\n";
+    s = s + "}\n\n";
     s = s + emit_strs_table(strs);
     s = s + emit_f64s_table(floats);
     s = s + "static int64_t vm_run(const int64_t *code, int64_t n) {\n";
@@ -1055,8 +1202,36 @@ fn write_c_driver(code: list, strs: list, floats: list) -> str {
     s = s + "  int64_t slot_bases[64];\n";
     s = s + "  int64_t slot_base = 0;\n";
     s = s + "  int64_t ip = 0; int i;\n";
+    s = s + "  int pump_active = 0;\n";
+    s = s + "  int64_t pump_left = 0;\n";
+    s = s + "  int64_t pump_done = 0;\n";
+    s = s + "  int64_t pump_ret_ip = 0;\n";
     s = s + "  for (i = 0; i < 256; i++) slots[i] = Vi(0);\n";
     s = s + "  while (ip < n) {\n";
+    s = s + "  vm_step:\n";
+    s = s + "    if (pump_active) {\n";
+    s = s + "      while (pump_left > 0) {\n";
+    s = s + "        int64_t name_idx; V val; int64_t hi, haddr, harity;\n";
+    s = s + "        if (!ev_dequeue(&name_idx, &val)) break;\n";
+    s = s + "        pump_left--;\n";
+    s = s + "        hi = find_handler(name_idx);\n";
+    s = s + "        if (hi < 0) continue;\n";
+    s = s + "        haddr = g_handlers[hi].addr; harity = g_handlers[hi].arity;\n";
+    s = s + "        ret_ips[rsp] = -1; slot_bases[rsp] = slot_base; rsp++;\n";
+    s = s + "        slot_base = slot_used;\n";
+    s = s + "        if (harity == 1) {\n";
+    s = s + "          slots[slot_base] = val;\n";
+    s = s + "          if (slot_base + 1 > slot_used) slot_used = slot_base + 1;\n";
+    s = s + "        } else if (harity != 0) { fprintf(stderr, \"bad handler arity\\n\"); exit(1); }\n";
+    s = s + "        ip = haddr;\n";
+    s = s + "        pump_active = 0;\n";
+    s = s + "        goto vm_step;\n";
+    s = s + "      }\n";
+    s = s + "      pump_active = 0;\n";
+    s = s + "      ip = pump_ret_ip;\n";
+    s = s + "      stack[sp++] = Vi(pump_done);\n";
+    s = s + "      continue;\n";
+    s = s + "    }\n";
     s = s + "    int64_t op = code[ip++];\n";
     s = s + "    if (op == OP_CONST) { stack[sp++] = Vi(code[ip++]); }\n";
     s = s + "    else if (op == OP_CONST_F64) { stack[sp++] = Vf(g_f64s[code[ip++]]); }\n";
@@ -1122,8 +1297,30 @@ fn write_c_driver(code: list, strs: list, floats: list) -> str {
     s = s + "    else if (op == OP_RET) {\n";
     s = s + "      V val = sp > 0 ? stack[--sp] : Vi(0);\n";
     s = s + "      if (rsp == 0) return as_i(val);\n";
-    s = s + "      rsp--; slot_base = slot_bases[rsp]; ip = ret_ips[rsp];\n";
+    s = s + "      rsp--;\n";
+    s = s + "      slot_base = slot_bases[rsp];\n";
+    s = s + "      if (ret_ips[rsp] == -1) {\n";
+    s = s + "        pump_done++;\n";
+    s = s + "        stack[sp++] = val;\n";
+    s = s + "        pump_active = 1;\n";
+    s = s + "        continue;\n";
+    s = s + "      }\n";
+    s = s + "      ip = ret_ips[rsp];\n";
     s = s + "      stack[sp++] = val;\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_EMIT) {\n";
+    s = s + "      V val = stack[--sp];\n";
+    s = s + "      int64_t name_idx = as_i(stack[--sp]);\n";
+    s = s + "      ev_enqueue(name_idx, val);\n";
+    s = s + "      stack[sp++] = Vi(0);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_PENDING) { stack[sp++] = Vi((int64_t)(ev_tail - ev_head)); }\n";
+    s = s + "    else if (op == OP_PUMP) {\n";
+    s = s + "      pump_left = as_i(stack[--sp]);\n";
+    s = s + "      pump_done = 0;\n";
+    s = s + "      pump_ret_ip = ip;\n";
+    s = s + "      pump_active = 1;\n";
+    s = s + "      continue;\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_HALT) { return 0; }\n";
     s = s + "    else { fprintf(stderr, \"bad op %lld\\n\", (long long)op); exit(1); }\n";
@@ -1140,53 +1337,57 @@ fn main() -> i64 {
     let src: str = read_file("examples/selfhost/bc_mini.kenga");
     let r = compile_src(src);
     assert(len(r[0]) > 10);
-    assert(write_file("bootstrap/generated/bc_from_src.c", write_c_driver(r[0], r[1], r[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_src.c", write_c_driver(r[0], r[1], r[2], r[3])) == true);
 
     let src2: str = read_file("examples/selfhost/bc_for.kenga");
     let r2 = compile_src(src2);
-    assert(write_file("bootstrap/generated/bc_from_for.c", write_c_driver(r2[0], r2[1], r2[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_for.c", write_c_driver(r2[0], r2[1], r2[2], r2[3])) == true);
 
     let src3: str = read_file("examples/selfhost/bc_fn_mini.kenga");
     let r3 = compile_src(src3);
-    assert(write_file("bootstrap/generated/bc_from_fn.c", write_c_driver(r3[0], r3[1], r3[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_fn.c", write_c_driver(r3[0], r3[1], r3[2], r3[3])) == true);
 
     let src4: str = read_file("examples/selfhost/bc_lists.kenga");
     let r4 = compile_src(src4);
-    assert(write_file("bootstrap/generated/bc_from_lists.c", write_c_driver(r4[0], r4[1], r4[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_lists.c", write_c_driver(r4[0], r4[1], r4[2], r4[3])) == true);
 
     let src5: str = read_file("examples/selfhost/bc_for_list.kenga");
     let r5 = compile_src(src5);
-    assert(write_file("bootstrap/generated/bc_from_for_list.c", write_c_driver(r5[0], r5[1], r5[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_for_list.c", write_c_driver(r5[0], r5[1], r5[2], r5[3])) == true);
 
     let src6: str = read_file("examples/selfhost/bc_break.kenga");
     let r6 = compile_src(src6);
-    assert(write_file("bootstrap/generated/bc_from_break.c", write_c_driver(r6[0], r6[1], r6[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_break.c", write_c_driver(r6[0], r6[1], r6[2], r6[3])) == true);
 
     let src7: str = read_file("examples/selfhost/for_lite.kenga");
     let r7 = compile_src(src7);
-    assert(write_file("bootstrap/generated/bc_from_for_lite.c", write_c_driver(r7[0], r7[1], r7[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_for_lite.c", write_c_driver(r7[0], r7[1], r7[2], r7[3])) == true);
 
     let src8: str = read_file("examples/selfhost/lists_lite.kenga");
     let r8 = compile_src(src8);
-    assert(write_file("bootstrap/generated/bc_from_lists_lite.c", write_c_driver(r8[0], r8[1], r8[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_lists_lite.c", write_c_driver(r8[0], r8[1], r8[2], r8[3])) == true);
 
     let src9: str = read_file("examples/selfhost/bc_elif.kenga");
     let r9 = compile_src(src9);
-    assert(write_file("bootstrap/generated/bc_from_elif.c", write_c_driver(r9[0], r9[1], r9[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_elif.c", write_c_driver(r9[0], r9[1], r9[2], r9[3])) == true);
 
     let src10: str = read_file("examples/selfhost/elif_lite.kenga");
     let r10 = compile_src(src10);
-    assert(write_file("bootstrap/generated/bc_from_elif_lite.c", write_c_driver(r10[0], r10[1], r10[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_elif_lite.c", write_c_driver(r10[0], r10[1], r10[2], r10[3])) == true);
 
     let src11: str = read_file("examples/selfhost/float_lite.kenga");
     let r11 = compile_src(src11);
-    assert(write_file("bootstrap/generated/bc_from_float_lite.c", write_c_driver(r11[0], r11[1], r11[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_float_lite.c", write_c_driver(r11[0], r11[1], r11[2], r11[3])) == true);
 
     let src12: str = read_file("examples/selfhost/struct_lite.kenga");
     let r12 = compile_src(src12);
-    assert(write_file("bootstrap/generated/bc_from_struct_lite.c", write_c_driver(r12[0], r12[1], r12[2])) == true);
+    assert(write_file("bootstrap/generated/bc_from_struct_lite.c", write_c_driver(r12[0], r12[1], r12[2], r12[3])) == true);
 
-    println("wrote bootstrap/generated/bc_from_*.c incl for_lite/lists_lite/elif/elif_lite/float_lite/struct_lite");
+    let src13: str = read_file("examples/agent.kenga");
+    let r13 = compile_src(src13);
+    assert(write_file("bootstrap/generated/bc_from_agent.c", write_c_driver(r13[0], r13[1], r13[2], r13[3])) == true);
+
+    println("wrote bootstrap/generated/bc_from_*.c incl agent/for_lite/lists_lite/elif/elif_lite/float_lite/struct_lite");
     println("bc_src_c ok");
     return 0;
 }
