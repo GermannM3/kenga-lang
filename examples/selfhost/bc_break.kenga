@@ -1,0 +1,17 @@
+// break/continue in for-range via bc_src_c.
+
+fn main() {
+    let acc = 0;
+    for i in 0..5 {
+        if i == 3 { break; }
+        acc = acc + i;
+    }
+    println(acc);
+    let skip = 0;
+    for i in 0..5 {
+        if i == 2 { continue; }
+        skip = skip + i;
+    }
+    println(skip);
+    return 0;
+}

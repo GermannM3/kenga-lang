@@ -8,6 +8,7 @@ fn OP_ADD() -> i64 { return 4; }
 fn OP_MUL() -> i64 { return 6; }
 fn OP_LT() -> i64 { return 8; }
 fn OP_GT() -> i64 { return 9; }
+fn OP_EQ() -> i64 { return 10; }
 fn OP_JMP() -> i64 { return 11; }
 fn OP_JMPF() -> i64 { return 12; }
 fn OP_HALT() -> i64 { return 13; }
@@ -316,6 +317,11 @@ fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     code = r[0]; i = r[1]; vnames = r[2];
     i = skip(s, i);
     if i >= len(s) { return [code, i, vnames]; }
+    if starts_with(s, i, "==") == 1 {
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        code = push(r[0], OP_EQ());
+        return [code, r[1], r[2]];
+    }
     if s[i] == "<" {
         r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc);
         code = push(r[0], OP_LT());
@@ -329,12 +335,39 @@ fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     return [code, i, vnames];
 }
 
-fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+fn loops_pop(loops: list) -> list {
+    let n: i64 = len(loops);
+    assert(n > 0);
+    let out: list = [];
+    let i: i64 = 0;
+    while i < n - 1 {
+        out = push(out, loops[i]);
+        i = i + 1;
+    }
+    return out;
+}
+fn patch_jmp_sites(code: list, sites: list, target: i64) -> list {
+    let i: i64 = 0;
+    while i < len(sites) {
+        code[sites[i]] = target;
+        i = i + 1;
+    }
+    return code;
+}
+
+fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, loops: list) -> list {
     i = skip(s, i);
     if starts_kw(s, i, "let") == 1 {
         i = skip(s, i + 3);
         let id = parse_ident(s, i);
         i = skip(s, id[1]);
+        if i < len(s) {
+            if s[i] == ":" {
+                i = i + 1;
+                let ty = parse_ident(s, i);
+                i = skip(s, ty[1]);
+            }
+        }
         assert(s[i] == "=");
         i = i + 1;
         let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
@@ -373,15 +406,23 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             code = push(code, OP_LT());
             let jmpf_at: i64 = len(code);
             code = emit2(code, OP_JMPF(), 0);
+            loops = push(loops, [[], []]);
             i = skip(s, i);
-            let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc);
+            let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops);
             code = body[0]; i = body[1]; vnames = body[2];
+            let top: i64 = len(loops) - 1;
+            let frame = loops[top];
+            let cont_ip: i64 = len(code);
+            code = patch_jmp_sites(code, frame[0], cont_ip);
             code = emit2(code, OP_LOAD(), sl[0]);
             code = emit2(code, OP_CONST(), 1);
             code = push(code, OP_ADD());
             code = emit2(code, OP_STORE(), sl[0]);
             code = emit2(code, OP_JMP(), loop_start);
-            code[jmpf_at + 1] = len(code);
+            let end_ip: i64 = len(code);
+            code[jmpf_at + 1] = end_ip;
+            code = patch_jmp_sites(code, frame[1], end_ip);
+            loops = loops_pop(loops);
             return [code, i, vnames];
         }
         // for v in xs
@@ -407,15 +448,23 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         code = emit2(code, OP_LOAD(), ix[0]);
         code = push(code, OP_GET());
         code = emit2(code, OP_STORE(), vsl[0]);
+        loops = push(loops, [[], []]);
         i = skip(s, i);
-        let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc);
+        let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops);
         code = body[0]; i = body[1]; vnames = body[2];
+        let top2: i64 = len(loops) - 1;
+        let frame2 = loops[top2];
+        let cont_ip2: i64 = len(code);
+        code = patch_jmp_sites(code, frame2[0], cont_ip2);
         code = emit2(code, OP_LOAD(), ix[0]);
         code = emit2(code, OP_CONST(), 1);
         code = push(code, OP_ADD());
         code = emit2(code, OP_STORE(), ix[0]);
         code = emit2(code, OP_JMP(), loop_start);
-        code[jmpf_at + 1] = len(code);
+        let end_ip2: i64 = len(code);
+        code[jmpf_at + 1] = end_ip2;
+        code = patch_jmp_sites(code, frame2[1], end_ip2);
+        loops = loops_pop(loops);
         return [code, i, vnames];
     }
     if starts_kw(s, i, "while") == 1 {
@@ -425,20 +474,18 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         code = r[0]; i = r[1]; vnames = r[2];
         let jmpf_at: i64 = len(code);
         code = emit2(code, OP_JMPF(), 0);
+        loops = push(loops, [[], []]);
         i = skip(s, i);
-        assert(s[i] == "{");
-        i = i + 1;
-        while true {
-            i = skip(s, i);
-            if i >= len(s) { break; }
-            if s[i] == "}" { break; }
-            let st = emit_stmt(s, i, code, vnames, fnames, faddrs, fargc);
-            code = st[0]; i = st[1]; vnames = st[2];
-        }
-        assert(s[i] == "}");
-        i = i + 1;
+        let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops);
+        code = body[0]; i = body[1]; vnames = body[2];
+        let top3: i64 = len(loops) - 1;
+        let frame3 = loops[top3];
+        code = patch_jmp_sites(code, frame3[0], loop_start);
         code = emit2(code, OP_JMP(), loop_start);
-        code[jmpf_at + 1] = len(code);
+        let end_ip3: i64 = len(code);
+        code[jmpf_at + 1] = end_ip3;
+        code = patch_jmp_sites(code, frame3[1], end_ip3);
+        loops = loops_pop(loops);
         return [code, i, vnames];
     }
     if starts_kw(s, i, "if") == 1 {
@@ -449,7 +496,7 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         code = emit2(code, OP_JMPF(), 0);
         i = skip(s, i);
         assert(s[i] == "{");
-        let th = compile_body(s, i, code, vnames, fnames, faddrs, fargc);
+        let th = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops);
         code = th[0]; i = th[1]; vnames = th[2];
         let jmp_end: i64 = len(code);
         code = emit2(code, OP_JMP(), 0);
@@ -457,10 +504,32 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         i = skip(s, i);
         if starts_kw(s, i, "else") == 1 {
             i = skip(s, i + 4);
-            let el = compile_body(s, i, code, vnames, fnames, faddrs, fargc);
+            let el = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops);
             code = el[0]; i = el[1]; vnames = el[2];
         }
         code[jmp_end + 1] = len(code);
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "break") == 1 {
+        assert(len(loops) > 0);
+        let top4: i64 = len(loops) - 1;
+        code = emit2(code, OP_JMP(), 0);
+        let brks = loops[top4][1];
+        brks = push(brks, len(code) - 1);
+        loops[top4] = [loops[top4][0], brks];
+        i = skip(s, i + 5);
+        if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "continue") == 1 {
+        assert(len(loops) > 0);
+        let top5: i64 = len(loops) - 1;
+        code = emit2(code, OP_JMP(), 0);
+        let conts = loops[top5][0];
+        conts = push(conts, len(code) - 1);
+        loops[top5] = [conts, loops[top5][1]];
+        i = skip(s, i + 8);
+        if i < len(s) { if s[i] == ";" { i = i + 1; } }
         return [code, i, vnames];
     }
     if starts_kw(s, i, "println") == 1 {
@@ -536,7 +605,7 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
     return [code, i, vnames];
 }
 
-fn compile_body(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+fn compile_body(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, loops: list) -> list {
     i = skip(s, i);
     assert(s[i] == "{");
     i = i + 1;
@@ -544,7 +613,7 @@ fn compile_body(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: 
         i = skip(s, i);
         if i >= len(s) { break; }
         if s[i] == "}" { break; }
-        let st = emit_stmt(s, i, code, vnames, fnames, faddrs, fargc);
+        let st = emit_stmt(s, i, code, vnames, fnames, faddrs, fargc, loops);
         code = st[0]; i = st[1]; vnames = st[2];
     }
     assert(s[i] == "}");
@@ -622,7 +691,7 @@ fn compile_src(src: str) -> list {
                 vnames = push(vnames, fparams[fi][pi]);
                 pi = pi + 1;
             }
-            let bl = compile_body(fbodies[fi], 0, code, vnames, fnames, faddrs, fargc);
+            let bl = compile_body(fbodies[fi], 0, code, vnames, fnames, faddrs, fargc, []);
             code = bl[0];
             code = push(code, OP_RET());
         } else {
@@ -637,7 +706,7 @@ fn compile_src(src: str) -> list {
     let mi: i64 = fn_index(fnames, "main");
     faddrs[mi] = main_ip;
     let vnames: list = [];
-    let bl = compile_body(fbodies[mi], 0, code, vnames, fnames, faddrs, fargc);
+    let bl = compile_body(fbodies[mi], 0, code, vnames, fnames, faddrs, fargc, []);
     code = bl[0];
     code = push(code, OP_HALT());
     return code;
@@ -698,6 +767,7 @@ fn write_c_driver(code: list) -> str {
     s = s + "    else if (op == OP_MUL) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a*b; }\n";
     s = s + "    else if (op == OP_LT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a<b; }\n";
     s = s + "    else if (op == OP_GT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a>b; }\n";
+    s = s + "    else if (op == OP_EQ) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a==b; }\n";
     s = s + "    else if (op == OP_JMP) { ip = code[ip]; }\n";
     s = s + "    else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=stack[--sp]; if (!c) ip = t; }\n";
     s = s + "    else if (op == OP_PRINTLN) { printf(\"%lld\\n\", (long long)stack[--sp]); }\n";
@@ -765,7 +835,15 @@ fn main() -> i64 {
     let code5 = compile_src(src5);
     assert(write_file("bootstrap/generated/bc_from_for_list.c", write_c_driver(code5)) == true);
 
-    println("wrote bootstrap/generated/bc_from_{src,for,fn,lists,for_list}.c");
+    let src6: str = read_file("examples/selfhost/bc_break.kenga");
+    let code6 = compile_src(src6);
+    assert(write_file("bootstrap/generated/bc_from_break.c", write_c_driver(code6)) == true);
+
+    let src7: str = read_file("examples/selfhost/bc_for_lite.kenga");
+    let code7 = compile_src(src7);
+    assert(write_file("bootstrap/generated/bc_from_for_lite.c", write_c_driver(code7)) == true);
+
+    println("wrote bootstrap/generated/bc_from_*.c incl for_lite");
     println("bc_src_c ok");
     return 0;
 }
