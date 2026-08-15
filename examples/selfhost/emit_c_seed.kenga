@@ -1,2 +1,2 @@
 // Ladder alias — canonical: kenga/emit/c_seed.kenga
-import "../../kenga/emit/c_seed.kenga"
+import "../../kenga/emit/c_seed.kenga";

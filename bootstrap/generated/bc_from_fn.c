@@ -48,7 +48,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 }
 
 int main(void) {
-  static const int64_t code[] = { 11, 2, 1, 1, 3, 0, 1, 1, 3, 1, 2, 1, 1, 6, 8, 12, 33, 2, 0, 2, 1, 6, 3, 0, 2, 1, 1, 1, 4, 3, 1, 11, 10, 2, 0, 1, 100, 9, 12, 45, 2, 0, 17, 11, 48, 1, 0, 17, 1, 0, 13 };
+  static const int64_t code[] = { 11, 8, 2, 0, 2, 1, 4, 16, 1, 20, 1, 22, 15, 2, 2, 17, 1, 0, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

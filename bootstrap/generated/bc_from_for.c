@@ -5,13 +5,18 @@
 #include "opcodes.inc.c"
 
 static int64_t vm_run(const int64_t *code, int64_t n) {
-  int64_t stack[256]; int sp = 0; int64_t slots[16]; int64_t ip = 0; int i;
-  for (i = 0; i < 16; i++) slots[i] = 0;
+  int64_t stack[256]; int sp = 0;
+  int64_t slots[256]; int64_t slot_used = 0;
+  int64_t ret_ips[64]; int rsp = 0;
+  int64_t slot_bases[64];
+  int64_t slot_base = 0;
+  int64_t ip = 0; int i;
+  for (i = 0; i < 256; i++) slots[i] = 0;
   while (ip < n) {
     int64_t op = code[ip++];
     if (op == OP_CONST) { stack[sp++] = code[ip++]; }
-    else if (op == OP_LOAD) { stack[sp++] = slots[code[ip++]]; }
-    else if (op == OP_STORE) { slots[code[ip++]] = stack[--sp]; }
+    else if (op == OP_LOAD) { stack[sp++] = slots[slot_base + code[ip++]]; }
+    else if (op == OP_STORE) { slots[slot_base + code[ip++]] = stack[--sp]; }
     else if (op == OP_ADD) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a+b; }
     else if (op == OP_MUL) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a*b; }
     else if (op == OP_LT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a<b; }
@@ -19,6 +24,23 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_JMP) { ip = code[ip]; }
     else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=stack[--sp]; if (!c) ip = t; }
     else if (op == OP_PRINTLN) { printf("%lld\n", (long long)stack[--sp]); }
+    else if (op == OP_CALL) {
+      int64_t addr = code[ip++]; int64_t argc = code[ip++];
+      int64_t args[16]; int64_t ai;
+      for (ai = argc - 1; ai >= 0; ai--) args[ai] = stack[--sp];
+      ret_ips[rsp] = ip; slot_bases[rsp] = slot_base; rsp++;
+      slot_base = slot_used;
+      for (ai = 0; ai < argc; ai++) {
+        slots[slot_base + ai] = args[ai];
+        if (slot_base + ai + 1 > slot_used) slot_used = slot_base + ai + 1;
+      }
+      ip = addr;
+    }
+    else if (op == OP_RET) {
+      int64_t val = sp > 0 ? stack[--sp] : 0;
+      rsp--; slot_base = slot_bases[rsp]; ip = ret_ips[rsp];
+      stack[sp++] = val;
+    }
     else if (op == OP_HALT) { return 0; }
     else { fprintf(stderr, "bad op %lld\n", (long long)op); exit(1); }
   }
@@ -26,7 +48,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 }
 
 int main(void) {
-  static const int64_t code[] = { 1, 0, 3, 0, 1, 1, 3, 1, 1, 6, 3, 2, 2, 1, 2, 2, 8, 12, 35, 2, 0, 2, 1, 4, 3, 0, 2, 1, 1, 1, 4, 3, 1, 11, 12, 2, 0, 17, 1, 0, 13 };
+  static const int64_t code[] = { 11, 2, 1, 0, 3, 0, 1, 1, 3, 1, 1, 6, 3, 2, 2, 1, 2, 2, 8, 12, 37, 2, 0, 2, 1, 4, 3, 0, 2, 1, 1, 1, 4, 3, 1, 11, 14, 2, 0, 17, 1, 0, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

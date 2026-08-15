@@ -1,0 +1,7 @@
+fn add(a, b) {
+    return a + b;
+}
+fn main() {
+    println(add(20, 22));
+    return 0;
+}

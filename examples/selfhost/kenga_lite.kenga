@@ -1,2 +1,2 @@
 // Ladder alias — canonical: kenga/compiler/lite.kenga
-import "../../kenga/compiler/lite.kenga"
+import "../../kenga/compiler/lite.kenga";
