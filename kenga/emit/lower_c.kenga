@@ -163,12 +163,25 @@ fn match_brace(src: str, i: i64) -> i64 {
     return i;
 }
 fn skip_type_annot(s: str, i: i64) -> i64 {
+    let r = parse_type_kind(s, i);
+    return r[1];
+}
+fn parse_type_kind(s: str, i: i64) -> list {
+    // returns [kind, new_i] kind 0=i64 1=list 2=str
     i = skip(s, i);
-    if i >= len(s) { return i; }
-    if s[i] != ":" { return i; }
+    if i >= len(s) { return [0, i]; }
+    if s[i] != ":" { return [0, i]; }
     i = skip(s, i + 1);
     let ty = parse_ident(s, i);
-    return skip(s, ty[1]);
+    let k: i64 = 0;
+    if ty[0] == "list" { k = 1; }
+    if ty[0] == "str" { k = 2; }
+    return [k, skip(s, ty[1])];
+}
+fn ctype(k: i64) -> str {
+    if k == 1 { return "KList"; }
+    if k == 2 { return "const char*"; }
+    return "int64_t";
 }
 
 // decls: list of [name, kind] kind 0=i64 1=list 2=str
@@ -573,11 +586,11 @@ fn lower_stmt(s: str, i: i64, ind: i64, decls: list) -> list {
 }
 
 fn lower_fn_body(body: str, params: list) -> list {
-    // returns [c_body_with_decls_inside, _]
+    // params: list of [name, kind]
     let decls: list = [];
     let pi: i64 = 0;
     while pi < len(params) {
-        decls = ensure_decl(decls, params[pi], 0);
+        decls = ensure_decl(decls, params[pi][0], params[pi][1]);
         pi = pi + 1;
     }
     let bl = lower_block(body, 0, 1, decls);
@@ -590,7 +603,7 @@ fn lower_fn_body(body: str, params: list) -> list {
         let is_param: i64 = 0;
         let pj: i64 = 0;
         while pj < len(params) {
-            if params[pj] == nm { is_param = 1; }
+            if params[pj][0] == nm { is_param = 1; }
             pj = pj + 1;
         }
         if is_param == 0 {
@@ -675,9 +688,9 @@ fn lower_program(src: str) -> str {
             if src[i] != ")" {
                 while true {
                     let pn = parse_ident(src, i);
-                    params = push(params, pn[0]);
-                    i = skip_type_annot(src, pn[1]);
-                    i = skip(src, i);
+                    let tk = parse_type_kind(src, pn[1]);
+                    params = push(params, [pn[0], tk[0]]);
+                    i = skip(src, tk[1]);
                     if src[i] == "," { i = i + 1; continue; }
                     break;
                 }
@@ -709,9 +722,9 @@ fn lower_program(src: str) -> str {
         if src[i] != ")" {
             while true {
                 let pn = parse_ident(src, i);
-                params = push(params, pn[0]);
-                i = skip_type_annot(src, pn[1]);
-                i = skip(src, i);
+                let tk = parse_type_kind(src, pn[1]);
+                params = push(params, [pn[0], tk[0]]);
+                i = skip(src, tk[1]);
                 if src[i] == "," { i = i + 1; continue; }
                 break;
             }
@@ -749,7 +762,7 @@ fn lower_program(src: str) -> str {
             let pj: i64 = 0;
             while pj < len(fparams[fi]) {
                 if pj > 0 { out = out + ", "; }
-                out = out + "int64_t " + fparams[fi][pj];
+                out = out + ctype(fparams[fi][pj][1]) + " " + fparams[fi][pj][0];
                 pj = pj + 1;
             }
             out = out + ");\n";
@@ -757,7 +770,7 @@ fn lower_program(src: str) -> str {
         if fkinds[fi] == 1 {
             out = out + "static void " + fnames[fi] + "(";
             if len(fparams[fi]) == 1 {
-                out = out + "int64_t " + fparams[fi][0];
+                out = out + ctype(fparams[fi][0][1]) + " " + fparams[fi][0][0];
             } else {
                 out = out + "int64_t __unused";
             }
@@ -772,7 +785,7 @@ fn lower_program(src: str) -> str {
         if fkinds[fi] == 1 {
             out = out + "static void " + fnames[fi] + "(";
             if len(fparams[fi]) == 1 {
-                out = out + "int64_t " + fparams[fi][0];
+                out = out + ctype(fparams[fi][0][1]) + " " + fparams[fi][0][0];
             } else {
                 out = out + "int64_t __unused";
             }
@@ -785,7 +798,7 @@ fn lower_program(src: str) -> str {
             let pj: i64 = 0;
             while pj < len(fparams[fi]) {
                 if pj > 0 { out = out + ", "; }
-                out = out + "int64_t " + fparams[fi][pj];
+                out = out + ctype(fparams[fi][pj][1]) + " " + fparams[fi][pj][0];
                 pj = pj + 1;
             }
             out = out + ") {\n";
@@ -835,7 +848,10 @@ fn main() -> i64 {
     let imp = resolve_imports("examples/selfhost/lower_import.kenga", 0);
     assert(write_file("bootstrap/bin/lower_import.c", lower_program(imp)) == true);
 
-    println("wrote bootstrap/bin/lower_*.c incl events+agent+import");
+    let forlite = resolve_imports("examples/selfhost/for_lite.kenga", 0);
+    assert(write_file("bootstrap/bin/lower_for_lite.c", lower_program(forlite)) == true);
+
+    println("wrote bootstrap/bin/lower_*.c incl events+agent+import+for_lite");
     println("lower_c ok");
     return 0;
 }
