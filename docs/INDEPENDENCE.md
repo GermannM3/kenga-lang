@@ -19,7 +19,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 1. Lite host (C) — living без Rust.  
 2. **`kenga/compiler`** вытесняет `src/compiler.rs` + кусок VM.  
 3. **`lower_c` / `lower_kv`** вытесняют `codegen.rs`.  
-4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM (lite + agent + **import** flatten); shared **`bootstrap/generated/bc_rt.inc.c`**.  
+4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM (lite + agent + **import** flatten); shared **`bootstrap/generated/bc_rt.inc.c`**. Одноразовый запуск: **`scripts\bc-run.cmd path\to\file.kenga`** → `bc_one_out.c`.  
 5. Emit полного lite runtime (`rt_kval` → host) → ручной `kenga_lite.c` уходит.  
 6. Releases без cargo; `src/` → archive.  
 7. VM на Kenga → C уходит.
@@ -31,6 +31,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 ```bat
 bootstrap\build.cmd
 scripts\freedom-smoke.cmd
+scripts\bc-run.cmd examples\selfhost\fact_lite.kenga
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval.kenga

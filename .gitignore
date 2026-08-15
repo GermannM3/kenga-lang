@@ -18,6 +18,7 @@ bootstrap/kenga_lite.gen.c
 bootstrap/generated/*.exe
 bootstrap/generated/*.obj
 bootstrap/generated/*.txt
+bootstrap/generated/bc_one_out.c
 !bootstrap/generated/.gitkeep
 !bootstrap/generated/*.c
 !bootstrap/generated/*.inc.c

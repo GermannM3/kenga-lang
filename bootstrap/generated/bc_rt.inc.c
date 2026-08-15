@@ -113,6 +113,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_ADD) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b)); else stack[sp++]=Vi(a.i+b.i); }
     else if (op == OP_SUB) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)-as_f(b)); else stack[sp++]=Vi(a.i-b.i); }
     else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }
+    else if (op == OP_DIV) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)/as_f(b)); else stack[sp++]=Vi(a.i/b.i); }
     else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }
     else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }
     else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }

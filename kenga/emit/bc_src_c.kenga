@@ -7,6 +7,7 @@ fn OP_STORE() -> i64 { return 3; }
 fn OP_ADD() -> i64 { return 4; }
 fn OP_SUB() -> i64 { return 5; }
 fn OP_MUL() -> i64 { return 6; }
+fn OP_DIV() -> i64 { return 7; }
 fn OP_LT() -> i64 { return 8; }
 fn OP_GT() -> i64 { return 9; }
 fn OP_EQ() -> i64 { return 10; }
@@ -51,6 +52,32 @@ fn join_path(dir: str, rel: str) -> str {
     if len(dir) == 0 { return rel; }
     if dir == "." { return rel; }
     return dir + "/" + rel;
+}
+fn trim_path(s: str) -> str {
+    let n: i64 = len(s);
+    let start: i64 = 0;
+    while start < n {
+        let ch: str = s[start];
+        if ch == " " { start = start + 1; continue; }
+        if ch == "\t" { start = start + 1; continue; }
+        if ch == "\n" { start = start + 1; continue; }
+        if ord(ch) == 13 { start = start + 1; continue; }
+        break;
+    }
+    let end: i64 = n - 1;
+    while end >= start {
+        let ch2: str = s[end];
+        if ch2 == " " { end = end - 1; continue; }
+        if ch2 == "\t" { end = end - 1; continue; }
+        if ch2 == "\n" { end = end - 1; continue; }
+        if ord(ch2) == 13 { end = end - 1; continue; }
+        break;
+    }
+    if end < start { return ""; }
+    let out: str = "";
+    let i: i64 = start;
+    while i <= end { out = out + s[i]; i = i + 1; }
+    return out;
 }
 fn resolve_imports(path: str, depth: i64) -> str {
     assert(depth < 32);
@@ -506,15 +533,35 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             i = id[1]; vnames = sl[1];
                         }
                     } else {
+                        if id[0] == "true" {
+                            code = emit2(code, OP_CONST(), 1);
+                            i = id[1];
+                        } else {
+                            if id[0] == "false" {
+                                code = emit2(code, OP_CONST(), 0);
+                                i = id[1];
+                            } else {
+                                let sl = slot_of(vnames, id[0]);
+                                code = emit2(code, OP_LOAD(), sl[0]);
+                                i = id[1]; vnames = sl[1];
+                            }
+                        }
+                    }
+                }
+            } else {
+                if id[0] == "true" {
+                    code = emit2(code, OP_CONST(), 1);
+                    i = id[1];
+                } else {
+                    if id[0] == "false" {
+                        code = emit2(code, OP_CONST(), 0);
+                        i = id[1];
+                    } else {
                         let sl = slot_of(vnames, id[0]);
                         code = emit2(code, OP_LOAD(), sl[0]);
                         i = id[1]; vnames = sl[1];
                     }
                 }
-            } else {
-                let sl = slot_of(vnames, id[0]);
-                code = emit2(code, OP_LOAD(), sl[0]);
-                i = id[1]; vnames = sl[1];
             }
         } else {
             let n = parse_number(s, i);
@@ -569,7 +616,13 @@ fn emit_term(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
             code = push(r[0], OP_MUL());
             i = r[1]; vnames = r[2];
-        } else { break; }
+        } else {
+            if s[i] == "/" {
+                r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+                code = push(r[0], OP_DIV());
+                i = r[1]; vnames = r[2];
+            } else { break; }
+        }
     }
     return [code, i, vnames];
 }
@@ -1313,6 +1366,7 @@ fn write_runtime() -> str {
     s = s + "    else if (op == OP_ADD) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b)); else stack[sp++]=Vi(a.i+b.i); }\n";
     s = s + "    else if (op == OP_SUB) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)-as_f(b)); else stack[sp++]=Vi(a.i-b.i); }\n";
     s = s + "    else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }\n";
+    s = s + "    else if (op == OP_DIV) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)/as_f(b)); else stack[sp++]=Vi(a.i/b.i); }\n";
     s = s + "    else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }\n";
     s = s + "    else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }\n";
     s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
@@ -1470,7 +1524,18 @@ fn main() -> i64 {
     let r15 = compile_src(resolve_imports("examples/selfhost/bc_arith.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_arith.c", write_c_driver(r15[0], r15[1], r15[2], r15[3])) == true);
 
-    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/arith/struct");
+    let r16 = compile_src(resolve_imports("examples/selfhost/fact_lite.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_fact_lite.c", write_c_driver(r16[0], r16[1], r16[2], r16[3])) == true);
+
+    let raw: str = read_file("bootstrap/generated/_bc_path.txt");
+    let one: str = trim_path(raw);
+    if len(one) > 0 {
+        let r17 = compile_src(resolve_imports(one, 0));
+        assert(write_file("bootstrap/generated/bc_one_out.c", write_c_driver(r17[0], r17[1], r17[2], r17[3])) == true);
+        println("wrote bc_one_out.c for " + one);
+    }
+
+    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/arith/struct/fact_lite");
     println("bc_src_c ok");
     return 0;
 }
