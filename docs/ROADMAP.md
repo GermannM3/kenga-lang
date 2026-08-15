@@ -27,7 +27,9 @@
 | ✅ | Каталог **`kenga/`** — каноническая замена `src/` (`compiler/more`, `emit/c_seed`) |
 | ✅ | `docs/REPLACE_RUST.md` — карта модулей Rust → Kenga |
 | ✅ | **`more.kenga` step 10**: for/break/continue, `xs[i]=`, else if, struct, import, `run_file` |
-| ✅ | **`kenga/emit/expr_c.kenga`** + `scripts/freedom-smoke.cmd` (Kenga → C → native без cargo) |
+| ✅ | Forward `fn` call patches в `more.kenga` |
+| ✅ | **`kenga/emit/{expr_c,control_c}.kenga`** + `scripts/freedom-smoke.cmd` (Kenga → C → native без cargo) |
+| ⬜ | Events (`on`/`emit`/`pump`) в `more.kenga` |
 | ⬜ | Emit полного lite-диалекта → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
