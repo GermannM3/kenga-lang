@@ -51,18 +51,18 @@ bootstrap\rebuild-from-kenga.cmd
 | 10 | `kenga/compiler/more.kenga` | for / elif / struct / import / events / `run_file` |
 | 11 | `kenga/emit/lower_c.kenga` | recursive Kenga→C99 (agent, lists, struct, f64, import) |
 | 12 | `kenga/emit/lower_kv.kenga` + `rt_kval` | tagged KVal path (str/ord/lex/parse) |
-| 13 | `opcodes_c` + `bc_vm_c` | opcodes + tiny bytecode VM seed from Kenga |
+| 13 | `opcodes_c` + `bc_vm_c` + `bc_compile_c` | opcodes + VM + while→bytecode→native |
 
 ```bash
 kenga run --lite kenga/compiler/more.kenga
 bootstrap/bin/kenga-lite.exe run kenga/emit/lower_c.kenga
 bootstrap/bin/kenga-lite.exe run kenga/emit/lower_kv.kenga
-bootstrap/bin/kenga-lite.exe run kenga/emit/bc_vm_c.kenga
+bootstrap/bin/kenga-lite.exe run kenga/emit/bc_compile_c.kenga
 scripts/freedom-smoke.cmd   # more + emit → C → native
 ```
 
 До полного chicken-egg: см. **`docs/INDEPENDENCE.md`**.  
-Codegen без Rust: `lower_c` / `lower_kv` / `rt_kval` / `bc_vm_c`.
+Codegen без Rust: `lower_c` / `lower_kv` / `rt_kval` / `bc_compile_c`.
 
 ## emit-c: tagged KVal
 

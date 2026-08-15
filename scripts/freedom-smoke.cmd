@@ -47,6 +47,10 @@ echo === kenga/emit/bc_vm_c.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\bc_vm_c.kenga
 if errorlevel 1 exit /b 1
 
+echo === kenga/emit/bc_compile_c.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\bc_compile_c.kenga
+if errorlevel 1 exit /b 1
+
 set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
 if exist "%VCVARS%" (
   call "%VCVARS%" >nul
@@ -105,7 +109,7 @@ if exist "%VCVARS%" (
       if errorlevel 1 exit /b 1
     )
     pushd bootstrap\generated
-    for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag bc_vm_seed) do (
+    for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag bc_vm_seed bc_while_sum) do (
       gcc -O2 -std=c99 %%f.c -o %%f.exe
       if errorlevel 1 exit /b 1
       %%f.exe
