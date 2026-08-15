@@ -29,7 +29,8 @@
 | ✅ | **`more.kenga` step 10**: for/break/continue, `xs[i]=`, else if, struct, import, `run_file` |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
-| ✅ | **`kenga/emit/{expr_c,control_c}.kenga`** + `scripts/freedom-smoke.cmd` (Kenga → C → native без cargo) |
+| ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
+| ✅ | **`kenga/emit/{expr_c,control_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ⬜ | Emit полного lite-диалекта → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
