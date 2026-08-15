@@ -1,0 +1,9 @@
+fn main() -> i64 {
+  let s = "ab";
+  assert(ord(s[0]) == 97);
+  assert(len(s) == 2);
+  let t = s + "c";
+  println(t);
+  assert(ord("A") == 65);
+  return 0;
+}

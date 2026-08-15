@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "opcodes.inc.c"
 
@@ -16,7 +17,7 @@ static const double g_f64s[] = { 0.0 };
 #include "bc_rt.inc.c"
 
 int main(void) {
-  static const int64_t code[] = { 11, 50, 2, 0, 17, 2, 0, 1, 3, 8, 12, 22, 1, 1, 2, 0, 1, 1, 4, 29, 11, 22, 16, 1, 2, 2, 0, 1, 2, 6, 29, 16, 2, 0, 17, 2, 0, 1, 8, 8, 12, 49, 1, 0, 2, 0, 29, 11, 49, 16, 32, 3, 1, 0, 1, 0, 29, 1, 32, 30, 3, 0, 2, 0, 17, 31, 1, 0, 10, 18, 1, 0, 16, 13 };
+  static const int64_t code[] = { 11, 50, 2, 0, 17, 2, 0, 1, 3, 8, 12, 22, 35, 1, 2, 0, 1, 1, 4, 29, 11, 22, 16, 35, 2, 2, 0, 1, 2, 6, 29, 16, 2, 0, 17, 2, 0, 1, 8, 8, 12, 49, 35, 0, 2, 0, 29, 11, 49, 16, 35, 3, 17, 35, 0, 1, 0, 29, 1, 32, 30, 3, 0, 2, 0, 17, 31, 1, 0, 10, 18, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

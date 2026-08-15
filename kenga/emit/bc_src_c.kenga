@@ -30,6 +30,8 @@ fn OP_LEN() -> i64 { return 23; }
 fn OP_GET() -> i64 { return 24; }
 fn OP_SET() -> i64 { return 28; }
 fn OP_LIST_TAG() -> i64 { return 34; }
+fn OP_CONST_STR() -> i64 { return 35; }
+fn OP_ORD() -> i64 { return 27; }
 fn OP_EMIT() -> i64 { return 29; }
 fn OP_PUMP() -> i64 { return 30; }
 fn OP_PENDING() -> i64 { return 31; }
@@ -403,7 +405,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
             let ps = parse_string(s, i);
             let sip = str_in_pool(strbox[0], ps[0]);
             strbox[0] = sip[1];
-            code = emit2(code, OP_CONST(), sip[0]);
+            code = emit2(code, OP_CONST_STR(), sip[0]);
             i = ps[1];
         } else {
         if is_alpha(s[i]) == 1 {
@@ -421,6 +423,15 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                         code = push(code, OP_ROUND());
                         i = j;
                     } else {
+                        if id[0] == "ord" {
+                            let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
+                            code = ar[0]; j = ar[1]; vnames = ar[2];
+                            j = skip(s, j);
+                            assert(s[j] == ")");
+                            j = j + 1;
+                            code = push(code, OP_ORD());
+                            i = j;
+                        } else {
                         if id[0] == "len" {
                             let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                             code = ar[0]; j = ar[1]; vnames = ar[2];
@@ -497,6 +508,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 } else {
@@ -909,13 +921,13 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         i = skip(s, i);
         if s[i] == "\"" {
             let ps = parse_string(s, i);
-            let strs = strbox[0];
-            strs = push(strs, ps[0]);
-            strbox[0] = strs;
-            code = emit2(code, OP_PRINT_STR(), len(strs) - 1);
+            let sip = str_in_pool(strbox[0], ps[0]);
+            strbox[0] = sip[1];
+            code = emit2(code, OP_CONST_STR(), sip[0]);
             i = skip(s, ps[1]);
             assert(s[i] == ")");
             i = i + 1;
+            code = push(code, OP_PRINTLN());
         } else {
             let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, strbox);
             code = r[0]; i = r[1]; vnames = r[2];
@@ -1263,11 +1275,47 @@ fn write_runtime() -> str {
     s = s + "static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }\n";
     s = s + "static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }\n";
     s = s + "static V Vl(int64_t x) { V v; v.tag=2; v.i=x; v.f=0; return v; }\n";
+    s = s + "static V Vs(int64_t x) { V v; v.tag=3; v.i=x; v.f=0; return v; }\n";
     s = s + "static double as_f(V v) { return v.tag==1 ? v.f : (double)v.i; }\n";
     s = s + "static int64_t as_i(V v) { return v.tag==1 ? (int64_t)llround(v.f) : v.i; }\n";
     s = s + "static int64_t as_list(V v) {\n";
     s = s + "  if (v.tag != 2) { fprintf(stderr, \"expected list\\n\"); exit(1); }\n";
     s = s + "  return v.i;\n";
+    s = s + "}\n";
+    s = s + "static char *gS[4096];\n";
+    s = s + "static int gSn = 0;\n";
+    s = s + "static int64_t s_new(const char *s) {\n";
+    s = s + "  size_t n;\n";
+    s = s + "  char *p;\n";
+    s = s + "  if (gSn >= 4096) { fprintf(stderr, \"str heap full\\n\"); exit(1); }\n";
+    s = s + "  n = strlen(s);\n";
+    s = s + "  p = (char*)malloc(n + 1);\n";
+    s = s + "  if (!p) { fprintf(stderr, \"oom\\n\"); exit(1); }\n";
+    s = s + "  memcpy(p, s, n + 1);\n";
+    s = s + "  gS[gSn] = p;\n";
+    s = s + "  return (int64_t)gSn++;\n";
+    s = s + "}\n";
+    s = s + "static const char *as_str(V v) {\n";
+    s = s + "  if (v.tag != 3) { fprintf(stderr, \"expected str\\n\"); exit(1); }\n";
+    s = s + "  return gS[v.i];\n";
+    s = s + "}\n";
+    s = s + "static int64_t s_from_pool(int idx) { return s_new(g_strs[idx]); }\n";
+    s = s + "static int64_t s_char_at(int64_t sid, int64_t ix) {\n";
+    s = s + "  const char *s = gS[sid];\n";
+    s = s + "  size_t n = strlen(s);\n";
+    s = s + "  char buf[2];\n";
+    s = s + "  if (ix < 0 || (size_t)ix >= n) { fprintf(stderr, \"index oob\\n\"); exit(1); }\n";
+    s = s + "  buf[0] = s[ix]; buf[1] = 0;\n";
+    s = s + "  return s_new(buf);\n";
+    s = s + "}\n";
+    s = s + "static char *v_to_cstr(V v) {\n";
+    s = s + "  char buf[64];\n";
+    s = s + "  char *out;\n";
+    s = s + "  if (v.tag == 3) return strdup(as_str(v));\n";
+    s = s + "  if (v.tag == 0) { sprintf(buf, \"%lld\", (long long)v.i); return strdup(buf); }\n";
+    s = s + "  if (v.tag == 1) { sprintf(buf, \"%g\", v.f); return strdup(buf); }\n";
+    s = s + "  fprintf(stderr, \"cannot stringify\\n\"); exit(1);\n";
+    s = s + "  return NULL;\n";
     s = s + "}\n\n";
     s = s + "typedef struct { int64_t *d; size_t n, cap; } LObj;\n";
     s = s + "static LObj gL[256];\n";
@@ -1361,9 +1409,20 @@ fn write_runtime() -> str {
     s = s + "    int64_t op = code[ip++];\n";
     s = s + "    if (op == OP_CONST) { stack[sp++] = Vi(code[ip++]); }\n";
     s = s + "    else if (op == OP_CONST_F64) { stack[sp++] = Vf(g_f64s[code[ip++]]); }\n";
+    s = s + "    else if (op == OP_CONST_STR) { stack[sp++] = Vs(s_from_pool((int)code[ip++])); }\n";
     s = s + "    else if (op == OP_LOAD) { stack[sp++] = slots[slot_base + code[ip++]]; }\n";
     s = s + "    else if (op == OP_STORE) { int64_t idx=slot_base+code[ip++]; slots[idx]=stack[--sp]; if (idx+1>slot_used) slot_used=idx+1; }\n";
-    s = s + "    else if (op == OP_ADD) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b)); else stack[sp++]=Vi(a.i+b.i); }\n";
+    s = s + "    else if (op == OP_ADD) {\n";
+    s = s + "      V b=stack[--sp]; V a=stack[--sp];\n";
+    s = s + "      if (a.tag==3 || b.tag==3) {\n";
+    s = s + "        char *sa=v_to_cstr(a), *sb=v_to_cstr(b); size_t na=strlen(sa), nb=strlen(sb);\n";
+    s = s + "        char *cat=(char*)malloc(na+nb+1);\n";
+    s = s + "        if (!cat) { fprintf(stderr, \"oom\\n\"); exit(1); }\n";
+    s = s + "        memcpy(cat, sa, na); memcpy(cat+na, sb, nb+1);\n";
+    s = s + "        free(sa); free(sb); stack[sp++]=Vs(s_new(cat)); free(cat);\n";
+    s = s + "      } else if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b));\n";
+    s = s + "      else stack[sp++]=Vi(a.i+b.i);\n";
+    s = s + "    }\n";
     s = s + "    else if (op == OP_SUB) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)-as_f(b)); else stack[sp++]=Vi(a.i-b.i); }\n";
     s = s + "    else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }\n";
     s = s + "    else if (op == OP_DIV) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)/as_f(b)); else stack[sp++]=Vi(a.i/b.i); }\n";
@@ -1371,8 +1430,18 @@ fn write_runtime() -> str {
     s = s + "    else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }\n";
     s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
     s = s + "    else if (op == OP_GE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>=as_f(b)); else stack[sp++]=Vi(a.i>=b.i); }\n";
-    s = s + "    else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }\n";
-    s = s + "    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }\n";
+    s = s + "    else if (op == OP_EQ) {\n";
+    s = s + "      V b=stack[--sp]; V a=stack[--sp];\n";
+    s = s + "      if (a.tag==3 && b.tag==3) stack[sp++]=Vi(strcmp(as_str(a), as_str(b))==0);\n";
+    s = s + "      else if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)==as_f(b));\n";
+    s = s + "      else stack[sp++]=Vi(a.i==b.i);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_NE) {\n";
+    s = s + "      V b=stack[--sp]; V a=stack[--sp];\n";
+    s = s + "      if (a.tag==3 && b.tag==3) stack[sp++]=Vi(strcmp(as_str(a), as_str(b))!=0);\n";
+    s = s + "      else if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)!=as_f(b));\n";
+    s = s + "      else stack[sp++]=Vi(a.i!=b.i);\n";
+    s = s + "    }\n";
     s = s + "    else if (op == OP_ROUND) { V x=stack[--sp]; stack[sp++]=Vi((int64_t)llround(as_f(x))); }\n";
     s = s + "    else if (op == OP_JMP) { ip = code[ip]; }\n";
     s = s + "    else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=as_i(stack[--sp]); if (!c) ip = t; }\n";
@@ -1389,7 +1458,8 @@ fn write_runtime() -> str {
     s = s + "          for (li=0; li<L->n; li++) { if (li) printf(\", \"); printf(\"%lld\", (long long)L->d[li]); }\n";
     s = s + "          printf(\"]\\n\");\n";
     s = s + "        }\n";
-    s = s + "      } else if (v.tag==1) printf(\"%g\\n\", v.f);\n";
+    s = s + "      } else if (v.tag==3) printf(\"%s\\n\", as_str(v));\n";
+    s = s + "      else if (v.tag==1) printf(\"%g\\n\", v.f);\n";
     s = s + "      else printf(\"%lld\\n\", (long long)v.i);\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_ASSERT) { if (!as_i(stack[--sp])) { fprintf(stderr, \"assert failed\\n\"); exit(1); } }\n";
@@ -1403,10 +1473,23 @@ fn write_runtime() -> str {
     s = s + "      int64_t v = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
     s = s + "      lpush(lid, v); stack[sp++] = Vl(lid);\n";
     s = s + "    }\n";
-    s = s + "    else if (op == OP_LEN) { int64_t x = as_list(stack[--sp]); stack[sp++] = Vi(llen(x)); }\n";
+    s = s + "    else if (op == OP_LEN) {\n";
+    s = s + "      V x=stack[--sp];\n";
+    s = s + "      if (x.tag==3) stack[sp++]=Vi((int64_t)strlen(as_str(x)));\n";
+    s = s + "      else if (x.tag==2) stack[sp++]=Vi(llen(x.i));\n";
+    s = s + "      else { fprintf(stderr, \"len: bad type\\n\"); exit(1); }\n";
+    s = s + "    }\n";
     s = s + "    else if (op == OP_GET) {\n";
-    s = s + "      int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
-    s = s + "      stack[sp++] = Vi(lget(lid, ix));\n";
+    s = s + "      int64_t ix = as_i(stack[--sp]); V lv = stack[--sp];\n";
+    s = s + "      if (lv.tag==2) stack[sp++]=Vi(lget(lv.i, ix));\n";
+    s = s + "      else if (lv.tag==3) stack[sp++]=Vs(s_char_at(lv.i, ix));\n";
+    s = s + "      else { fprintf(stderr, \"get: bad type\\n\"); exit(1); }\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_ORD) {\n";
+    s = s + "      V x=stack[--sp];\n";
+    s = s + "      if (x.tag==3) { const char *t=as_str(x); stack[sp++]=Vi(t[0]?(unsigned char)t[0]:0); }\n";
+    s = s + "      else if (x.tag==0) stack[sp++]=Vi(x.i);\n";
+    s = s + "      else { fprintf(stderr, \"ord: bad type\\n\"); exit(1); }\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_SET) {\n";
     s = s + "      int64_t v = as_i(stack[--sp]); int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
@@ -1462,7 +1545,7 @@ fn write_runtime() -> str {
 fn write_c_driver(code: list, strs: list, floats: list, binds: list) -> str {
     let s: str = "";
     s = s + "/* GENERATED by kenga/emit/bc_src_c.kenga — parsed source → bytecode */\n";
-    s = s + "#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n#include <math.h>\n";
+    s = s + "#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n";
     s = s + "#include \"opcodes.inc.c\"\n\n";
     s = s + emit_handlers_table(binds);
     s = s + emit_strs_table(strs);
@@ -1527,6 +1610,9 @@ fn main() -> i64 {
     let r16 = compile_src(resolve_imports("examples/selfhost/fact_lite.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_fact_lite.c", write_c_driver(r16[0], r16[1], r16[2], r16[3])) == true);
 
+    let r17 = compile_src(resolve_imports("examples/selfhost/bc_str.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_str.c", write_c_driver(r17[0], r17[1], r17[2], r17[3])) == true);
+
     let raw: str = read_file("bootstrap/generated/_bc_path.txt");
     let one: str = trim_path(raw);
     if len(one) > 0 {
@@ -1535,7 +1621,7 @@ fn main() -> i64 {
         println("wrote bc_one_out.c for " + one);
     }
 
-    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/arith/struct/fact_lite");
+    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/arith/struct/fact_lite/str");
     println("bc_src_c ok");
     return 0;
 }

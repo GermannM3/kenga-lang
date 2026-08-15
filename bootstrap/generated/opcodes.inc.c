@@ -35,6 +35,7 @@ enum {
   OP_PENDING = 31,
   OP_PRINT_STR = 32,
   OP_CONST_F64 = 33,
-  OP_LIST_TAG = 34
+  OP_LIST_TAG = 34,
+  OP_CONST_STR = 35
 };
 #endif

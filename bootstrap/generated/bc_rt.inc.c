@@ -5,11 +5,47 @@ typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
 static V Vl(int64_t x) { V v; v.tag=2; v.i=x; v.f=0; return v; }
+static V Vs(int64_t x) { V v; v.tag=3; v.i=x; v.f=0; return v; }
 static double as_f(V v) { return v.tag==1 ? v.f : (double)v.i; }
 static int64_t as_i(V v) { return v.tag==1 ? (int64_t)llround(v.f) : v.i; }
 static int64_t as_list(V v) {
   if (v.tag != 2) { fprintf(stderr, "expected list\n"); exit(1); }
   return v.i;
+}
+static char *gS[4096];
+static int gSn = 0;
+static int64_t s_new(const char *s) {
+  size_t n;
+  char *p;
+  if (gSn >= 4096) { fprintf(stderr, "str heap full\n"); exit(1); }
+  n = strlen(s);
+  p = (char*)malloc(n + 1);
+  if (!p) { fprintf(stderr, "oom\n"); exit(1); }
+  memcpy(p, s, n + 1);
+  gS[gSn] = p;
+  return (int64_t)gSn++;
+}
+static const char *as_str(V v) {
+  if (v.tag != 3) { fprintf(stderr, "expected str\n"); exit(1); }
+  return gS[v.i];
+}
+static int64_t s_from_pool(int idx) { return s_new(g_strs[idx]); }
+static int64_t s_char_at(int64_t sid, int64_t ix) {
+  const char *s = gS[sid];
+  size_t n = strlen(s);
+  char buf[2];
+  if (ix < 0 || (size_t)ix >= n) { fprintf(stderr, "index oob\n"); exit(1); }
+  buf[0] = s[ix]; buf[1] = 0;
+  return s_new(buf);
+}
+static char *v_to_cstr(V v) {
+  char buf[64];
+  char *out;
+  if (v.tag == 3) return strdup(as_str(v));
+  if (v.tag == 0) { sprintf(buf, "%lld", (long long)v.i); return strdup(buf); }
+  if (v.tag == 1) { sprintf(buf, "%g", v.f); return strdup(buf); }
+  fprintf(stderr, "cannot stringify\n"); exit(1);
+  return NULL;
 }
 
 typedef struct { int64_t *d; size_t n, cap; } LObj;
@@ -108,9 +144,20 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     int64_t op = code[ip++];
     if (op == OP_CONST) { stack[sp++] = Vi(code[ip++]); }
     else if (op == OP_CONST_F64) { stack[sp++] = Vf(g_f64s[code[ip++]]); }
+    else if (op == OP_CONST_STR) { stack[sp++] = Vs(s_from_pool((int)code[ip++])); }
     else if (op == OP_LOAD) { stack[sp++] = slots[slot_base + code[ip++]]; }
     else if (op == OP_STORE) { int64_t idx=slot_base+code[ip++]; slots[idx]=stack[--sp]; if (idx+1>slot_used) slot_used=idx+1; }
-    else if (op == OP_ADD) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b)); else stack[sp++]=Vi(a.i+b.i); }
+    else if (op == OP_ADD) {
+      V b=stack[--sp]; V a=stack[--sp];
+      if (a.tag==3 || b.tag==3) {
+        char *sa=v_to_cstr(a), *sb=v_to_cstr(b); size_t na=strlen(sa), nb=strlen(sb);
+        char *cat=(char*)malloc(na+nb+1);
+        if (!cat) { fprintf(stderr, "oom\n"); exit(1); }
+        memcpy(cat, sa, na); memcpy(cat+na, sb, nb+1);
+        free(sa); free(sb); stack[sp++]=Vs(s_new(cat)); free(cat);
+      } else if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b));
+      else stack[sp++]=Vi(a.i+b.i);
+    }
     else if (op == OP_SUB) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)-as_f(b)); else stack[sp++]=Vi(a.i-b.i); }
     else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }
     else if (op == OP_DIV) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)/as_f(b)); else stack[sp++]=Vi(a.i/b.i); }
@@ -118,8 +165,18 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }
     else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }
     else if (op == OP_GE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>=as_f(b)); else stack[sp++]=Vi(a.i>=b.i); }
-    else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }
-    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }
+    else if (op == OP_EQ) {
+      V b=stack[--sp]; V a=stack[--sp];
+      if (a.tag==3 && b.tag==3) stack[sp++]=Vi(strcmp(as_str(a), as_str(b))==0);
+      else if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)==as_f(b));
+      else stack[sp++]=Vi(a.i==b.i);
+    }
+    else if (op == OP_NE) {
+      V b=stack[--sp]; V a=stack[--sp];
+      if (a.tag==3 && b.tag==3) stack[sp++]=Vi(strcmp(as_str(a), as_str(b))!=0);
+      else if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)!=as_f(b));
+      else stack[sp++]=Vi(a.i!=b.i);
+    }
     else if (op == OP_ROUND) { V x=stack[--sp]; stack[sp++]=Vi((int64_t)llround(as_f(x))); }
     else if (op == OP_JMP) { ip = code[ip]; }
     else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=as_i(stack[--sp]); if (!c) ip = t; }
@@ -136,7 +193,8 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
           for (li=0; li<L->n; li++) { if (li) printf(", "); printf("%lld", (long long)L->d[li]); }
           printf("]\n");
         }
-      } else if (v.tag==1) printf("%g\n", v.f);
+      } else if (v.tag==3) printf("%s\n", as_str(v));
+      else if (v.tag==1) printf("%g\n", v.f);
       else printf("%lld\n", (long long)v.i);
     }
     else if (op == OP_ASSERT) { if (!as_i(stack[--sp])) { fprintf(stderr, "assert failed\n"); exit(1); } }
@@ -150,10 +208,23 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       int64_t v = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);
       lpush(lid, v); stack[sp++] = Vl(lid);
     }
-    else if (op == OP_LEN) { int64_t x = as_list(stack[--sp]); stack[sp++] = Vi(llen(x)); }
+    else if (op == OP_LEN) {
+      V x=stack[--sp];
+      if (x.tag==3) stack[sp++]=Vi((int64_t)strlen(as_str(x)));
+      else if (x.tag==2) stack[sp++]=Vi(llen(x.i));
+      else { fprintf(stderr, "len: bad type\n"); exit(1); }
+    }
     else if (op == OP_GET) {
-      int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);
-      stack[sp++] = Vi(lget(lid, ix));
+      int64_t ix = as_i(stack[--sp]); V lv = stack[--sp];
+      if (lv.tag==2) stack[sp++]=Vi(lget(lv.i, ix));
+      else if (lv.tag==3) stack[sp++]=Vs(s_char_at(lv.i, ix));
+      else { fprintf(stderr, "get: bad type\n"); exit(1); }
+    }
+    else if (op == OP_ORD) {
+      V x=stack[--sp];
+      if (x.tag==3) { const char *t=as_str(x); stack[sp++]=Vi(t[0]?(unsigned char)t[0]:0); }
+      else if (x.tag==0) stack[sp++]=Vi(x.i);
+      else { fprintf(stderr, "ord: bad type\n"); exit(1); }
     }
     else if (op == OP_SET) {
       int64_t v = as_i(stack[--sp]); int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);

@@ -40,7 +40,8 @@ fn main() -> i64 {
     s = s + "  OP_PENDING = 31,\n";
     s = s + "  OP_PRINT_STR = 32,\n";
     s = s + "  OP_CONST_F64 = 33,\n";
-    s = s + "  OP_LIST_TAG = 34\n";
+    s = s + "  OP_LIST_TAG = 34,\n";
+    s = s + "  OP_CONST_STR = 35\n";
     s = s + "};\n";
     s = s + "#endif\n";
     assert(write_file("bootstrap/generated/opcodes.inc.c", s) == true);

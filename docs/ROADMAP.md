@@ -34,7 +34,7 @@
 | ✅ | **`kenga/emit/lower_c.kenga`** — agent / for / lists / **struct** / **elif** / **f64** / import → native C |
 | ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
-| ✅ | **`bc_src_c`** — parse → bytecode → C VM (lite suite + **struct** + **events/agent** + **import** + **fact_lite**); shared **`bc_rt.inc.c`** runtime; **`scripts\bc-run.cmd`** — один `.kenga` → native |
+| ✅ | **`bc_src_c`** — parse → bytecode → C VM (lite suite + **struct** + **events/agent** + **import** + **fact_lite** + **runtime str**); shared **`bc_rt.inc.c`** runtime; **`scripts\bc-run.cmd`** — один `.kenga` → native |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ⬜ | Emit полный lite runtime → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
