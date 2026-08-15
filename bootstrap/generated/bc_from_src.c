@@ -13,7 +13,9 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_LOAD) { stack[sp++] = slots[code[ip++]]; }
     else if (op == OP_STORE) { slots[code[ip++]] = stack[--sp]; }
     else if (op == OP_ADD) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a+b; }
+    else if (op == OP_MUL) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a*b; }
     else if (op == OP_LT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a<b; }
+    else if (op == OP_GT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a>b; }
     else if (op == OP_JMP) { ip = code[ip]; }
     else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=stack[--sp]; if (!c) ip = t; }
     else if (op == OP_PRINTLN) { printf("%lld\n", (long long)stack[--sp]); }
@@ -24,7 +26,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 }
 
 int main(void) {
-  static const int64_t code[] = { 1, 0, 3, 0, 1, 1, 3, 1, 2, 1, 1, 6, 8, 12, 31, 2, 0, 2, 1, 4, 3, 0, 2, 1, 1, 1, 4, 3, 1, 11, 8, 2, 0, 17, 1, 0, 13 };
+  static const int64_t code[] = { 1, 1, 3, 0, 1, 1, 3, 1, 2, 1, 1, 6, 8, 12, 31, 2, 0, 2, 1, 6, 3, 0, 2, 1, 1, 1, 4, 3, 1, 11, 8, 2, 0, 1, 100, 9, 12, 43, 2, 0, 17, 11, 46, 1, 0, 17, 1, 0, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

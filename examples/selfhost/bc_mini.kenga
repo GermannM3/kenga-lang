@@ -1,0 +1,16 @@
+// Source for bc_src_c — parse → bytecode → native VM (no Rust).
+
+fn main() {
+    let n = 1;
+    let i = 1;
+    while i < 6 {
+        n = n * i;
+        i = i + 1;
+    }
+    if n > 100 {
+        println(n);
+    } else {
+        println(0);
+    }
+    return 0;
+}

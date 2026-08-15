@@ -5,7 +5,9 @@ fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
 fn OP_STORE() -> i64 { return 3; }
 fn OP_ADD() -> i64 { return 4; }
+fn OP_MUL() -> i64 { return 6; }
 fn OP_LT() -> i64 { return 8; }
+fn OP_GT() -> i64 { return 9; }
 fn OP_JMP() -> i64 { return 11; }
 fn OP_JMPF() -> i64 { return 12; }
 fn OP_HALT() -> i64 { return 13; }
@@ -56,8 +58,20 @@ fn is_alpha(ch: str) -> i64 {
 }
 fn skip(s: str, i: i64) -> i64 {
     while i < len(s) {
-        if is_space(s[i]) == 0 { break; }
-        i = i + 1;
+        if is_space(s[i]) == 1 { i = i + 1; continue; }
+        if s[i] == "/" {
+            if i + 1 < len(s) {
+                if s[i + 1] == "/" {
+                    i = i + 2;
+                    while i < len(s) {
+                        if s[i] == "\n" { break; }
+                        i = i + 1;
+                    }
+                    continue;
+                }
+            }
+        }
+        break;
     }
     return i;
 }
@@ -129,14 +143,29 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list) -> list {
     return [code, n[1], vnames];
 }
 
-fn emit_sum(s: str, i: i64, code: list, vnames: list) -> list {
+fn emit_term(s: str, i: i64, code: list, vnames: list) -> list {
     let r = emit_factor(s, i, code, vnames);
     code = r[0]; i = r[1]; vnames = r[2];
     while true {
         i = skip(s, i);
         if i >= len(s) { break; }
-        if s[i] == "+" {
+        if s[i] == "*" {
             r = emit_factor(s, i + 1, code, vnames);
+            code = push(r[0], OP_MUL());
+            i = r[1]; vnames = r[2];
+        } else { break; }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_sum(s: str, i: i64, code: list, vnames: list) -> list {
+    let r = emit_term(s, i, code, vnames);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "+" {
+            r = emit_term(s, i + 1, code, vnames);
             code = push(r[0], OP_ADD());
             i = r[1]; vnames = r[2];
         } else { break; }
@@ -152,6 +181,11 @@ fn emit_cmp(s: str, i: i64, code: list, vnames: list) -> list {
     if s[i] == "<" {
         r = emit_sum(s, i + 1, code, vnames);
         code = push(r[0], OP_LT());
+        return [code, r[1], r[2]];
+    }
+    if s[i] == ">" {
+        r = emit_sum(s, i + 1, code, vnames);
+        code = push(r[0], OP_GT());
         return [code, r[1], r[2]];
     }
     return [code, i, vnames];
@@ -195,6 +229,28 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list) -> list {
         i = i + 1;
         code = emit2(code, OP_JMP(), loop_start);
         code[jmpf_at + 1] = len(code);
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "if") == 1 {
+        i = skip(s, i + 2);
+        let r = emit_cmp(s, i, code, vnames);
+        code = r[0]; i = r[1]; vnames = r[2];
+        let jmpf_at: i64 = len(code);
+        code = emit2(code, OP_JMPF(), 0);
+        i = skip(s, i);
+        assert(s[i] == "{");
+        let th = compile_body(s, i, code, vnames);
+        code = th[0]; i = th[1]; vnames = th[2];
+        let jmp_end: i64 = len(code);
+        code = emit2(code, OP_JMP(), 0);
+        code[jmpf_at + 1] = len(code);
+        i = skip(s, i);
+        if starts_kw(s, i, "else") == 1 {
+            i = skip(s, i + 4);
+            let el = compile_body(s, i, code, vnames);
+            code = el[0]; i = el[1]; vnames = el[2];
+        }
+        code[jmp_end + 1] = len(code);
         return [code, i, vnames];
     }
     if starts_kw(s, i, "println") == 1 {
@@ -290,7 +346,9 @@ fn write_c_driver(code: list) -> str {
     s = s + "    else if (op == OP_LOAD) { stack[sp++] = slots[code[ip++]]; }\n";
     s = s + "    else if (op == OP_STORE) { slots[code[ip++]] = stack[--sp]; }\n";
     s = s + "    else if (op == OP_ADD) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a+b; }\n";
+    s = s + "    else if (op == OP_MUL) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a*b; }\n";
     s = s + "    else if (op == OP_LT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a<b; }\n";
+    s = s + "    else if (op == OP_GT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a>b; }\n";
     s = s + "    else if (op == OP_JMP) { ip = code[ip]; }\n";
     s = s + "    else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=stack[--sp]; if (!c) ip = t; }\n";
     s = s + "    else if (op == OP_PRINTLN) { printf(\"%lld\\n\", (long long)stack[--sp]); }\n";
@@ -306,7 +364,7 @@ fn write_c_driver(code: list) -> str {
 }
 
 fn main() -> i64 {
-    let src: str = "fn main() {\n  let n = 0;\n  let i = 1;\n  while i < 6 {\n    n = n + i;\n    i = i + 1;\n  }\n  println(n);\n  return 0;\n}\n";
+    let src: str = read_file("examples/selfhost/bc_mini.kenga");
     let code = compile_src(src);
     assert(len(code) > 10);
 
