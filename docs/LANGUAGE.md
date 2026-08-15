@@ -1,7 +1,7 @@
 # Язык Kenga — справочник
 
-Версия хоста: **3.10.x**. Канон без Rust: `bootstrap/` + **`kenga/`**.  
-Замена `src/`: `docs/REPLACE_RUST.md`. Путь свободы: `docs/INDEPENDENCE.md`.
+Версия хоста: **3.11.x**. Канон без Rust: `bootstrap/` + **`kenga/`**.  
+Замена `src/`: `docs/REPLACE_RUST.md`. Путь свободы: `docs/INDEPENDENCE.md`. Smoke: `scripts/freedom-smoke.cmd`.
 
 ## Запуск
 

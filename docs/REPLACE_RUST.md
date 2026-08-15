@@ -7,13 +7,13 @@
 |---|---|---|
 | `lexer.rs` / `token.rs` | 🟡 частично | парсер внутри `kenga/compiler/*.kenga` |
 | `parser.rs` / `ast.rs` | 🟡 частично | то же (рекурсивный descent в `.kenga`) |
-| `compiler.rs` / `bytecode.rs` | 🟡 растёт | `kenga/compiler/more.kenga` |
-| `vm.rs` (ядро) | 🟡 растёт | VM в `more.kenga` + полный runtime в `bootstrap/` |
+| `compiler.rs` / `bytecode.rs` | 🟢 растёт | `kenga/compiler/more.kenga` (for/elif/struct/import/SET) |
+| `vm.rs` (ядро) | 🟢 растёт | VM в `more.kenga` + полный runtime в `bootstrap/` |
 | `tensor.rs` | ✅ на lite | `bootstrap/tensor_lite.inc.c` |
 | `autograd.rs` | ✅ на lite | `bootstrap/tape_lite.inc.c` |
 | `memory.rs` | ✅ на lite | `bootstrap/prophet_lite.inc.c` |
 | `talk.rs` (chat) | ✅ на lite | `bootstrap/chat_lite.inc.c` |
-| `codegen.rs` (emit-c) | 🟡 зерно | `kenga/emit/c_seed.kenga` |
+| `codegen.rs` (emit-c) | 🟡 зерно | `kenga/emit/c_seed.kenga` + `expr_c.kenga` |
 | `main.rs` / `driver.rs` | ⬜ | CLI = `kenga-lite` пока |
 | `demo.rs` / `build.rs` | ⬜ | позже |
 
@@ -27,5 +27,8 @@
 Проверка сегодня:
 
 ```bat
+scripts\freedom-smoke.cmd
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
+
+`more` уже гоняет `for_lite` / `elif_lite` / `struct_lite` / `float_lite` / `lists_lite` через свой bytecode VM.

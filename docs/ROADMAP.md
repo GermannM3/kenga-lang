@@ -26,7 +26,9 @@
 | ✅ | C-lite: brace-match пропускает строки/комменты (чинит `kenga_lite.kenga` на lite) |
 | ✅ | Каталог **`kenga/`** — каноническая замена `src/` (`compiler/more`, `emit/c_seed`) |
 | ✅ | `docs/REPLACE_RUST.md` — карта модулей Rust → Kenga |
-| ⬜ | Компилятор на Kenga покрывает полный lite-диалект → убрать ручной `kenga_lite.c` |
+| ✅ | **`more.kenga` step 10**: for/break/continue, `xs[i]=`, else if, struct, import, `run_file` |
+| ✅ | **`kenga/emit/expr_c.kenga`** + `scripts/freedom-smoke.cmd` (Kenga → C → native без cargo) |
+| ⬜ | Emit полного lite-диалекта → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 
@@ -61,4 +63,4 @@
 | ✅ | LEARN / LANGUAGE / UNIX / LIVING_MULTIMODAL / CHAT_AND_LM / INDEPENDENCE / REPLACE_RUST / … |
 | ✅ | Marketplace: ручной Upload `.vsix` (без Azure PAT) |
 
-Версия: **3.10.0**.
+Версия: **3.11.0**.

@@ -2,14 +2,14 @@
 
 Kenga должна **жить на себе**. C и Rust — подмости.
 
-## Сейчас (3.10)
+## Сейчас (3.11)
 
 | Слой | Без Rust? | Без C? |
 |---|---|---|
 | Living runtime | ✅ `kenga-lite` | ❌ C99 host |
 | Word-LM / tape / tensor / Prophet | ✅ | ❌ |
-| Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** | ❌ |
-| Emit seed на Kenga | ✅ **`kenga/emit/c_seed.kenga`** | ❌ gcc |
+| Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** (for / elif / struct / import / `xs[i]=`) | ❌ |
+| Emit на Kenga | ✅ **`c_seed` + `expr_c`** | ❌ gcc |
 | Каталог замены Rust | ✅ **`kenga/`** + `docs/REPLACE_RUST.md` | — |
 | Полный CLI `src/` | 🟡 legacy | — |
 
@@ -28,8 +28,9 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 
 ```bat
 bootstrap\build.cmd
+scripts\freedom-smoke.cmd
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
-bootstrap\bin\kenga-lite.exe run kenga\emit\c_seed.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\expr_c.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\word_lm.kenga
 ```
 

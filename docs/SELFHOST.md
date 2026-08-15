@@ -48,13 +48,15 @@ bootstrap\rebuild-from-kenga.cmd
 | 7 | `bc_fn.kenga` | bytecode functions CALL/RET |
 | 8 | `kenga_lite.kenga` | тот же диалект, написанный на Kenga |
 | 9 | `kenga_more.kenga` | f64 + lists + println/assert/round |
+| 10 | `kenga/compiler/more.kenga` | for / elif / struct / import / `run_file` |
 
 ```bash
-kenga run --lite examples/selfhost/kenga_more.kenga
+kenga run --lite kenga/compiler/more.kenga
+scripts/freedom-smoke.cmd   # Windows: more + emit → C → native
 ```
 
 До полного chicken-egg: см. **`docs/INDEPENDENCE.md`**.  
-Новое зерно codegen без Rust: `examples/selfhost/emit_c_seed.kenga` (`write_file`).
+Codegen без Rust: `kenga/emit/c_seed.kenga`, `kenga/emit/expr_c.kenga`.
 
 ## emit-c: tagged KVal
 

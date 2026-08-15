@@ -1,6 +1,6 @@
 // Self-host compiler on Kenga (canonical). Replaces growing slice of src/compiler.rs + vm.rs.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
-// Dialect: i64/f64, lists, str, true/false, println/assert/round/ord, match_brace-aware.
+// Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, import, types/ttl skip.
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -29,6 +29,152 @@ fn OP_GET() -> i64 { return 24; }
 fn OP_NE() -> i64 { return 25; }
 fn OP_GE() -> i64 { return 26; }
 fn OP_ORD() -> i64 { return 27; }
+fn OP_SET() -> i64 { return 28; }
+
+fn empty_lctx() -> list {
+    // [conts, brkss, contss, tmpn]
+    return [[], [], [], 0];
+}
+fn lctx_push(lctx: list, cont_target: i64) -> list {
+    let conts: list = lctx[0];
+    let brkss: list = lctx[1];
+    let contss: list = lctx[2];
+    conts = push(conts, cont_target);
+    brkss = push(brkss, []);
+    contss = push(contss, []);
+    return [conts, brkss, contss, lctx[3]];
+}
+fn lctx_set_cont(lctx: list, cont_target: i64) -> list {
+    let conts: list = lctx[0];
+    let depth: i64 = len(conts) - 1;
+    assert(depth >= 0);
+    conts[depth] = cont_target;
+    return [conts, lctx[1], lctx[2], lctx[3]];
+}
+fn lctx_pop_finish(code: list, lctx: list, end_ip: i64) -> list {
+    let conts: list = lctx[0];
+    let brkss: list = lctx[1];
+    let contss: list = lctx[2];
+    let depth: i64 = len(conts) - 1;
+    assert(depth >= 0);
+    let cont_target: i64 = conts[depth];
+    let brks: list = brkss[depth];
+    let conts_p: list = contss[depth];
+    let bi: i64 = 0;
+    while bi < len(brks) {
+        code[brks[bi] + 1] = end_ip;
+        bi = bi + 1;
+    }
+    let ci: i64 = 0;
+    while ci < len(conts_p) {
+        code[conts_p[ci] + 1] = cont_target;
+        ci = ci + 1;
+    }
+    let nconts: list = [];
+    let nbrkss: list = [];
+    let ncontss: list = [];
+    let i: i64 = 0;
+    while i < depth {
+        nconts = push(nconts, conts[i]);
+        nbrkss = push(nbrkss, brkss[i]);
+        ncontss = push(ncontss, contss[i]);
+        i = i + 1;
+    }
+    return [code, [nconts, nbrkss, ncontss, lctx[3]]];
+}
+fn lctx_add_break(code: list, lctx: list) -> list {
+    let conts: list = lctx[0];
+    let brkss: list = lctx[1];
+    let depth: i64 = len(conts) - 1;
+    assert(depth >= 0);
+    let at: i64 = len(code);
+    code = emit2(code, OP_JMP(), 0);
+    let brks: list = brkss[depth];
+    brks = push(brks, at);
+    brkss[depth] = brks;
+    return [code, [conts, brkss, lctx[2], lctx[3]]];
+}
+fn lctx_add_continue(code: list, lctx: list) -> list {
+    let conts: list = lctx[0];
+    let contss: list = lctx[2];
+    let depth: i64 = len(conts) - 1;
+    assert(depth >= 0);
+    let at: i64 = len(code);
+    code = emit2(code, OP_JMP(), 0);
+    let cps: list = contss[depth];
+    cps = push(cps, at);
+    contss[depth] = cps;
+    return [code, [conts, lctx[1], contss, lctx[3]]];
+}
+fn skip_type_annot(s: str, i: i64) -> i64 {
+    i = skip(s, i);
+    if i >= len(s) { return i; }
+    if s[i] != ":" { return i; }
+    i = skip(s, i + 1);
+    let ty = parse_ident(s, i);
+    i = skip(s, ty[1]);
+    if starts_kw(s, i, "ttl") == 1 {
+        i = skip(s, i + 3);
+        while i < len(s) {
+            if is_digit(s[i]) == 0 { break; }
+            i = i + 1;
+        }
+        if i + 1 < len(s) {
+            if s[i] == "m" {
+                if s[i + 1] == "s" { i = i + 2; return i; }
+            }
+        }
+        if i < len(s) {
+            if s[i] == "s" { i = i + 1; }
+            if s[i] == "m" { i = i + 1; }
+            if s[i] == "h" { i = i + 1; }
+            if s[i] == "d" { i = i + 1; }
+        }
+    }
+    return i;
+}
+fn dirname_of(path: str) -> str {
+    let i: i64 = len(path) - 1;
+    while i >= 0 {
+        if path[i] == "/" { break; }
+        if path[i] == "\\" { break; }
+        i = i - 1;
+    }
+    if i < 0 { return "."; }
+    let out: str = "";
+    let j: i64 = 0;
+    while j < i { out = out + path[j]; j = j + 1; }
+    if len(out) == 0 { return "."; }
+    return out;
+}
+fn join_path(dir: str, rel: str) -> str {
+    if len(dir) == 0 { return rel; }
+    if dir == "." { return rel; }
+    return dir + "/" + rel;
+}
+fn resolve_imports(path: str, depth: i64) -> str {
+    assert(depth < 32);
+    let src: str = read_file(path);
+    let dir: str = dirname_of(path);
+    let i: i64 = 0;
+    let acc: str = "";
+    while true {
+        i = skip(src, i);
+        if starts_kw(src, i, "import") == 0 { break; }
+        i = skip(src, i + 6);
+        assert(src[i] == "\"");
+        let ps = parse_string(src, i);
+        i = ps[1];
+        i = skip(src, i);
+        if i < len(src) { if src[i] == ";" { i = i + 1; } }
+        let dep_path: str = join_path(dir, ps[0]);
+        acc = acc + resolve_imports(dep_path, depth + 1);
+        acc = acc + "\n";
+    }
+    let rest: str = "";
+    while i < len(src) { rest = rest + src[i]; i = i + 1; }
+    return acc + rest;
+}
 
 fn list_pop(xs: list) -> list {
     let n: i64 = len(xs);
@@ -132,6 +278,14 @@ fn vm_exec(code: list) -> i64 {
             let pi = list_pop(stack); let px = list_pop(pi[0]);
             stack = push(px[0], px[1][pi[1]]);
         }
+        if op == OP_SET() {
+            let pv = list_pop(stack);
+            let pi = list_pop(pv[0]);
+            let px = list_pop(pi[0]);
+            let xs = px[1];
+            xs[pi[1]] = pv[1];
+            stack = push(px[0], xs);
+        }
         if op == OP_ORD() {
             let p = list_pop(stack); stack = push(p[0], ord(p[1]));
         }
@@ -159,7 +313,22 @@ fn is_alpha(ch: str) -> i64 {
     return 0;
 }
 fn skip(s: str, i: i64) -> i64 {
-    while i < len(s) { if is_space(s[i]) == 0 { break; } i = i + 1; }
+    while i < len(s) {
+        if is_space(s[i]) == 1 { i = i + 1; continue; }
+        if s[i] == "/" {
+            if i + 1 < len(s) {
+                if s[i + 1] == "/" {
+                    i = i + 2;
+                    while i < len(s) {
+                        if s[i] == "\n" { break; }
+                        i = i + 1;
+                    }
+                    continue;
+                }
+            }
+        }
+        break;
+    }
     return i;
 }
 fn starts_with(s: str, i: i64, w: str) -> i64 {
@@ -197,6 +366,10 @@ fn parse_number(s: str, i: i64) -> list {
     }
     if i < len(s) {
         if s[i] == "." {
+            // `0..n` range — not a float
+            if i + 1 < len(s) {
+                if s[i + 1] == "." { return [v, i]; }
+            }
             i = i + 1;
             let f = v + 0.0;
             let place = 0.1;
@@ -235,16 +408,48 @@ fn emit3(code: list, a: i64, b: i64, c: i64) -> list {
     code = push(code, a); code = push(code, b); return push(code, c);
 }
 
-fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+fn find_struct(stypes: list, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(stypes) {
+        if stypes[i][0] == name { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+fn field_index(fields: list, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(fields) {
+        if fields[i] == name { return i; }
+        i = i + 1;
+    }
+    assert(0 == 1);
+    return 0;
+}
+fn field_index_any(stypes: list, name: str) -> i64 {
+    let si: i64 = 0;
+    while si < len(stypes) {
+        let fields: list = stypes[si][1];
+        let fi: i64 = 0;
+        while fi < len(fields) {
+            if fields[fi] == name { return fi; }
+            fi = fi + 1;
+        }
+        si = si + 1;
+    }
+    assert(0 == 1);
+    return 0;
+}
+
+fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list) -> list {
     i = skip(s, i);
     if s[i] == "(" {
-        let r = emit_cmp(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        let r = emit_cmp(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
         code = r[0]; i = skip(s, r[1]); vnames = r[2]; assert(s[i] == ")");
         i = i + 1;
     } else {
         if s[i] == "-" {
             code = emit2(code, OP_CONST(), 0);
-            let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc);
+            let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
             code = push(r[0], OP_SUB()); i = r[1]; vnames = r[2];
         } else {
             if s[i] == "\"" {
@@ -257,7 +462,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                     i = skip(s, i);
                     if s[i] != "]" {
                         while true {
-                            let ar = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
+                            let ar = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes);
                             code = push(ar[0], OP_LIST_PUSH()); i = ar[1]; vnames = ar[2];
                             i = skip(s, i);
                             if s[i] == "," { i = i + 1; continue; }
@@ -273,31 +478,31 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             if s[j] == "(" {
                                 j = j + 1; j = skip(s, j);
                                 if id[0] == "round" {
-                                    let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc);
+                                    let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
                                     code = ar[0]; j = ar[1]; vnames = ar[2];
                                     j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                     code = push(code, OP_ROUND());
                                     i = j;
                                 } else {
                                     if id[0] == "ord" {
-                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc);
+                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
                                         code = ar[0]; j = ar[1]; vnames = ar[2];
                                         j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                         code = push(code, OP_ORD());
                                         i = j;
                                     } else {
                                     if id[0] == "len" {
-                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc);
+                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
                                         code = ar[0]; j = ar[1]; vnames = ar[2];
                                         j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                         code = push(code, OP_LEN());
                                         i = j;
                                     } else {
                                         if id[0] == "push" {
-                                            let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc);
+                                            let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
                                             code = ar[0]; j = ar[1]; vnames = ar[2];
                                             j = skip(s, j); assert(s[j] == ","); j = j + 1;
-                                            ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc);
+                                            ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
                                             code = ar[0]; j = ar[1]; vnames = ar[2];
                                             j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                             code = push(code, OP_LIST_PUSH());
@@ -306,7 +511,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                             let argc: i64 = 0;
                                             if s[j] != ")" {
                                                 while true {
-                                                    let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc);
+                                                    let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
                                                     code = ar[0]; j = ar[1]; vnames = ar[2]; argc = argc + 1;
                                                     j = skip(s, j);
                                                     if s[j] == "," { j = j + 1; continue; }
@@ -333,8 +538,36 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                     if id[0] == "false" {
                                         code = emit2(code, OP_CONST(), 0); i = id[1];
                                     } else {
-                                        let sl = slot_of(vnames, id[0]);
-                                        code = emit2(code, OP_LOAD(), sl[0]); i = id[1]; vnames = sl[1];
+                                        if s[j] == "{" {
+                                            let tid: i64 = find_struct(stypes, id[0]);
+                                            if tid < 0 {
+                                                let sl = slot_of(vnames, id[0]);
+                                                code = emit2(code, OP_LOAD(), sl[0]); i = id[1]; vnames = sl[1];
+                                            } else {
+                                                let fields: list = stypes[tid][1];
+                                                j = j + 1;
+                                                code = push(code, OP_LIST_NEW());
+                                                let fi: i64 = 0;
+                                                while fi < len(fields) {
+                                                    j = skip(s, j);
+                                                    let fnm = parse_ident(s, j);
+                                                    assert(fnm[0] == fields[fi]);
+                                                    j = skip(s, fnm[1]);
+                                                    assert(s[j] == ":"); j = j + 1;
+                                                    let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
+                                                    code = push(ar[0], OP_LIST_PUSH()); j = ar[1]; vnames = ar[2];
+                                                    j = skip(s, j);
+                                                    if j < len(s) { if s[j] == "," { j = j + 1; } }
+                                                    fi = fi + 1;
+                                                }
+                                                j = skip(s, j);
+                                                assert(s[j] == "}"); j = j + 1;
+                                                i = j;
+                                            }
+                                        } else {
+                                            let sl = slot_of(vnames, id[0]);
+                                            code = emit2(code, OP_LOAD(), sl[0]); i = id[1]; vnames = sl[1];
+                                        }
                                     }
                                 }
                             }
@@ -362,25 +595,40 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
         i = skip(s, i);
         if i >= len(s) { break; }
         if s[i] != "[" { break; }
-        let ix = emit_cmp(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        let ix = emit_cmp(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
         code = ix[0]; i = ix[1]; vnames = ix[2];
         i = skip(s, i); assert(s[i] == "]"); i = i + 1;
         code = push(code, OP_GET());
     }
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] != "." { break; }
+        // `..` is range, not field
+        if i + 1 < len(s) {
+            if s[i + 1] == "." { break; }
+        }
+        let fld = parse_ident(s, i + 1);
+        assert(len(fld[0]) > 0);
+        let fidx: i64 = field_index_any(stypes, fld[0]);
+        code = emit2(code, OP_CONST(), fidx);
+        code = push(code, OP_GET());
+        i = fld[1];
+    }
     return [code, i, vnames];
 }
 
-fn emit_term(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
-    let r = emit_factor(s, i, code, vnames, fnames, faddrs, fargc);
+fn emit_term(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list) -> list {
+    let r = emit_factor(s, i, code, vnames, fnames, faddrs, fargc, stypes);
     code = r[0]; i = r[1]; vnames = r[2];
     while true {
         i = skip(s, i); if i >= len(s) { break; }
         if s[i] == "*" {
-            r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc);
+            r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
             code = push(r[0], OP_MUL()); i = r[1]; vnames = r[2];
         } else {
             if s[i] == "/" {
-                r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc);
+                r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
                 code = push(r[0], OP_DIV()); i = r[1]; vnames = r[2];
             } else { break; }
         }
@@ -388,17 +636,17 @@ fn emit_term(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
     return [code, i, vnames];
 }
 
-fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
-    let r = emit_term(s, i, code, vnames, fnames, faddrs, fargc);
+fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list) -> list {
+    let r = emit_term(s, i, code, vnames, fnames, faddrs, fargc, stypes);
     code = r[0]; i = r[1]; vnames = r[2];
     while true {
         i = skip(s, i); if i >= len(s) { break; }
         if s[i] == "+" {
-            r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc);
+            r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
             code = push(r[0], OP_ADD()); i = r[1]; vnames = r[2];
         } else {
             if s[i] == "-" {
-                r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc);
+                r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
                 code = push(r[0], OP_SUB()); i = r[1]; vnames = r[2];
             } else { break; }
         }
@@ -406,150 +654,327 @@ fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     return [code, i, vnames];
 }
 
-fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
-    let r = emit_sum(s, i, code, vnames, fnames, faddrs, fargc);
+fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list) -> list {
+    let r = emit_sum(s, i, code, vnames, fnames, faddrs, fargc, stypes);
     code = r[0]; i = r[1]; vnames = r[2]; i = skip(s, i);
     if i >= len(s) { return [code, i, vnames]; }
     if starts_with(s, i, "<=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes);
         return [push(r[0], OP_LE()), r[1], r[2]];
     }
     if starts_with(s, i, ">=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes);
         return [push(r[0], OP_GE()), r[1], r[2]];
     }
     if starts_with(s, i, "==") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes);
         return [push(r[0], OP_EQ()), r[1], r[2]];
     }
     if starts_with(s, i, "!=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes);
         return [push(r[0], OP_NE()), r[1], r[2]];
     }
     if s[i] == "<" {
-        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
         return [push(r[0], OP_LT()), r[1], r[2]];
     }
     if s[i] == ">" {
-        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes);
         return [push(r[0], OP_GT()), r[1], r[2]];
     }
     return [code, i, vnames];
 }
 
-fn emit_block(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+fn emit_block(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, lctx: list) -> list {
     i = skip(s, i); assert(s[i] == "{"); i = i + 1;
     while true {
         i = skip(s, i);
         if i >= len(s) { break; }
         if s[i] == "}" { break; }
-        let st = emit_stmt(s, i, code, vnames, fnames, faddrs, fargc);
-        code = st[0]; i = st[1]; vnames = st[2];
+        let st = emit_stmt(s, i, code, vnames, fnames, faddrs, fargc, stypes, lctx);
+        code = st[0]; i = st[1]; vnames = st[2]; lctx = st[3];
     }
     assert(s[i] == "}");
-    return [code, i + 1, vnames];
+    return [code, i + 1, vnames, lctx];
 }
 
-fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, lctx: list) -> list {
     i = skip(s, i);
     if starts_kw(s, i, "let") == 1 {
         i = skip(s, i + 3);
         let id = parse_ident(s, i);
-        i = skip(s, id[1]);
-        if i < len(s) {
-            if s[i] == ":" {
-                i = skip(s, i + 1);
-                let ty = parse_ident(s, i);
-                i = skip(s, ty[1]);
-            }
-        }
+        i = skip_type_annot(s, id[1]);
+        i = skip(s, i);
         assert(s[i] == "="); i = i + 1;
-        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
+        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes);
         code = r[0]; i = r[1]; vnames = r[2];
         let sl = slot_of(vnames, id[0]); vnames = sl[1];
         code = emit2(code, OP_STORE(), sl[0]);
         code = push(code, OP_POP());
         i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
-        return [code, i, vnames];
+        return [code, i, vnames, lctx];
     }
     if starts_kw(s, i, "println") == 1 {
         i = skip(s, i + 7);
         assert(s[i] == "("); i = i + 1;
-        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
+        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes);
         code = r[0]; i = r[1]; vnames = r[2];
         i = skip(s, i); assert(s[i] == ")"); i = i + 1;
         code = push(code, OP_PRINTLN());
         i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
-        return [code, i, vnames];
+        return [code, i, vnames, lctx];
     }
     if starts_kw(s, i, "assert") == 1 {
         i = skip(s, i + 6);
         assert(s[i] == "("); i = i + 1;
-        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
+        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes);
         code = r[0]; i = r[1]; vnames = r[2];
         i = skip(s, i); assert(s[i] == ")"); i = i + 1;
         code = push(code, OP_ASSERT());
         i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
-        return [code, i, vnames];
+        return [code, i, vnames, lctx];
     }
     if starts_kw(s, i, "return") == 1 {
-        let r = emit_cmp(s, i + 6, code, vnames, fnames, faddrs, fargc);
+        let r = emit_cmp(s, i + 6, code, vnames, fnames, faddrs, fargc, stypes);
         code = r[0]; i = r[1]; vnames = r[2];
         code = push(code, OP_RET());
         i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
-        return [code, i, vnames];
+        return [code, i, vnames, lctx];
     }
     if starts_kw(s, i, "while") == 1 {
         let loop_start: i64 = len(code);
-        let r = emit_cmp(s, i + 5, code, vnames, fnames, faddrs, fargc);
+        let r = emit_cmp(s, i + 5, code, vnames, fnames, faddrs, fargc, stypes);
         code = r[0]; i = r[1]; vnames = r[2];
         let jmpf_at: i64 = len(code);
         code = emit2(code, OP_JMPF(), 0);
-        let bl = emit_block(s, i, code, vnames, fnames, faddrs, fargc);
-        code = bl[0]; i = bl[1]; vnames = bl[2];
+        lctx = lctx_push(lctx, loop_start);
+        let bl = emit_block(s, i, code, vnames, fnames, faddrs, fargc, stypes, lctx);
+        code = bl[0]; i = bl[1]; vnames = bl[2]; lctx = bl[3];
         code = emit2(code, OP_JMP(), loop_start);
         code[jmpf_at + 1] = len(code);
-        return [code, i, vnames];
+        let fin = lctx_pop_finish(code, lctx, len(code));
+        code = fin[0]; lctx = fin[1];
+        return [code, i, vnames, lctx];
+    }
+    if starts_kw(s, i, "for") == 1 {
+        i = skip(s, i + 3);
+        let var = parse_ident(s, i);
+        i = skip(s, var[1]);
+        assert(starts_kw(s, i, "in") == 1);
+        i = skip(s, i + 2);
+        let sl = slot_of(vnames, var[0]); vnames = sl[1];
+        let vslot: i64 = sl[0];
+        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes);
+        code = r[0]; i = r[1]; vnames = r[2];
+        i = skip(s, i);
+        if starts_with(s, i, "..") == 1 {
+            code = emit2(code, OP_STORE(), vslot);
+            code = push(code, OP_POP());
+            i = skip(s, i + 2);
+            let tmpn: i64 = lctx[3];
+            let digs: str = "0123456789";
+            let endn: str = "__fe";
+            let t: i64 = tmpn;
+            let digits: str = "";
+            if t == 0 { digits = "0"; }
+            while t > 0 {
+                let d: i64 = t - (t / 10) * 10;
+                digits = digs[d] + digits;
+                t = t / 10;
+            }
+            endn = endn + digits;
+            lctx = [lctx[0], lctx[1], lctx[2], tmpn + 1];
+            let esl = slot_of(vnames, endn); vnames = esl[1];
+            let eslot: i64 = esl[0];
+            r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes);
+            code = r[0]; i = r[1]; vnames = r[2];
+            code = emit2(code, OP_STORE(), eslot);
+            code = push(code, OP_POP());
+            let loop_start: i64 = len(code);
+            code = emit2(code, OP_LOAD(), vslot);
+            code = emit2(code, OP_LOAD(), eslot);
+            code = push(code, OP_LT());
+            let jmpf_at: i64 = len(code);
+            code = emit2(code, OP_JMPF(), 0);
+            lctx = lctx_push(lctx, 0);
+            let bl = emit_block(s, i, code, vnames, fnames, faddrs, fargc, stypes, lctx);
+            code = bl[0]; i = bl[1]; vnames = bl[2]; lctx = bl[3];
+            let cont_at: i64 = len(code);
+            lctx = lctx_set_cont(lctx, cont_at);
+            code = emit2(code, OP_LOAD(), vslot);
+            code = emit2(code, OP_CONST(), 1);
+            code = push(code, OP_ADD());
+            code = emit2(code, OP_STORE(), vslot);
+            code = push(code, OP_POP());
+            code = emit2(code, OP_JMP(), loop_start);
+            code[jmpf_at + 1] = len(code);
+            let fin = lctx_pop_finish(code, lctx, len(code));
+            code = fin[0]; lctx = fin[1];
+            return [code, i, vnames, lctx];
+        }
+        // list iteration
+        let tmpn2: i64 = lctx[3];
+        let digs2: str = "0123456789";
+        let td: str = "";
+        let t2: i64 = tmpn2;
+        if t2 == 0 { td = "0"; }
+        while t2 > 0 {
+            let d2: i64 = t2 - (t2 / 10) * 10;
+            td = digs2[d2] + td;
+            t2 = t2 / 10;
+        }
+        let ln: str = "__fl" + td;
+        let ix: str = "__fi" + td;
+        lctx = [lctx[0], lctx[1], lctx[2], tmpn2 + 1];
+        let lsl = slot_of(vnames, ln); vnames = lsl[1];
+        let lslot: i64 = lsl[0];
+        let isl = slot_of(vnames, ix); vnames = isl[1];
+        let islot: i64 = isl[0];
+        code = emit2(code, OP_STORE(), lslot);
+        code = push(code, OP_POP());
+        code = emit2(code, OP_CONST(), 0);
+        code = emit2(code, OP_STORE(), islot);
+        code = push(code, OP_POP());
+        let loop_start2: i64 = len(code);
+        code = emit2(code, OP_LOAD(), islot);
+        code = emit2(code, OP_LOAD(), lslot);
+        code = push(code, OP_LEN());
+        code = push(code, OP_LT());
+        let jmpf_at2: i64 = len(code);
+        code = emit2(code, OP_JMPF(), 0);
+        code = emit2(code, OP_LOAD(), lslot);
+        code = emit2(code, OP_LOAD(), islot);
+        code = push(code, OP_GET());
+        code = emit2(code, OP_STORE(), vslot);
+        code = push(code, OP_POP());
+        lctx = lctx_push(lctx, 0);
+        let bl2 = emit_block(s, i, code, vnames, fnames, faddrs, fargc, stypes, lctx);
+        code = bl2[0]; i = bl2[1]; vnames = bl2[2]; lctx = bl2[3];
+        let cont_at2: i64 = len(code);
+        lctx = lctx_set_cont(lctx, cont_at2);
+        code = emit2(code, OP_LOAD(), islot);
+        code = emit2(code, OP_CONST(), 1);
+        code = push(code, OP_ADD());
+        code = emit2(code, OP_STORE(), islot);
+        code = push(code, OP_POP());
+        code = emit2(code, OP_JMP(), loop_start2);
+        code[jmpf_at2 + 1] = len(code);
+        let fin2 = lctx_pop_finish(code, lctx, len(code));
+        code = fin2[0]; lctx = fin2[1];
+        return [code, i, vnames, lctx];
+    }
+    if starts_kw(s, i, "break") == 1 {
+        let br = lctx_add_break(code, lctx);
+        code = br[0]; lctx = br[1];
+        i = skip(s, i + 5);
+        if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames, lctx];
+    }
+    if starts_kw(s, i, "continue") == 1 {
+        let cr = lctx_add_continue(code, lctx);
+        code = cr[0]; lctx = cr[1];
+        i = skip(s, i + 8);
+        if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames, lctx];
     }
     if starts_kw(s, i, "if") == 1 {
-        let r = emit_cmp(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        let r = emit_cmp(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes);
         code = r[0]; i = r[1]; vnames = r[2];
         let jmpf_at: i64 = len(code);
         code = emit2(code, OP_JMPF(), 0);
-        let th = emit_block(s, i, code, vnames, fnames, faddrs, fargc);
-        code = th[0]; i = th[1]; vnames = th[2];
+        let th = emit_block(s, i, code, vnames, fnames, faddrs, fargc, stypes, lctx);
+        code = th[0]; i = th[1]; vnames = th[2]; lctx = th[3];
         i = skip(s, i);
         if starts_kw(s, i, "else") == 1 {
             let jmp_at: i64 = len(code);
             code = emit2(code, OP_JMP(), 0);
             code[jmpf_at + 1] = len(code);
-            let el = emit_block(s, i + 4, code, vnames, fnames, faddrs, fargc);
-            code = el[0]; i = el[1]; vnames = el[2];
+            i = skip(s, i + 4);
+            if starts_kw(s, i, "if") == 1 {
+                let el = emit_stmt(s, i, code, vnames, fnames, faddrs, fargc, stypes, lctx);
+                code = el[0]; i = el[1]; vnames = el[2]; lctx = el[3];
+            } else {
+                let el = emit_block(s, i, code, vnames, fnames, faddrs, fargc, stypes, lctx);
+                code = el[0]; i = el[1]; vnames = el[2]; lctx = el[3];
+            }
             code[jmp_at + 1] = len(code);
         } else {
             code[jmpf_at + 1] = len(code);
         }
-        return [code, i, vnames];
+        return [code, i, vnames, lctx];
     }
-    // bare assign or expr
+    // bare assign, xs[i]=, or expr
     if is_alpha(s[i]) == 1 {
+        let save: i64 = i;
         let id = parse_ident(s, i);
         let j: i64 = skip(s, id[1]);
         if j < len(s) {
-            if s[j] == "=" {
-                if starts_with(s, j, "==") == 0 {
-                    let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc);
-                    code = r[0]; i = r[1]; vnames = r[2];
+            if s[j] == "[" {
+                let sl = slot_of(vnames, id[0]); vnames = sl[1];
+                code = emit2(code, OP_LOAD(), sl[0]);
+                j = j + 1;
+                let ix = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes);
+                code = ix[0]; j = ix[1]; vnames = ix[2];
+                j = skip(s, j); assert(s[j] == "]"); j = skip(s, j + 1);
+                if j < len(s) {
+                    if s[j] == "=" {
+                        if starts_with(s, j, "==") == 0 {
+                            let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, stypes);
+                            code = r[0]; j = r[1]; vnames = r[2];
+                            code = push(code, OP_SET());
+                            code = emit2(code, OP_STORE(), sl[0]);
+                            code = push(code, OP_POP());
+                            j = skip(s, j); if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                            return [code, j, vnames, lctx];
+                        }
+                    }
+                }
+                // not assignment — drop the LOAD we emitted and reparse as expr
+                // (LOAD + slot = 2 ops)
+                let nc: list = [];
+                let ki: i64 = 0;
+                while ki < len(code) - 2 { nc = push(nc, code[ki]); ki = ki + 1; }
+                code = nc;
+                i = save;
+            } else {
+                if s[j] == "." {
                     let sl = slot_of(vnames, id[0]); vnames = sl[1];
-                    code = emit2(code, OP_STORE(), sl[0]);
-                    code = push(code, OP_POP());
-                    i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
-                    return [code, i, vnames];
+                    let fld = parse_ident(s, j + 1);
+                    j = skip(s, fld[1]);
+                    if j < len(s) {
+                        if s[j] == "=" {
+                            if starts_with(s, j, "==") == 0 {
+                                let fidx: i64 = field_index_any(stypes, fld[0]);
+                                code = emit2(code, OP_LOAD(), sl[0]);
+                                code = emit2(code, OP_CONST(), fidx);
+                                let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, stypes);
+                                code = r[0]; j = r[1]; vnames = r[2];
+                                code = push(code, OP_SET());
+                                code = emit2(code, OP_STORE(), sl[0]);
+                                code = push(code, OP_POP());
+                                j = skip(s, j); if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                                return [code, j, vnames, lctx];
+                            }
+                        }
+                    }
+                    i = save;
+                } else {
+                if s[j] == "=" {
+                    if starts_with(s, j, "==") == 0 {
+                        let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, stypes);
+                        code = r[0]; i = r[1]; vnames = r[2];
+                        let sl = slot_of(vnames, id[0]); vnames = sl[1];
+                        code = emit2(code, OP_STORE(), sl[0]);
+                        code = push(code, OP_POP());
+                        i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+                        return [code, i, vnames, lctx];
+                    }
+                }
                 }
             }
         }
     }
-    let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
+    let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes);
     code = r[0]; i = r[1]; vnames = r[2];
     i = skip(s, i);
     if i < len(s) {
@@ -558,7 +983,7 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             code = push(code, OP_POP());
         }
     }
-    return [code, i, vnames];
+    return [code, i, vnames, lctx];
 }
 
 fn match_brace(src: str, i: i64) -> i64 {
@@ -605,10 +1030,32 @@ fn compile_lite(src: str) -> list {
     let fnames: list = [];
     let fparams: list = [];
     let fbodies: list = [];
+    let stypes: list = [];
     let i: i64 = 0;
     while i < len(src) {
         i = skip(src, i);
         if i >= len(src) { break; }
+        if starts_kw(src, i, "struct") == 1 {
+            i = skip(src, i + 6);
+            let id = parse_ident(src, i);
+            i = skip(src, id[1]);
+            assert(src[i] == "{"); i = i + 1;
+            let fields: list = [];
+            i = skip(src, i);
+            if src[i] != "}" {
+                while true {
+                    let fnm = parse_ident(src, i);
+                    fields = push(fields, fnm[0]);
+                    i = skip_type_annot(src, fnm[1]);
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; i = skip(src, i); continue; }
+                    break;
+                }
+            }
+            assert(src[i] == "}"); i = i + 1;
+            stypes = push(stypes, [id[0], fields]);
+            continue;
+        }
         assert(starts_kw(src, i, "fn") == 1);
         i = skip(src, i + 2);
         let id = parse_ident(src, i);
@@ -620,7 +1067,8 @@ fn compile_lite(src: str) -> list {
             while true {
                 let pn = parse_ident(src, i);
                 params = push(params, pn[0]);
-                i = skip(src, pn[1]);
+                i = skip_type_annot(src, pn[1]);
+                i = skip(src, i);
                 if src[i] == "," { i = i + 1; continue; }
                 break;
             }
@@ -656,7 +1104,8 @@ fn compile_lite(src: str) -> list {
         let vnames: list = [];
         let pi: i64 = 0;
         while pi < len(fparams[fi]) { vnames = push(vnames, fparams[fi][pi]); pi = pi + 1; }
-        let bl = emit_block(fbodies[fi], 0, code, vnames, fnames, faddrs, fargc);
+        let lctx = empty_lctx();
+        let bl = emit_block(fbodies[fi], 0, code, vnames, fnames, faddrs, fargc, stypes, lctx);
         code = bl[0];
         code = push(code, OP_RET());
         fi = fi + 1;
@@ -678,6 +1127,10 @@ fn run_lite(src: str) -> i64 {
     return vm_exec(compile_lite(src));
 }
 
+fn run_file(path: str) -> i64 {
+    return vm_exec(compile_lite(resolve_imports(path, 0)));
+}
+
 fn main() -> i64 {
     println("kenga-more → bytecode");
     assert(run_lite("fn main() { 2 + 3 * 4 }") == 14);
@@ -692,6 +1145,16 @@ fn main() -> i64 {
     assert(run_lite("fn main() { let s = \"ab\"; s = s + \"c\"; println(s); 0 }") == 0);
     assert(run_lite("fn main() { if true { 7 } else { 0 } }") == 7);
     assert(run_lite("fn main() { ord(\"A\") }") == 65);
+    assert(run_lite("fn main() { let xs = [1, 2]; xs[0] = 7; xs[0] + xs[1] }") == 9);
+    assert(run_lite("fn main() { let n = 2; let label = 0; if n == 0 { label = 10; } else if n == 1 { label = 20; } else if n == 2 { label = 30; } else { label = 40; } label }") == 30);
+    assert(run_lite("fn main() { let acc = 0; for i in 0..5 { if i == 3 { break; } acc = acc + i; } acc }") == 3);
+    assert(run_lite("fn main() { let skip = 0; for i in 0..5 { if i == 2 { continue; } skip = skip + i; } skip }") == 8);
+    assert(run_lite("fn sum(xs: list) -> i64 { let s: i64 = 0; for v in xs { s = s + v; } return s; } fn main() -> i64 { let xs: list = [1, 2, 3, 4]; xs[0] = 10; return sum(xs); }") == 19);
+    assert(run_file("examples/selfhost/for_lite.kenga") == 0);
+    assert(run_file("examples/selfhost/elif_lite.kenga") == 0);
+    assert(run_file("examples/selfhost/float_lite.kenga") == 0);
+    assert(run_file("examples/selfhost/lists_lite.kenga") == 0);
+    assert(run_file("examples/selfhost/struct_lite.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }

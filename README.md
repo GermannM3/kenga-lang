@@ -13,7 +13,7 @@
   <a href="https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga"><img src="https://img.shields.io/visual-studio-marketplace/v/Kenga-ai.kenga?label=VS%20Marketplace&color=5b9dff&labelColor=12151a" alt="VS Marketplace"/></a>
   <a href="https://github.com/GermannM3/kenga-lang/releases"><img src="https://img.shields.io/github/v/release/GermannM3/kenga-lang?include_prereleases&color=5b9dff&labelColor=12151a" alt="release"/></a>
   <p align="center">
-  <img src="https://img.shields.io/badge/friends--ready-3.10-5b9dff?labelColor=12151a" alt="friends-ready"/>
+  <img src="https://img.shields.io/badge/friends--ready-3.11-5b9dff?labelColor=12151a" alt="friends-ready"/>
 </p>
 
 ---
@@ -61,8 +61,8 @@ kenga run --lite examples\selfhost\struct_lite.kenga
 Обычные стеки для ML — Python-клей вокруг C++/CUDA.  
 **Kenga** — язык, где тензор, `ttl`, консолидация и агентный цикл часть семантики.
 
-Сейчас — **3.10**: каталог **`kenga/`** вытесняет Rust (`docs/REPLACE_RUST.md`).  
-Что в git: `docs/REPO.md`.  
+Сейчас — **3.11**: `kenga/compiler/more.kenga` ест for/struct/elif; emit пишет C без cargo (`scripts/freedom-smoke.cmd`).  
+Карта: `docs/REPLACE_RUST.md`. Что в git: `docs/REPO.md`.  
 Расширение: [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga) (`Kenga-ai.kenga`).  
 Rust ещё держит GPU / production-scale path. **Python не нужен.** Linux/macOS/Git Bash: `docs/UNIX.md`.
 
