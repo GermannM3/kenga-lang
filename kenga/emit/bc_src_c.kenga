@@ -208,6 +208,44 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list) -> list {
         if i < len(s) { if s[i] == ";" { i = i + 1; } }
         return [code, i, vnames];
     }
+    if starts_kw(s, i, "for") == 1 {
+        // for v in lo..hi { body }  →  v=lo; while v<hi { body; v=v+1 }
+        i = skip(s, i + 3);
+        let id = parse_ident(s, i);
+        i = skip(s, id[1]);
+        assert(starts_kw(s, i, "in") == 1);
+        i = skip(s, i + 2);
+        let lo = emit_sum(s, i, code, vnames);
+        code = lo[0]; i = lo[1]; vnames = lo[2];
+        let sl = slot_of(vnames, id[0]);
+        vnames = sl[1];
+        code = emit2(code, OP_STORE(), sl[0]);
+        i = skip(s, i);
+        assert(starts_with(s, i, "..") == 1);
+        i = i + 2;
+        let hi_slot_name: str = "__hi" + itoa(len(vnames));
+        let hi = emit_sum(s, i, code, vnames);
+        code = hi[0]; i = hi[1]; vnames = hi[2];
+        let hs = slot_of(vnames, hi_slot_name);
+        vnames = hs[1];
+        code = emit2(code, OP_STORE(), hs[0]);
+        let loop_start: i64 = len(code);
+        code = emit2(code, OP_LOAD(), sl[0]);
+        code = emit2(code, OP_LOAD(), hs[0]);
+        code = push(code, OP_LT());
+        let jmpf_at: i64 = len(code);
+        code = emit2(code, OP_JMPF(), 0);
+        i = skip(s, i);
+        let body = compile_body(s, i, code, vnames);
+        code = body[0]; i = body[1]; vnames = body[2];
+        code = emit2(code, OP_LOAD(), sl[0]);
+        code = emit2(code, OP_CONST(), 1);
+        code = push(code, OP_ADD());
+        code = emit2(code, OP_STORE(), sl[0]);
+        code = emit2(code, OP_JMP(), loop_start);
+        code[jmpf_at + 1] = len(code);
+        return [code, i, vnames];
+    }
     if starts_kw(s, i, "while") == 1 {
         let loop_start: i64 = len(code);
         i = skip(s, i + 5);
@@ -367,10 +405,13 @@ fn main() -> i64 {
     let src: str = read_file("examples/selfhost/bc_mini.kenga");
     let code = compile_src(src);
     assert(len(code) > 10);
+    assert(write_file("bootstrap/generated/bc_from_src.c", write_c_driver(code)) == true);
 
-    let out = write_c_driver(code);
-    assert(write_file("bootstrap/generated/bc_from_src.c", out) == true);
-    println("wrote bootstrap/generated/bc_from_src.c");
+    let src2: str = read_file("examples/selfhost/bc_for.kenga");
+    let code2 = compile_src(src2);
+    assert(write_file("bootstrap/generated/bc_from_for.c", write_c_driver(code2)) == true);
+
+    println("wrote bootstrap/generated/bc_from_src.c bc_from_for.c");
     println("bc_src_c ok");
     return 0;
 }

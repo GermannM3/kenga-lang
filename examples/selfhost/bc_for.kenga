@@ -1,0 +1,10 @@
+// for-range via bc_src_c (parse → bytecode → C).
+
+fn main() {
+    let s = 0;
+    for i in 1..6 {
+        s = s + i;
+    }
+    println(s);
+    return 0;
+}
