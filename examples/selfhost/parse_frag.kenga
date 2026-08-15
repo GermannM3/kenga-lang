@@ -1,0 +1,101 @@
+// Richer parse helpers (compiler front) — lower_kv → native C.
+
+fn is_space(ch: str) -> i64 {
+    if ch == " " { return 1; }
+    if ch == "\t" { return 1; }
+    if ch == "\n" { return 1; }
+    return 0;
+}
+fn is_digit(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn is_alpha(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 122 { return 1; } }
+    if c >= 65 { if c <= 90 { return 1; } }
+    if ch == "_" { return 1; }
+    return 0;
+}
+fn skip(s: str, i: i64) -> i64 {
+    while i < len(s) {
+        if is_space(s[i]) == 1 { i = i + 1; continue; }
+        if s[i] == "/" {
+            if i + 1 < len(s) {
+                if s[i + 1] == "/" {
+                    i = i + 2;
+                    while i < len(s) {
+                        if s[i] == "\n" { break; }
+                        i = i + 1;
+                    }
+                    continue;
+                }
+            }
+        }
+        break;
+    }
+    return i;
+}
+fn starts_with(s: str, i: i64, w: str) -> i64 {
+    let j: i64 = 0;
+    while j < len(w) {
+        if i + j >= len(s) { return 0; }
+        if s[i + j] != w[j] { return 0; }
+        j = j + 1;
+    }
+    return 1;
+}
+fn starts_kw(s: str, i: i64, w: str) -> i64 {
+    if starts_with(s, i, w) == 0 { return 0; }
+    if i + len(w) < len(s) {
+        let n: str = s[i + len(w)];
+        if is_alpha(n) == 1 { return 0; }
+        if is_digit(n) == 1 { return 0; }
+    }
+    return 1;
+}
+fn parse_ident(s: str, i: i64) -> list {
+    i = skip(s, i);
+    let name: str = "";
+    while i < len(s) {
+        let ch: str = s[i];
+        if is_alpha(ch) == 0 { if is_digit(ch) == 0 { break; } }
+        name = name + ch;
+        i = i + 1;
+    }
+    return [name, i];
+}
+fn parse_string(s: str, i: i64) -> list {
+    assert(s[i] == "\"");
+    i = i + 1;
+    let out: str = "";
+    while i < len(s) {
+        if s[i] == "\"" { return [out, i + 1]; }
+        out = out + s[i];
+        i = i + 1;
+    }
+    assert(0 == 1);
+    return [out, i];
+}
+
+fn main() -> i64 {
+    let src: str = "  // c\nfn main() { let x = \"hi\"; }";
+    let i: i64 = skip(src, 0);
+    assert(starts_kw(src, i, "fn") == 1);
+    assert(starts_kw(src, i, "f") == 0);
+    let id = parse_ident(src, i + 2);
+    assert(id[0] == "main");
+    i = skip(src, id[1]);
+    assert(src[i] == "(");
+    // jump to string
+    while i < len(src) {
+        if src[i] == "\"" { break; }
+        i = i + 1;
+    }
+    let ps = parse_string(src, i);
+    assert(ps[0] == "hi");
+    println(ps[0]);
+    println("parse_frag ok");
+    return 0;
+}

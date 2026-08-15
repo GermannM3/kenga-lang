@@ -1056,7 +1056,10 @@ fn main() -> i64 {
     let lex = resolve_imports("examples/selfhost/lex_frag.kenga", 0);
     assert(write_file("bootstrap/generated/lower_lex_frag.c", lower_program(lex)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag}.c");
+    let parsef = resolve_imports("examples/selfhost/parse_frag.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_parse_frag.c", lower_program(parsef)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag}.c");
     println("lower_kv ok");
     return 0;
 }
