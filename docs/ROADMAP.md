@@ -32,6 +32,8 @@
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
 | ✅ | **`kenga/emit/core_c.kenga`** — while / if / for / list → C99 self-check |
 | ✅ | **`kenga/emit/lower_c.kenga`** — agent / for / lists / **struct** / **elif** / **f64** / import → native C |
+| ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
+| ✅ | **`lex_frag`** — кусок lexer-хелперов компилятора → native C (путь к `more.kenga` без VM host) |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ⬜ | Emit полный lite runtime → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |

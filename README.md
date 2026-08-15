@@ -61,7 +61,7 @@ kenga run --lite examples\selfhost\struct_lite.kenga
 Обычные стеки для ML — Python-клей вокруг C++/CUDA.  
 **Kenga** — язык, где тензор, `ttl`, консолидация и агентный цикл часть семантики.
 
-Сейчас — **3.12**: `more.kenga` + **`lower_c.kenga`** гоняют agent / for / lists / struct / elif / float → native C без cargo (`scripts/freedom-smoke.cmd`).  
+Сейчас — **3.12**: `more` + `lower_c` + **`lower_kv` (KVal)** → native C без cargo (`scripts/freedom-smoke.cmd`).  
 Карта: `docs/REPLACE_RUST.md`. Что в git: `docs/REPO.md`.  
 Расширение: [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga) (`Kenga-ai.kenga`).  
 Rust ещё держит GPU / production-scale path. **Python не нужен.** Linux/macOS/Git Bash: `docs/UNIX.md`.
@@ -211,6 +211,7 @@ fn main() {
 | Tape-autograd (`ag_*`) | ✅ |
 | Self-host Kenga-lite → bytecode VM | ✅ |
 | **`lower_c`**: Kenga → native C (agent/for/lists/struct/elif/float) | ✅ |
+| **`lower_kv` + `rt_kval`**: tagged KVal (str/ord/lex_frag/agent) | ✅ |
 | Полный self-host / LLVM / LLM | 🚧 |
 
 ---

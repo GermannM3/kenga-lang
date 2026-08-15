@@ -95,14 +95,19 @@ kenga run --lite examples\agent.kenga
 ```
 
 Компилятор и VM на Kenga: `kenga/compiler/more.kenga`.  
-Kenga сама пишет C99 (agent / for / lists / struct / elif / float):
+Kenga сама пишет C99:
 
 ```bat
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 scripts\freedom-smoke.cmd
 ```
 
-Получишь `bootstrap/bin/lower_*.c` → native exe без Rust.
+- `lower_c` — i64/struct/float/agent → `bootstrap/bin/lower_*.c`  
+- `lower_kv` — tagged KVal (str/ord/hetero lists) + **lex_frag** → `bootstrap/generated/`  
+
+Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.
 
 ## 8. Упражнения
 

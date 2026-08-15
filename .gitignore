@@ -15,6 +15,12 @@
 bootstrap/bin/
 bootstrap/*.gen.c
 bootstrap/kenga_lite.gen.c
+bootstrap/generated/*.exe
+bootstrap/generated/*.obj
+bootstrap/generated/*.txt
+!bootstrap/generated/.gitkeep
+!bootstrap/generated/*.c
+!bootstrap/generated/*.inc.c
 
 # emit-c / chicken-egg artifacts next to sources
 examples/**/*.kenga.c

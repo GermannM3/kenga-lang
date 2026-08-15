@@ -1,0 +1,1062 @@
+// KVal lowerer: Kenga i64/str/list/f64 subset → C99 with tagged KVal runtime.
+// Includes rt_kval.inc.c (from rt_kval.kenga). All value locals/params emit as KVal.
+// Run: bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
+
+fn is_space(ch: str) -> i64 {
+    if ch == " " { return 1; }
+    if ch == "\t" { return 1; }
+    if ch == "\n" { return 1; }
+    return 0;
+}
+fn is_digit(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn is_alpha(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 122 { return 1; } }
+    if c >= 65 { if c <= 90 { return 1; } }
+    if ch == "_" { return 1; }
+    return 0;
+}
+fn skip(s: str, i: i64) -> i64 {
+    while i < len(s) {
+        if is_space(s[i]) == 1 { i = i + 1; continue; }
+        if s[i] == "/" {
+            if i + 1 < len(s) {
+                if s[i + 1] == "/" {
+                    i = i + 2;
+                    while i < len(s) {
+                        if s[i] == "\n" { break; }
+                        i = i + 1;
+                    }
+                    continue;
+                }
+            }
+        }
+        break;
+    }
+    return i;
+}
+fn starts_with(s: str, i: i64, w: str) -> i64 {
+    let j: i64 = 0;
+    while j < len(w) {
+        if i + j >= len(s) { return 0; }
+        if s[i + j] != w[j] { return 0; }
+        j = j + 1;
+    }
+    return 1;
+}
+fn starts_kw(s: str, i: i64, w: str) -> i64 {
+    if starts_with(s, i, w) == 0 { return 0; }
+    if i + len(w) < len(s) {
+        let n: str = s[i + len(w)];
+        if is_alpha(n) == 1 { return 0; }
+        if is_digit(n) == 1 { return 0; }
+    }
+    return 1;
+}
+fn parse_ident(s: str, i: i64) -> list {
+    i = skip(s, i); let name: str = "";
+    while i < len(s) {
+        let ch: str = s[i];
+        if is_alpha(ch) == 0 { if is_digit(ch) == 0 { break; } }
+        name = name + ch; i = i + 1;
+    }
+    return [name, i];
+}
+fn parse_string(s: str, i: i64) -> list {
+    assert(s[i] == "\"");
+    i = i + 1;
+    let out: str = "";
+    while i < len(s) {
+        if s[i] == "\"" { return [out, i + 1]; }
+        if s[i] == "\\" {
+            if i + 1 < len(s) {
+                out = out + s[i + 1];
+                i = i + 2;
+                continue;
+            }
+        }
+        out = out + s[i];
+        i = i + 1;
+    }
+    assert(0 == 1);
+    return [out, i];
+}
+fn c_escape(s: str) -> str {
+    let out: str = "";
+    let i: i64 = 0;
+    while i < len(s) {
+        if s[i] == "\\" {
+            out = out + "\\\\";
+        } else {
+            if s[i] == "\"" {
+                out = out + "\\\"";
+            } else {
+                out = out + s[i];
+            }
+        }
+        i = i + 1;
+    }
+    return out;
+}
+fn itoa(n: i64) -> str {
+    let digs: str = "0123456789";
+    if n == 0 { return "0"; }
+    let out: str = "";
+    let x: i64 = n;
+    if x < 0 { x = 0 - x; }
+    while x > 0 {
+        let d: i64 = x - (x / 10) * 10;
+        out = digs[d] + out;
+        x = x / 10;
+    }
+    if n < 0 { return "-" + out; }
+    return out;
+}
+fn indent(n: i64) -> str {
+    let s: str = "";
+    let i: i64 = 0;
+    while i < n { s = s + "  "; i = i + 1; }
+    return s;
+}
+fn match_brace(src: str, i: i64) -> i64 {
+    assert(src[i] == "{");
+    let depth: i64 = 0;
+    let n: i64 = len(src);
+    while i < n {
+        let ch: str = src[i];
+        if ch == "/" {
+            if i + 1 < n {
+                if src[i + 1] == "/" {
+                    i = i + 2;
+                    while i < n {
+                        if src[i] == "\n" { break; }
+                        i = i + 1;
+                    }
+                    continue;
+                }
+            }
+        }
+        if ch == "\"" {
+            i = i + 1;
+            while i < n {
+                if src[i] == "\\" { i = i + 2; continue; }
+                if src[i] == "\"" { i = i + 1; break; }
+                i = i + 1;
+            }
+            continue;
+        }
+        if ch == "{" { depth = depth + 1; i = i + 1; continue; }
+        if ch == "}" {
+            depth = depth - 1;
+            i = i + 1;
+            if depth == 0 { return i; }
+            continue;
+        }
+        i = i + 1;
+    }
+    assert(0 == 1);
+    return i;
+}
+fn skip_type_annot(s: str, i: i64) -> i64 {
+    let r = parse_type_kind(s, i);
+    return r[1];
+}
+fn parse_type_kind(s: str, i: i64) -> list {
+    i = skip(s, i);
+    if i >= len(s) { return [0, i]; }
+    if s[i] != ":" { return [0, i]; }
+    i = skip(s, i + 1);
+    let ty = parse_ident(s, i);
+    let k: i64 = 0;
+    if ty[0] == "list" { k = 1; }
+    if ty[0] == "str" { k = 2; }
+    if ty[0] == "f64" { k = 3; }
+    return [k, skip(s, ty[1])];
+}
+fn ctype(k: i64) -> str {
+    return "KVal";
+}
+
+fn find_struct(stypes: list, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(stypes) {
+        if stypes[i][0] == name { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+fn field_index(fields: list, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(fields) {
+        if fields[i] == name { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+fn field_index_any(stypes: list, name: str) -> i64 {
+    let si: i64 = 0;
+    while si < len(stypes) {
+        let fi: i64 = field_index(stypes[si][1], name);
+        if fi >= 0 { return fi; }
+        si = si + 1;
+    }
+    return 0 - 1;
+}
+fn stypes_of(decls: list) -> list {
+    let i: i64 = 0;
+    while i < len(decls) {
+        if decls[i][0] == "__stypes__" { return decls[i][1]; }
+        i = i + 1;
+    }
+    return [];
+}
+
+fn decl_kind(decls: list, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(decls) {
+        if decls[i][0] == name { return decls[i][1]; }
+        i = i + 1;
+    }
+    return 0;
+}
+fn ensure_decl(decls: list, name: str, kind: i64) -> list {
+    let i: i64 = 0;
+    while i < len(decls) {
+        if decls[i][0] == name {
+            decls[i] = [name, kind];
+            return decls;
+        }
+        i = i + 1;
+    }
+    return push(decls, [name, kind]);
+}
+
+fn runtime_c() -> str {
+    let s: str = "";
+    s = s + "/* generated by kenga/emit/lower_kv.kenga — no Rust */\n";
+    s = s + "#include \"rt_kval.inc.c\"\n\n";
+    return s;
+}
+
+fn merge_pre(a: str, b: str) -> str {
+    return a + b;
+}
+
+fn lower_factor(s: str, i: i64, decls: list) -> list {
+    i = skip(s, i);
+    if s[i] == "(" {
+        let r = lower_cmp(s, i + 1, decls);
+        i = skip(s, r[1]); assert(s[i] == ")");
+        return ["(" + r[0] + ")", i + 1, r[2], r[3]];
+    }
+    if s[i] == "-" {
+        let r = lower_factor(s, i + 1, decls);
+        if r[2] == 3 {
+            return ["kval_f64(-kval_as_f64(" + r[0] + "))", r[1], 3, r[3]];
+        }
+        return ["kval_i64(-kval_as_i64(" + r[0] + "))", r[1], 0, r[3]];
+    }
+    if s[i] == "\"" {
+        let ps = parse_string(s, i);
+        return ["kval_str(\"" + c_escape(ps[0]) + "\")", ps[1], 2, ""];
+    }
+    if s[i] == "[" {
+        i = i + 1;
+        let lid: str = "_lk" + itoa(i);
+        let pre: str = "  int64_t " + lid + " = klist_new();\n";
+        let n: i64 = 0;
+        i = skip(s, i);
+        if s[i] != "]" {
+            while true {
+                let ar = lower_cmp(s, i, decls);
+                pre = merge_pre(pre, ar[3]);
+                pre = pre + "  klist_push_val(" + lid + ", " + ar[0] + ");\n";
+                n = n + 1;
+                i = skip(s, ar[1]);
+                if s[i] == "," { i = i + 1; continue; }
+                break;
+            }
+        }
+        assert(s[i] == "]"); i = i + 1;
+        return ["kval_list(" + lid + ")", i, 1, pre];
+    }
+    if is_digit(s[i]) == 1 {
+        let start: i64 = i;
+        let v: i64 = 0;
+        while i < len(s) {
+            if is_digit(s[i]) == 0 { break; }
+            v = v * 10 + (ord(s[i]) - 48); i = i + 1;
+        }
+        if i < len(s) {
+            if s[i] == "." {
+                if i + 1 < len(s) {
+                    if s[i + 1] != "." {
+                        if is_digit(s[i + 1]) == 1 {
+                            let lit: str = "";
+                            let k: i64 = start;
+                            while k < i { lit = lit + s[k]; k = k + 1; }
+                            lit = lit + ".";
+                            i = i + 1;
+                            while i < len(s) {
+                                if is_digit(s[i]) == 0 { break; }
+                                lit = lit + s[i]; i = i + 1;
+                            }
+                            return ["kval_f64(" + lit + ")", i, 3, ""];
+                        }
+                    }
+                }
+            }
+        }
+        return ["kval_i64(" + itoa(v) + "LL)", i, 0, ""];
+    }
+    assert(is_alpha(s[i]) == 1);
+    let id = parse_ident(s, i);
+    let j: i64 = skip(s, id[1]);
+    if id[0] == "true" { return ["kval_i64(1LL)", id[1], 0, ""]; }
+    if id[0] == "false" { return ["kval_i64(0LL)", id[1], 0, ""]; }
+    if j < len(s) {
+        if s[j] == "{" {
+            let tid: i64 = find_struct(stypes_of(decls), id[0]);
+            if tid >= 0 {
+                let fields: list = stypes_of(decls)[tid][1];
+                j = j + 1;
+                let lid: str = "_ls" + itoa(j);
+                let pre: str = "  int64_t " + lid + " = klist_new();\n";
+                let fi: i64 = 0;
+                while fi < len(fields) {
+                    j = skip(s, j);
+                    let fnm = parse_ident(s, j);
+                    assert(fnm[0] == fields[fi]);
+                    j = skip(s, fnm[1]);
+                    assert(s[j] == ":"); j = j + 1;
+                    let ar = lower_cmp(s, j, decls);
+                    pre = merge_pre(pre, ar[3]);
+                    pre = pre + "  klist_push_val(" + lid + ", " + ar[0] + ");\n";
+                    j = skip(s, ar[1]);
+                    if j < len(s) { if s[j] == "," { j = j + 1; } }
+                    fi = fi + 1;
+                }
+                j = skip(s, j); assert(s[j] == "}"); j = j + 1;
+                return ["kval_list(" + lid + ")", j, 1, pre];
+            }
+        }
+        if s[j] == "(" {
+            j = j + 1; j = skip(s, j);
+            if id[0] == "len" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["kval_i64(kval_len(" + ar[0] + "))", j, 0, ar[3]];
+            }
+            if id[0] == "push" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let av = lower_cmp(s, j, decls);
+                j = skip(s, av[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], av[3]);
+                return ["kval_list(klist_push_ret(kval_as_list(" + ar[0] + "), " + av[0] + "))", j, 1, pre];
+            }
+            if id[0] == "ord" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["kval_i64(k_ord(kval_as_str(" + ar[0] + ")))", j, 0, ar[3]];
+            }
+            if id[0] == "round" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["kval_i64(k_round(kval_as_f64(" + ar[0] + ")))", j, 0, ar[3]];
+            }
+            if id[0] == "read_file" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["kval_str(k_read_file(kval_as_str(" + ar[0] + ")))", j, 2, ar[3]];
+            }
+            if id[0] == "write_file" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let av = lower_cmp(s, j, decls);
+                j = skip(s, av[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], av[3]);
+                return ["kval_i64(k_write_file(kval_as_str(" + ar[0] + "), kval_as_str(" + av[0] + ")))", j, 0, pre];
+            }
+            if id[0] == "emit" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let av = lower_cmp(s, j, decls);
+                j = skip(s, av[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], av[3]);
+                return ["kval_i64(ke_emit(kval_as_str(" + ar[0] + "), " + av[0] + "))", j, 0, pre];
+            }
+            if id[0] == "pump" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["kval_i64(ke_pump(kval_as_i64(" + ar[0] + ")))", j, 0, ar[3]];
+            }
+            if id[0] == "pending" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["kval_i64(ke_pending())", j, 0, ""];
+            }
+            let args: str = "";
+            let pre: str = "";
+            let argc: i64 = 0;
+            if s[j] != ")" {
+                while true {
+                    let ar = lower_cmp(s, j, decls);
+                    pre = merge_pre(pre, ar[3]);
+                    if argc > 0 { args = args + ", "; }
+                    args = args + ar[0];
+                    argc = argc + 1;
+                    j = skip(s, ar[1]);
+                    if s[j] == "," { j = j + 1; continue; }
+                    break;
+                }
+            }
+            assert(s[j] == ")"); j = j + 1;
+            return ["fn_" + id[0] + "(" + args + ")", j, 0, pre];
+        }
+    }
+    let k: i64 = decl_kind(decls, id[0]);
+    return [id[0], id[1], k, ""];
+}
+
+fn lower_index(s: str, i: i64, decls: list, base: str, bkind: i64, pre: str) -> list {
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "[" {
+            let ix = lower_cmp(s, i + 1, decls);
+            pre = merge_pre(pre, ix[3]);
+            i = skip(s, ix[1]); assert(s[i] == "]"); i = i + 1;
+            base = "kval_index(" + base + ", kval_as_i64(" + ix[0] + "))";
+            if bkind == 2 { bkind = 2; } else { bkind = 0; }
+            continue;
+        }
+        if s[i] == "." {
+            if i + 1 < len(s) {
+                if s[i + 1] == "." { break; }
+            }
+            let fld = parse_ident(s, i + 1);
+            let fidx: i64 = field_index_any(stypes_of(decls), fld[0]);
+            assert(fidx >= 0);
+            base = "kval_index(" + base + ", " + itoa(fidx) + "LL)";
+            bkind = 0;
+            i = fld[1];
+            continue;
+        }
+        break;
+    }
+    return [base, i, bkind, pre];
+}
+
+fn lower_term(s: str, i: i64, decls: list) -> list {
+    let r = lower_factor(s, i, decls);
+    r = lower_index(s, r[1], decls, r[0], r[2], r[3]);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2]; let pre: str = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "*" {
+            r = lower_factor(s, i + 1, decls);
+            r = lower_index(s, r[1], decls, r[0], r[2], r[3]);
+            pre = merge_pre(pre, r[3]);
+            if kind == 3 { kind = 3; } else { if r[2] == 3 { kind = 3; } else { kind = 0; } }
+            if kind == 3 {
+                out = "kval_f64(kval_as_f64(" + out + ") * kval_as_f64(" + r[0] + "))";
+            } else {
+                out = "kval_i64(kval_as_i64(" + out + ") * kval_as_i64(" + r[0] + "))";
+            }
+            i = r[1];
+        } else {
+            if s[i] == "/" {
+                r = lower_factor(s, i + 1, decls);
+                r = lower_index(s, r[1], decls, r[0], r[2], r[3]);
+                pre = merge_pre(pre, r[3]);
+                if kind == 3 { kind = 3; } else { if r[2] == 3 { kind = 3; } else { kind = 0; } }
+                if kind == 3 {
+                    out = "kval_f64(kval_as_f64(" + out + ") / kval_as_f64(" + r[0] + "))";
+                } else {
+                    out = "kval_i64(kval_as_i64(" + out + ") / kval_as_i64(" + r[0] + "))";
+                }
+                i = r[1];
+            } else { break; }
+        }
+    }
+    return [out, i, kind, pre];
+}
+
+fn lower_sum(s: str, i: i64, decls: list) -> list {
+    let r = lower_term(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2]; let pre: str = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "+" {
+            r = lower_term(s, i + 1, decls);
+            pre = merge_pre(pre, r[3]);
+            if kind == 2 {
+                if r[2] == 2 {
+                    out = "kval_str(kstr_concat(kval_as_str(" + out + "), kval_as_str(" + r[0] + ")))";
+                    kind = 2;
+                } else {
+                    if kind == 3 { kind = 3; } else { if r[2] == 3 { kind = 3; } else { kind = 0; } }
+                    if kind == 3 {
+                        out = "kval_f64(kval_as_f64(" + out + ") + kval_as_f64(" + r[0] + "))";
+                    } else {
+                        out = "kval_i64(kval_as_i64(" + out + ") + kval_as_i64(" + r[0] + "))";
+                    }
+                }
+            } else {
+                if kind == 3 { kind = 3; } else { if r[2] == 3 { kind = 3; } else { kind = 0; } }
+                if kind == 3 {
+                    out = "kval_f64(kval_as_f64(" + out + ") + kval_as_f64(" + r[0] + "))";
+                } else {
+                    out = "kval_i64(kval_as_i64(" + out + ") + kval_as_i64(" + r[0] + "))";
+                }
+            }
+            i = r[1];
+        } else {
+            if s[i] == "-" {
+                r = lower_term(s, i + 1, decls);
+                pre = merge_pre(pre, r[3]);
+                if kind == 3 { kind = 3; } else { if r[2] == 3 { kind = 3; } else { kind = 0; } }
+                if kind == 3 {
+                    out = "kval_f64(kval_as_f64(" + out + ") - kval_as_f64(" + r[0] + "))";
+                } else {
+                    out = "kval_i64(kval_as_i64(" + out + ") - kval_as_i64(" + r[0] + "))";
+                }
+                i = r[1];
+            } else { break; }
+        }
+    }
+    return [out, i, kind, pre];
+}
+
+fn lower_cmp(s: str, i: i64, decls: list) -> list {
+    let r = lower_sum(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2]; let pre: str = r[3];
+    i = skip(s, i);
+    if i >= len(s) { return [out, i, kind, pre]; }
+    if starts_with(s, i, "<=") == 1 {
+        r = lower_sum(s, i + 2, decls);
+        pre = merge_pre(pre, r[3]);
+        return ["kval_i64(kval_as_i64(" + out + ") <= kval_as_i64(" + r[0] + "))", r[1], 0, pre];
+    }
+    if starts_with(s, i, ">=") == 1 {
+        r = lower_sum(s, i + 2, decls);
+        pre = merge_pre(pre, r[3]);
+        return ["kval_i64(kval_as_i64(" + out + ") >= kval_as_i64(" + r[0] + "))", r[1], 0, pre];
+    }
+    if starts_with(s, i, "==") == 1 {
+        r = lower_sum(s, i + 2, decls);
+        pre = merge_pre(pre, r[3]);
+        if kind == 2 { return ["kval_i64(kval_eq(" + out + ", " + r[0] + "))", r[1], 0, pre]; }
+        if r[2] == 2 { return ["kval_i64(kval_eq(" + out + ", " + r[0] + "))", r[1], 0, pre]; }
+        if kind == 3 { if r[2] == 3 {
+            return ["kval_i64(kval_as_f64(" + out + ") == kval_as_f64(" + r[0] + "))", r[1], 0, pre];
+        } }
+        if kind == 3 { return ["kval_i64(kval_as_f64(" + out + ") == kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
+        if r[2] == 3 { return ["kval_i64(kval_as_f64(" + out + ") == kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
+        return ["kval_i64(kval_as_i64(" + out + ") == kval_as_i64(" + r[0] + "))", r[1], 0, pre];
+    }
+    if starts_with(s, i, "!=") == 1 {
+        r = lower_sum(s, i + 2, decls);
+        pre = merge_pre(pre, r[3]);
+        if kind == 2 { return ["kval_i64(!kval_eq(" + out + ", " + r[0] + "))", r[1], 0, pre]; }
+        if r[2] == 2 { return ["kval_i64(!kval_eq(" + out + ", " + r[0] + "))", r[1], 0, pre]; }
+        return ["kval_i64(kval_as_i64(" + out + ") != kval_as_i64(" + r[0] + "))", r[1], 0, pre];
+    }
+    if s[i] == "<" {
+        r = lower_sum(s, i + 1, decls);
+        pre = merge_pre(pre, r[3]);
+        return ["kval_i64(kval_as_i64(" + out + ") < kval_as_i64(" + r[0] + "))", r[1], 0, pre];
+    }
+    if s[i] == ">" {
+        r = lower_sum(s, i + 1, decls);
+        pre = merge_pre(pre, r[3]);
+        return ["kval_i64(kval_as_i64(" + out + ") > kval_as_i64(" + r[0] + "))", r[1], 0, pre];
+    }
+    return [out, i, kind, pre];
+}
+
+fn wrap_if_pre(pre: str, inner: str) -> str {
+    if len(pre) == 0 { return inner; }
+    return "{\n" + pre + inner + "}\n";
+}
+
+fn lower_block(s: str, i: i64, ind: i64, decls: list, is_main: i64) -> list {
+    i = skip(s, i); assert(s[i] == "{"); i = i + 1;
+    let out: str = "";
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "}" { break; }
+        let st = lower_stmt(s, i, ind, decls, is_main);
+        out = out + st[0]; i = st[1]; decls = st[2];
+    }
+    assert(s[i] == "}");
+    return [out, i + 1, decls];
+}
+
+fn lower_stmt(s: str, i: i64, ind: i64, decls: list, is_main: i64) -> list {
+    i = skip(s, i);
+    let pad: str = indent(ind);
+    if starts_kw(s, i, "let") == 1 {
+        i = skip(s, i + 3);
+        let id = parse_ident(s, i);
+        i = skip_type_annot(s, id[1]);
+        i = skip(s, i);
+        assert(s[i] == "="); i = i + 1;
+        let r = lower_cmp(s, i, decls);
+        i = r[1]; i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        decls = ensure_decl(decls, id[0], r[2]);
+        let stmt: str = pad + id[0] + " = " + r[0] + ";\n";
+        if len(r[3]) > 0 {
+            stmt = pad + "{\n" + r[3] + pad + "  " + id[0] + " = " + r[0] + ";\n" + pad + "}\n";
+        }
+        return [stmt, i, decls];
+    }
+    if starts_kw(s, i, "return") == 1 {
+        let r = lower_cmp(s, i + 6, decls);
+        i = r[1]; i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        let ret: str = "";
+        if is_main == 1 {
+            ret = pad + "return (int)kval_as_i64(" + r[0] + ");\n";
+        } else {
+            ret = pad + "return " + r[0] + ";\n";
+        }
+        return [wrap_if_pre(r[3], ret), i, decls];
+    }
+    if starts_kw(s, i, "println") == 1 {
+        i = skip(s, i + 7); assert(s[i] == "("); i = i + 1;
+        let r = lower_cmp(s, i, decls);
+        i = skip(s, r[1]); assert(s[i] == ")"); i = i + 1;
+        i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [wrap_if_pre(r[3], pad + "kenga_println_val(" + r[0] + ");\n"), i, decls];
+    }
+    if starts_kw(s, i, "assert") == 1 {
+        i = skip(s, i + 6); assert(s[i] == "("); i = i + 1;
+        let r = lower_cmp(s, i, decls);
+        i = skip(s, r[1]); assert(s[i] == ")"); i = i + 1;
+        i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [wrap_if_pre(r[3], pad + "k_assert(kval_as_i64(" + r[0] + "));\n"), i, decls];
+    }
+    if starts_kw(s, i, "while") == 1 {
+        let r = lower_cmp(s, i + 5, decls);
+        let bl = lower_block(s, r[1], ind + 1, decls, is_main);
+        let cond: str = pad + "while (kval_as_i64(" + r[0] + ")) {\n";
+        if len(r[3]) > 0 {
+            cond = pad + "{\n" + r[3] + pad + "  while (kval_as_i64(" + r[0] + ")) {\n";
+            return [cond + bl[0] + pad + "  }\n" + pad + "}\n", bl[1], bl[2]];
+        }
+        return [cond + bl[0] + pad + "}\n", bl[1], bl[2]];
+    }
+    if starts_kw(s, i, "for") == 1 {
+        i = skip(s, i + 3);
+        let var = parse_ident(s, i);
+        i = skip(s, var[1]);
+        assert(starts_kw(s, i, "in") == 1);
+        i = skip(s, i + 2);
+        let lo = lower_cmp(s, i, decls);
+        i = skip(s, lo[1]);
+        if starts_with(s, i, "..") == 1 {
+            i = i + 2;
+            let hi = lower_cmp(s, i, decls);
+            decls = ensure_decl(decls, var[0], 0);
+            let bl = lower_block(s, hi[1], ind + 1, decls, is_main);
+            let pre: str = merge_pre(lo[3], hi[3]);
+            let out: str = "";
+            if len(pre) > 0 { out = out + pad + "{\n" + pre; }
+            let p2: str = pad;
+            if len(pre) > 0 { p2 = pad + "  "; }
+            out = out + p2 + var[0] + " = " + lo[0] + ";\n";
+            out = out + p2 + "while (kval_as_i64(" + var[0] + ") < kval_as_i64(" + hi[0] + ")) {\n";
+            out = out + bl[0];
+            out = out + p2 + "  " + var[0] + " = kval_i64(kval_as_i64(" + var[0] + ") + 1);\n";
+            out = out + p2 + "}\n";
+            if len(pre) > 0 { out = out + pad + "}\n"; }
+            return [out, bl[1], bl[2]];
+        }
+        let ti: str = "_fi" + itoa(i);
+        let tl: str = "_fl" + itoa(i);
+        decls = ensure_decl(decls, var[0], 0);
+        decls = ensure_decl(decls, ti, 0);
+        decls = ensure_decl(decls, tl, 1);
+        let bl = lower_block(s, i, ind + 1, decls, is_main);
+        let pre: str = lo[3];
+        let out: str = "";
+        if len(pre) > 0 { out = out + pad + "{\n" + pre; }
+        let p2: str = pad;
+        if len(pre) > 0 { p2 = pad + "  "; }
+        out = out + p2 + tl + " = " + lo[0] + ";\n";
+        out = out + p2 + ti + " = kval_i64(0);\n";
+        out = out + p2 + "while (kval_as_i64(" + ti + ") < klist_len(kval_as_list(" + tl + "))) {\n";
+        out = out + p2 + "  " + var[0] + " = klist_get_val(kval_as_list(" + tl + "), kval_as_i64(" + ti + "));\n";
+        out = out + bl[0];
+        out = out + p2 + "  " + ti + " = kval_i64(kval_as_i64(" + ti + ") + 1);\n";
+        out = out + p2 + "}\n";
+        if len(pre) > 0 { out = out + pad + "}\n"; }
+        return [out, bl[1], bl[2]];
+    }
+    if starts_kw(s, i, "break") == 1 {
+        i = skip(s, i + 5); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [pad + "break;\n", i, decls];
+    }
+    if starts_kw(s, i, "continue") == 1 {
+        i = skip(s, i + 8); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [pad + "continue;\n", i, decls];
+    }
+    if starts_kw(s, i, "if") == 1 {
+        let r = lower_cmp(s, i + 2, decls);
+        let th = lower_block(s, r[1], ind + 1, decls, is_main);
+        let hdr: str = pad + "if (kval_as_i64(" + r[0] + ")) {\n";
+        if len(r[3]) > 0 {
+            hdr = pad + "{\n" + r[3] + pad + "  if (kval_as_i64(" + r[0] + ")) {\n";
+        }
+        let out: str = hdr + th[0];
+        if len(r[3]) > 0 { out = out + pad + "  }"; } else { out = out + pad + "}"; }
+        let j: i64 = skip(s, th[1]);
+        if starts_kw(s, j, "else") == 1 {
+            j = skip(s, j + 4);
+            if starts_kw(s, j, "if") == 1 {
+                let el = lower_stmt(s, j, ind, th[2], is_main);
+                out = out + " else {\n" + el[0] + pad + "}\n";
+                if len(r[3]) > 0 { out = out + pad + "}\n"; } else { out = out + "\n"; }
+                return [out, el[1], el[2]];
+            }
+            let el = lower_block(s, j, ind + 1, th[2], is_main);
+            out = out + " else {\n" + el[0] + pad + "}\n";
+            if len(r[3]) > 0 { out = out + pad + "}\n"; } else { out = out + "\n"; }
+            return [out, el[1], el[2]];
+        }
+        if len(r[3]) > 0 { out = out + "\n" + pad + "}\n"; } else { out = out + "\n"; }
+        return [out, th[1], th[2]];
+    }
+    if is_alpha(s[i]) == 1 {
+        let save: i64 = i;
+        let id = parse_ident(s, i);
+        let j: i64 = skip(s, id[1]);
+        if j < len(s) {
+            if s[j] == "[" {
+                let ix = lower_cmp(s, j + 1, decls);
+                j = skip(s, ix[1]); assert(s[j] == "]"); j = skip(s, j + 1);
+                if j < len(s) {
+                    if s[j] == "=" {
+                        if starts_with(s, j, "==") == 0 {
+                            let r = lower_cmp(s, j + 1, decls);
+                            j = r[1]; j = skip(s, j); if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                            let pre: str = merge_pre(ix[3], r[3]);
+                            let st: str = pad + "klist_set_val(kval_as_list(" + id[0] + "), kval_as_i64(" + ix[0] + "), " + r[0] + ");\n";
+                            return [wrap_if_pre(pre, st), j, decls];
+                        }
+                    }
+                }
+                i = save;
+            } else {
+                if s[j] == "." {
+                    if j + 1 < len(s) {
+                        if s[j + 1] != "." {
+                            let fld = parse_ident(s, j + 1);
+                            let fidx: i64 = field_index_any(stypes_of(decls), fld[0]);
+                            assert(fidx >= 0);
+                            j = skip(s, fld[1]);
+                            if j < len(s) {
+                                if s[j] == "=" {
+                                    if starts_with(s, j, "==") == 0 {
+                                        let r = lower_cmp(s, j + 1, decls);
+                                        j = r[1]; j = skip(s, j); if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                                        let st: str = pad + "klist_set_val(kval_as_list(" + id[0] + "), " + itoa(fidx) + "LL, " + r[0] + ");\n";
+                                        return [wrap_if_pre(r[3], st), j, decls];
+                                    }
+                                }
+                            }
+                            i = save;
+                        }
+                    }
+                } else {
+                    if s[j] == "=" {
+                        if starts_with(s, j, "==") == 0 {
+                            let r = lower_cmp(s, j + 1, decls);
+                            j = r[1]; j = skip(s, j); if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                            decls = ensure_decl(decls, id[0], r[2]);
+                            let st: str = pad + id[0] + " = " + r[0] + ";\n";
+                            return [wrap_if_pre(r[3], st), j, decls];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let r = lower_cmp(s, i, decls);
+    i = skip(s, r[1]); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+    return [wrap_if_pre(r[3], pad + "(void)(" + r[0] + ");\n"), i, decls];
+}
+
+fn lower_fn_body(body: str, params: list, stypes: list, is_main: i64) -> list {
+    let decls: list = [];
+    let pi: i64 = 0;
+    while pi < len(params) {
+        decls = ensure_decl(decls, params[pi][0], params[pi][1]);
+        pi = pi + 1;
+    }
+    decls = push(decls, ["__stypes__", stypes]);
+    let bl = lower_block(body, 0, 1, decls, is_main);
+    let locals: list = bl[2];
+    let pre: str = "";
+    let li: i64 = 0;
+    while li < len(locals) {
+        let nm: str = locals[li][0];
+        if nm == "__stypes__" {
+            li = li + 1;
+            continue;
+        }
+        let is_param: i64 = 0;
+        let pj: i64 = 0;
+        while pj < len(params) {
+            if params[pj][0] == nm { is_param = 1; }
+            pj = pj + 1;
+        }
+        if is_param == 0 {
+            pre = pre + "  KVal " + nm + " = kval_i64(0);\n";
+        }
+        li = li + 1;
+    }
+    return [pre + bl[0]];
+}
+
+fn dirname_of(path: str) -> str {
+    let i: i64 = len(path) - 1;
+    while i >= 0 {
+        if path[i] == "/" { break; }
+        if path[i] == "\\" { break; }
+        i = i - 1;
+    }
+    if i < 0 { return "."; }
+    let out: str = "";
+    let j: i64 = 0;
+    while j < i { out = out + path[j]; j = j + 1; }
+    if len(out) == 0 { return "."; }
+    return out;
+}
+fn join_path(dir: str, rel: str) -> str {
+    if len(dir) == 0 { return rel; }
+    if dir == "." { return rel; }
+    return dir + "/" + rel;
+}
+fn resolve_imports(path: str, depth: i64) -> str {
+    assert(depth < 32);
+    let src: str = read_file(path);
+    let dir: str = dirname_of(path);
+    let i: i64 = 0;
+    let acc: str = "";
+    while true {
+        i = skip(src, i);
+        if starts_kw(src, i, "import") == 0 { break; }
+        i = skip(src, i + 6);
+        assert(src[i] == "\"");
+        let ps = parse_string(src, i);
+        i = ps[1];
+        i = skip(src, i);
+        if i < len(src) { if src[i] == ";" { i = i + 1; } }
+        let dep_path: str = join_path(dir, ps[0]);
+        acc = acc + resolve_imports(dep_path, depth + 1);
+        acc = acc + "\n";
+    }
+    let rest: str = "";
+    while i < len(src) { rest = rest + src[i]; i = i + 1; }
+    return acc + rest;
+}
+
+fn lower_program(src: str) -> str {
+    let fnames: list = [];
+    let fparams: list = [];
+    let fbodies: list = [];
+    let fkinds: list = [];
+    let events: list = [];
+    let stypes: list = [];
+    let on_serial: i64 = 0;
+    let i: i64 = 0;
+    while i < len(src) {
+        i = skip(src, i);
+        if i >= len(src) { break; }
+        if starts_kw(src, i, "struct") == 1 {
+            i = skip(src, i + 6);
+            let id = parse_ident(src, i);
+            i = skip(src, id[1]);
+            assert(src[i] == "{"); i = i + 1;
+            let fields: list = [];
+            i = skip(src, i);
+            if src[i] != "}" {
+                while true {
+                    let fnm = parse_ident(src, i);
+                    fields = push(fields, fnm[0]);
+                    i = skip_type_annot(src, fnm[1]);
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; i = skip(src, i); continue; }
+                    break;
+                }
+            }
+            assert(src[i] == "}"); i = i + 1;
+            stypes = push(stypes, [id[0], fields]);
+            continue;
+        }
+        if starts_kw(src, i, "on") == 1 {
+            i = skip(src, i + 2);
+            assert(src[i] == "\"");
+            let ps = parse_string(src, i);
+            let ev: str = ps[0]; i = ps[1];
+            i = skip(src, i);
+            assert(src[i] == "("); i = i + 1;
+            let params: list = [];
+            i = skip(src, i);
+            if src[i] != ")" {
+                while true {
+                    let pn = parse_ident(src, i);
+                    let tk = parse_type_kind(src, pn[1]);
+                    params = push(params, [pn[0], tk[0]]);
+                    i = skip(src, tk[1]);
+                    if src[i] == "," { i = i + 1; continue; }
+                    break;
+                }
+            }
+            assert(src[i] == ")");
+            i = skip(src, i + 1);
+            assert(src[i] == "{");
+            let start: i64 = i;
+            i = match_brace(src, i);
+            let body: str = "";
+            let bi: i64 = start;
+            while bi < i { body = body + src[bi]; bi = bi + 1; }
+            let hname: str = "on_" + itoa(on_serial);
+            on_serial = on_serial + 1;
+            events = push(events, [ev, hname, len(params)]);
+            fnames = push(fnames, hname);
+            fparams = push(fparams, params);
+            fbodies = push(fbodies, body);
+            fkinds = push(fkinds, 1);
+            continue;
+        }
+        assert(starts_kw(src, i, "fn") == 1);
+        i = skip(src, i + 2);
+        let id = parse_ident(src, i);
+        i = skip(src, id[1]);
+        assert(src[i] == "("); i = i + 1;
+        let params: list = [];
+        i = skip(src, i);
+        if src[i] != ")" {
+            while true {
+                let pn = parse_ident(src, i);
+                let tk = parse_type_kind(src, pn[1]);
+                params = push(params, [pn[0], tk[0]]);
+                i = skip(src, tk[1]);
+                if src[i] == "," { i = i + 1; continue; }
+                break;
+            }
+        }
+        assert(src[i] == ")");
+        i = skip(src, i + 1);
+        if starts_with(src, i, "->") == 1 {
+            i = skip(src, i + 2);
+            let ty = parse_ident(src, i);
+            i = ty[1];
+        }
+        i = skip(src, i);
+        assert(src[i] == "{");
+        let start: i64 = i;
+        i = match_brace(src, i);
+        let body: str = "";
+        let bi: i64 = start;
+        while bi < i { body = body + src[bi]; bi = bi + 1; }
+        fnames = push(fnames, id[0]);
+        fparams = push(fparams, params);
+        fbodies = push(fbodies, body);
+        if id[0] == "main" {
+            fkinds = push(fkinds, 2);
+        } else {
+            fkinds = push(fkinds, 0);
+        }
+    }
+
+    let out: str = runtime_c();
+    let fi: i64 = 0;
+    while fi < len(fnames) {
+        if fkinds[fi] == 0 {
+            out = out + "static KVal fn_" + fnames[fi] + "(";
+            let pj: i64 = 0;
+            while pj < len(fparams[fi]) {
+                if pj > 0 { out = out + ", "; }
+                out = out + "KVal " + fparams[fi][pj][0];
+                pj = pj + 1;
+            }
+            out = out + ");\n";
+        }
+        if fkinds[fi] == 1 {
+            out = out + "static void " + fnames[fi] + "(";
+            if len(fparams[fi]) == 1 {
+                out = out + "KVal " + fparams[fi][0][0];
+            } else {
+                out = out + "KVal __unused";
+            }
+            out = out + ");\n";
+        }
+        fi = fi + 1;
+    }
+    out = out + "\n";
+
+    fi = 0;
+    while fi < len(fnames) {
+        if fkinds[fi] == 1 {
+            out = out + "static void " + fnames[fi] + "(";
+            if len(fparams[fi]) == 1 {
+                out = out + "KVal " + fparams[fi][0][0];
+            } else {
+                out = out + "KVal __unused";
+            }
+            out = out + ") {\n";
+            let body = lower_fn_body(fbodies[fi], fparams[fi], stypes, 0);
+            out = out + body[0] + "}\n\n";
+        }
+        if fkinds[fi] == 0 {
+            out = out + "static KVal fn_" + fnames[fi] + "(";
+            let pj: i64 = 0;
+            while pj < len(fparams[fi]) {
+                if pj > 0 { out = out + ", "; }
+                out = out + "KVal " + fparams[fi][pj][0];
+                pj = pj + 1;
+            }
+            out = out + ") {\n";
+            let body = lower_fn_body(fbodies[fi], fparams[fi], stypes, 0);
+            out = out + body[0] + "  return kval_i64(0);\n}\n\n";
+        }
+        if fkinds[fi] == 2 {
+            let body = lower_fn_body(fbodies[fi], fparams[fi], stypes, 1);
+            out = out + "int main(void) {\n";
+            let ei: i64 = 0;
+            while ei < len(events) {
+                out = out + "  ke_listen(\"" + c_escape(events[ei][0]) + "\", " + events[ei][1] + ", " + itoa(events[ei][2]) + ");\n";
+                ei = ei + 1;
+            }
+            out = out + body[0] + "  return 0;\n}\n\n";
+        }
+        fi = fi + 1;
+    }
+    return out;
+}
+
+fn main() -> i64 {
+    let strkv = resolve_imports("examples/selfhost/str_kv.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_str_kv.c", lower_program(strkv)) == true);
+
+    let ping: str = "on \"ping\"(x) { emit(\"pong\", x); } on \"pong\"(x) { println(x); } fn main() { emit(\"ping\", 7); assert(pump(8) == 2); assert(pending() == 0); return 0; }";
+    assert(write_file("bootstrap/generated/lower_events_kv.c", lower_program(ping)) == true);
+
+    let agent = resolve_imports("examples/agent.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_agent_kv.c", lower_program(agent)) == true);
+
+    let lex = resolve_imports("examples/selfhost/lex_frag.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_lex_frag.c", lower_program(lex)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag}.c");
+    println("lower_kv ok");
+    return 0;
+}

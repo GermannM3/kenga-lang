@@ -1,0 +1,24 @@
+// String/list KVal smoke for lower_kv (no Rust)
+fn is_digit(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn main() -> i64 {
+    let s: str = "ab12";
+    assert(len(s) == 4);
+    assert(ord(s[0]) == 97);
+    assert(is_digit(s[2]) == 1);
+    let t: str = "x" + "y";
+    assert(t == "xy");
+    let xs = ["a", "b"];
+    xs = push(xs, "c");
+    assert(len(xs) == 3);
+    assert(xs[1] == "b");
+    println(len(s) + len(xs));
+    assert(write_file("str_kv_out.txt", "ok") == true);
+    let back: str = read_file("str_kv_out.txt");
+    assert(back == "ok");
+    println("str_kv ok");
+    return 0;
+}

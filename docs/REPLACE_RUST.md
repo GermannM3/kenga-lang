@@ -13,7 +13,7 @@
 | `autograd.rs` | ✅ на lite | `bootstrap/tape_lite.inc.c` |
 | `memory.rs` | ✅ на lite | `bootstrap/prophet_lite.inc.c` |
 | `talk.rs` (chat) | ✅ на lite | `bootstrap/chat_lite.inc.c` |
-| `codegen.rs` (emit-c) | 🟢 растёт | `lower_c.kenga` (agent/struct/f64/import + selfhost lites) + `core_c` |
+| `codegen.rs` (emit-c) | 🟢 растёт | `lower_c` + **`lower_kv`/`rt_kval`** (KVal path к `more`) |
 | `main.rs` / `driver.rs` | ⬜ | CLI = `kenga-lite` пока |
 | `demo.rs` / `build.rs` | ⬜ | позже |
 

@@ -9,8 +9,8 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 | Living runtime | ✅ `kenga-lite` | ❌ C99 host |
 | Word-LM / tape / tensor / Prophet | ✅ | ❌ |
 | Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** (for / elif / struct / import / events) | ❌ |
-| Emit на Kenga | ✅ **`lower_c`** + seeds (`expr_c` / `core_c`) | ❌ gcc/cl |
-| Native из `.kenga` | ✅ agent / for / lists / struct / elif / float → `bootstrap/bin/lower_*.c` | ❌ |
+| Emit на Kenga | ✅ **`lower_c`** + **`lower_kv`/`rt_kval`** | ❌ gcc/cl |
+| Native из `.kenga` | ✅ agent / struct / float + **str/ord/lex_frag** (KVal) | ❌ |
 | Каталог замены Rust | ✅ **`kenga/`** + `docs/REPLACE_RUST.md` | — |
 | Полный CLI `src/` | 🟡 legacy | — |
 
@@ -18,8 +18,8 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 
 1. Lite host (C) — living без Rust.  
 2. **`kenga/compiler`** вытесняет `src/compiler.rs` + кусок VM.  
-3. **`kenga/emit/lower_c`** вытесняет `codegen.rs` (уже: control + events + struct + f64).  
-4. Emit полного lite runtime → ручной `kenga_lite.c` уходит.  
+3. **`lower_c` / `lower_kv`** вытесняют `codegen.rs`.  
+4. Emit полного lite runtime (`rt_kval` → host) → ручной `kenga_lite.c` уходит.  
 5. Releases без cargo; `src/` → archive.  
 6. VM на Kenga → C уходит.
 
@@ -32,10 +32,11 @@ bootstrap\build.cmd
 scripts\freedom-smoke.cmd
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
-bootstrap\bin\kenga-lite.exe run examples\ml\word_lm.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 ```
 
-После `lower_c` можно собрать, например, `bootstrap\bin\lower_agent.exe` — тот же `examples/agent.kenga`, но уже как native C.
+`lower_kv` пишет в `bootstrap/generated/` (KVal runtime + agent/str/lex native).
 
 ## Честно
 

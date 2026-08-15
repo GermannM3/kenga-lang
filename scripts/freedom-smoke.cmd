@@ -31,6 +31,14 @@ echo === kenga/emit/lower_c.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
 if errorlevel 1 exit /b 1
 
+echo === kenga/emit/rt_kval.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/lower_kv.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
+if errorlevel 1 exit /b 1
+
 set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
 if exist "%VCVARS%" (
   call "%VCVARS%" >nul
@@ -56,6 +64,14 @@ if exist "%VCVARS%" (
     bootstrap\bin\%%f.exe
     if errorlevel 1 exit /b 1
   )
+  pushd bootstrap\generated
+  for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag) do (
+    cl /nologo /O2 /TC %%f.c /Fe:%%f.exe /Fo:%%f.obj
+    if errorlevel 1 exit /b 1
+    %%f.exe
+    if errorlevel 1 exit /b 1
+  )
+  popd
 ) else (
   where gcc >nul 2>&1 && (
     gcc -O2 -std=c99 bootstrap\bin\expr_from_kenga.c -o bootstrap\bin\expr_from_kenga.exe
@@ -80,8 +96,16 @@ if exist "%VCVARS%" (
       bootstrap\bin\%%f.exe
       if errorlevel 1 exit /b 1
     )
+    pushd bootstrap\generated
+    for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag) do (
+      gcc -O2 -std=c99 %%f.c -o %%f.exe
+      if errorlevel 1 exit /b 1
+      %%f.exe
+      if errorlevel 1 exit /b 1
+    )
+    popd
   )
 )
 
 echo.
-echo OK: freedom smoke ^(more dialect + Kenga emit → C → native^)
+echo OK: freedom smoke ^(more + lower_c + KVal lower_kv → native^)
