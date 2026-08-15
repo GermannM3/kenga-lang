@@ -25,6 +25,7 @@ fn OP_LIST_PUSH() -> i64 { return 22; }
 fn OP_LEN() -> i64 { return 23; }
 fn OP_GET() -> i64 { return 24; }
 fn OP_SET() -> i64 { return 28; }
+fn OP_LIST_TAG() -> i64 { return 34; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -247,6 +248,38 @@ fn fn_index(fnames: list, name: str) -> i64 {
     return -1;
 }
 
+fn find_struct(stypes: list, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(stypes) {
+        if stypes[i][0] == name { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+fn field_index(fields: list, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(fields) {
+        if fields[i] == name { return i; }
+        i = i + 1;
+    }
+    assert(0 == 1);
+    return 0;
+}
+fn field_index_any(stypes: list, name: str) -> i64 {
+    let si: i64 = 0;
+    while si < len(stypes) {
+        let fields: list = stypes[si][1];
+        let fi: i64 = 0;
+        while fi < len(fields) {
+            if fields[fi] == name { return fi; }
+            fi = fi + 1;
+        }
+        si = si + 1;
+    }
+    assert(0 == 1);
+    return 0;
+}
+
 fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
     i = skip(s, i);
     if s[i] == "[" {
@@ -327,9 +360,43 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                         }
                     }
                 } else {
-                    let sl = slot_of(vnames, id[0]);
-                    code = emit2(code, OP_LOAD(), sl[0]);
-                    i = id[1]; vnames = sl[1];
+                    if s[j] == "{" {
+                        let tid: i64 = find_struct(strbox[2], id[0]);
+                        if tid >= 0 {
+                            let fields: list = strbox[2][tid][1];
+                            j = j + 1;
+                            code = push(code, OP_LIST_NEW());
+                            let fi: i64 = 0;
+                            while fi < len(fields) {
+                                j = skip(s, j);
+                                let fnm = parse_ident(s, j);
+                                assert(fnm[0] == fields[fi]);
+                                j = skip(s, fnm[1]);
+                                assert(s[j] == ":"); j = j + 1;
+                                let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
+                                code = push(ar[0], OP_LIST_PUSH());
+                                j = ar[1]; vnames = ar[2];
+                                j = skip(s, j);
+                                if j < len(s) { if s[j] == "," { j = j + 1; } }
+                                fi = fi + 1;
+                            }
+                            j = skip(s, j);
+                            assert(s[j] == "}"); j = j + 1;
+                            let strs = strbox[0];
+                            strs = push(strs, id[0]);
+                            strbox[0] = strs;
+                            code = emit2(code, OP_LIST_TAG(), len(strs) - 1);
+                            i = j;
+                        } else {
+                            let sl = slot_of(vnames, id[0]);
+                            code = emit2(code, OP_LOAD(), sl[0]);
+                            i = id[1]; vnames = sl[1];
+                        }
+                    } else {
+                        let sl = slot_of(vnames, id[0]);
+                        code = emit2(code, OP_LOAD(), sl[0]);
+                        i = id[1]; vnames = sl[1];
+                    }
                 }
             } else {
                 let sl = slot_of(vnames, id[0]);
@@ -359,6 +426,20 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
         assert(s[i] == "]");
         i = i + 1;
         code = push(code, OP_GET());
+    }
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] != "." { break; }
+        if i + 1 < len(s) {
+            if s[i + 1] == "." { break; }
+        }
+        let fld = parse_ident(s, i + 1);
+        assert(len(fld[0]) > 0);
+        let fidx: i64 = field_index_any(strbox[2], fld[0]);
+        code = emit2(code, OP_CONST(), fidx);
+        code = push(code, OP_GET());
+        i = fld[1];
     }
     return [code, i, vnames];
 }
@@ -703,15 +784,40 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
                 code = nc;
                 i = save;
             } else {
-                if s[j] == "=" {
-                    let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, strbox);
-                    code = r[0]; i = r[1]; vnames = r[2];
+                if s[j] == "." {
                     let sl = slot_of(vnames, id[0]);
                     vnames = sl[1];
-                    code = emit2(code, OP_STORE(), sl[0]);
-                    i = skip(s, i);
-                    if i < len(s) { if s[i] == ";" { i = i + 1; } }
-                    return [code, i, vnames];
+                    let fld = parse_ident(s, j + 1);
+                    j = skip(s, fld[1]);
+                    if j < len(s) {
+                        if s[j] == "=" {
+                            if starts_with(s, j, "==") == 0 {
+                                let fidx: i64 = field_index_any(strbox[2], fld[0]);
+                                code = emit2(code, OP_LOAD(), sl[0]);
+                                code = emit2(code, OP_CONST(), fidx);
+                                let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, strbox);
+                                code = r[0]; j = r[1]; vnames = r[2];
+                                code = push(code, OP_SET());
+                                j = skip(s, j);
+                                if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                                return [code, j, vnames];
+                            }
+                        }
+                    }
+                    i = save;
+                } else {
+                if s[j] == "=" {
+                    if starts_with(s, j, "==") == 0 {
+                        let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, strbox);
+                        code = r[0]; i = r[1]; vnames = r[2];
+                        let sl = slot_of(vnames, id[0]);
+                        vnames = sl[1];
+                        code = emit2(code, OP_STORE(), sl[0]);
+                        i = skip(s, i);
+                        if i < len(s) { if s[i] == ";" { i = i + 1; } }
+                        return [code, i, vnames];
+                    }
+                }
                 }
             }
         }
@@ -742,10 +848,39 @@ fn compile_src(src: str) -> list {
     let fnames: list = [];
     let fparams: list = [];
     let fbodies: list = [];
+    let stypes: list = [];
     let i: i64 = 0;
     while i < len(src) {
         i = skip(src, i);
         if i >= len(src) { break; }
+        if starts_kw(src, i, "struct") == 1 {
+            i = skip(src, i + 6);
+            let id = parse_ident(src, i);
+            i = skip(src, id[1]);
+            assert(src[i] == "{"); i = i + 1;
+            let fields: list = [];
+            i = skip(src, i);
+            if src[i] != "}" {
+                while true {
+                    let fnm = parse_ident(src, i);
+                    fields = push(fields, fnm[0]);
+                    i = skip(src, fnm[1]);
+                    if i < len(src) {
+                        if src[i] == ":" {
+                            i = i + 1;
+                            let ty = parse_ident(src, i);
+                            i = ty[1];
+                        }
+                    }
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; i = skip(src, i); continue; }
+                    break;
+                }
+            }
+            assert(src[i] == "}"); i = i + 1;
+            stypes = push(stypes, [id[0], fields]);
+            continue;
+        }
         assert(starts_kw(src, i, "fn") == 1);
         i = skip(src, i + 2);
         let id = parse_ident(src, i);
@@ -799,7 +934,7 @@ fn compile_src(src: str) -> list {
 
     let code: list = emit2([], OP_JMP(), 0);
     let faddrs: list = [];
-    let strbox: list = [[], []];
+    let strbox: list = [[], [], stypes];
     fi = 0;
     while fi < len(fnames) {
         if fnames[fi] != "main" {
@@ -869,14 +1004,21 @@ fn write_c_driver(code: list, strs: list, floats: list) -> str {
     s = s + "typedef struct { int tag; int64_t i; double f; } V;\n";
     s = s + "static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }\n";
     s = s + "static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }\n";
-    s = s + "static double as_f(V v) { return v.tag ? v.f : (double)v.i; }\n";
-    s = s + "static int64_t as_i(V v) { return v.tag ? (int64_t)llround(v.f) : v.i; }\n\n";
+    s = s + "static V Vl(int64_t x) { V v; v.tag=2; v.i=x; v.f=0; return v; }\n";
+    s = s + "static double as_f(V v) { return v.tag==1 ? v.f : (double)v.i; }\n";
+    s = s + "static int64_t as_i(V v) { return v.tag==1 ? (int64_t)llround(v.f) : v.i; }\n";
+    s = s + "static int64_t as_list(V v) {\n";
+    s = s + "  if (v.tag != 2) { fprintf(stderr, \"expected list\\n\"); exit(1); }\n";
+    s = s + "  return v.i;\n";
+    s = s + "}\n\n";
     s = s + "typedef struct { int64_t *d; size_t n, cap; } LObj;\n";
     s = s + "static LObj gL[256];\n";
+    s = s + "static const char *g_ltype[256];\n";
     s = s + "static int gLn = 0;\n\n";
     s = s + "static int64_t lnew(void) {\n";
     s = s + "  if (gLn >= 256) { fprintf(stderr, \"list heap full\\n\"); exit(1); }\n";
     s = s + "  gL[gLn].d = NULL; gL[gLn].n = 0; gL[gLn].cap = 0;\n";
+    s = s + "  g_ltype[gLn] = NULL;\n";
     s = s + "  return (int64_t)gLn++;\n";
     s = s + "}\n";
     s = s + "static void lgrow(int id) {\n";
@@ -920,30 +1062,49 @@ fn write_c_driver(code: list, strs: list, floats: list) -> str {
     s = s + "    else if (op == OP_CONST_F64) { stack[sp++] = Vf(g_f64s[code[ip++]]); }\n";
     s = s + "    else if (op == OP_LOAD) { stack[sp++] = slots[slot_base + code[ip++]]; }\n";
     s = s + "    else if (op == OP_STORE) { int64_t idx=slot_base+code[ip++]; slots[idx]=stack[--sp]; if (idx+1>slot_used) slot_used=idx+1; }\n";
-    s = s + "    else if (op == OP_ADD) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vf(as_f(a)+as_f(b)); else stack[sp++]=Vi(a.i+b.i); }\n";
-    s = s + "    else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }\n";
-    s = s + "    else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }\n";
-    s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
-    s = s + "    else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }\n";
-    s = s + "    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }\n";
+    s = s + "    else if (op == OP_ADD) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)+as_f(b)); else stack[sp++]=Vi(a.i+b.i); }\n";
+    s = s + "    else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }\n";
+    s = s + "    else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }\n";
+    s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
+    s = s + "    else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }\n";
+    s = s + "    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }\n";
     s = s + "    else if (op == OP_ROUND) { V x=stack[--sp]; stack[sp++]=Vi((int64_t)llround(as_f(x))); }\n";
     s = s + "    else if (op == OP_JMP) { ip = code[ip]; }\n";
     s = s + "    else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=as_i(stack[--sp]); if (!c) ip = t; }\n";
-    s = s + "    else if (op == OP_PRINTLN) { V v=stack[--sp]; if (v.tag) printf(\"%g\\n\", v.f); else printf(\"%lld\\n\", (long long)v.i); }\n";
+    s = s + "    else if (op == OP_PRINTLN) {\n";
+    s = s + "      V v=stack[--sp];\n";
+    s = s + "      if (v.tag==2) {\n";
+    s = s + "        int64_t lid=v.i; LObj *L=&gL[lid]; const char *tn=g_ltype[lid]; size_t li;\n";
+    s = s + "        if (tn && tn[0]) {\n";
+    s = s + "          printf(\"%s{\", tn);\n";
+    s = s + "          for (li=0; li<L->n; li++) { if (li) printf(\", \"); printf(\"%lld\", (long long)L->d[li]); }\n";
+    s = s + "          printf(\"}\\n\");\n";
+    s = s + "        } else {\n";
+    s = s + "          printf(\"[\");\n";
+    s = s + "          for (li=0; li<L->n; li++) { if (li) printf(\", \"); printf(\"%lld\", (long long)L->d[li]); }\n";
+    s = s + "          printf(\"]\\n\");\n";
+    s = s + "        }\n";
+    s = s + "      } else if (v.tag==1) printf(\"%g\\n\", v.f);\n";
+    s = s + "      else printf(\"%lld\\n\", (long long)v.i);\n";
+    s = s + "    }\n";
     s = s + "    else if (op == OP_ASSERT) { if (!as_i(stack[--sp])) { fprintf(stderr, \"assert failed\\n\"); exit(1); } }\n";
     s = s + "    else if (op == OP_PRINT_STR) { puts(g_strs[code[ip++]]); }\n";
-    s = s + "    else if (op == OP_LIST_NEW) { stack[sp++] = Vi(lnew()); }\n";
-    s = s + "    else if (op == OP_LIST_PUSH) {\n";
-    s = s + "      int64_t v = as_i(stack[--sp]); int64_t lid = as_i(stack[--sp]);\n";
-    s = s + "      lpush(lid, v); stack[sp++] = Vi(lid);\n";
+    s = s + "    else if (op == OP_LIST_NEW) { stack[sp++] = Vl(lnew()); }\n";
+    s = s + "    else if (op == OP_LIST_TAG) {\n";
+    s = s + "      int64_t idx=code[ip++]; int64_t lid=as_list(stack[--sp]);\n";
+    s = s + "      g_ltype[lid]=g_strs[idx]; stack[sp++]=Vl(lid);\n";
     s = s + "    }\n";
-    s = s + "    else if (op == OP_LEN) { int64_t x = as_i(stack[--sp]); stack[sp++] = Vi(llen(x)); }\n";
+    s = s + "    else if (op == OP_LIST_PUSH) {\n";
+    s = s + "      int64_t v = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
+    s = s + "      lpush(lid, v); stack[sp++] = Vl(lid);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_LEN) { int64_t x = as_list(stack[--sp]); stack[sp++] = Vi(llen(x)); }\n";
     s = s + "    else if (op == OP_GET) {\n";
-    s = s + "      int64_t ix = as_i(stack[--sp]); int64_t lid = as_i(stack[--sp]);\n";
+    s = s + "      int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
     s = s + "      stack[sp++] = Vi(lget(lid, ix));\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_SET) {\n";
-    s = s + "      int64_t v = as_i(stack[--sp]); int64_t ix = as_i(stack[--sp]); int64_t lid = as_i(stack[--sp]);\n";
+    s = s + "      int64_t v = as_i(stack[--sp]); int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
     s = s + "      lset(lid, ix, v);\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_CALL) {\n";
@@ -1021,7 +1182,11 @@ fn main() -> i64 {
     let r11 = compile_src(src11);
     assert(write_file("bootstrap/generated/bc_from_float_lite.c", write_c_driver(r11[0], r11[1], r11[2])) == true);
 
-    println("wrote bootstrap/generated/bc_from_*.c incl for_lite/lists_lite/elif/elif_lite/float_lite");
+    let src12: str = read_file("examples/selfhost/struct_lite.kenga");
+    let r12 = compile_src(src12);
+    assert(write_file("bootstrap/generated/bc_from_struct_lite.c", write_c_driver(r12[0], r12[1], r12[2])) == true);
+
+    println("wrote bootstrap/generated/bc_from_*.c incl for_lite/lists_lite/elif/elif_lite/float_lite/struct_lite");
     println("bc_src_c ok");
     return 0;
 }
