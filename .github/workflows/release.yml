@@ -43,21 +43,38 @@ jobs:
       - name: Build release
         run: cargo build --release --locked --target ${{ matrix.target }}
 
-      - name: Pack (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p dist
-          cp "target/${{ matrix.target }}/release/kenga" "dist/${{ matrix.artifact }}"
-          chmod +x "dist/${{ matrix.artifact }}"
-          cd dist && tar -czf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
-
       - name: Pack (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/kenga.exe" "dist/${{ matrix.artifact }}.exe"
-          Compress-Archive -Path "dist/${{ matrix.artifact }}.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip"
+          # Rust-free lite companion
+          cmd /c "bootstrap\build.cmd"
+          if (Test-Path "bootstrap\bin\kenga-lite.exe") {
+            Copy-Item "bootstrap\bin\kenga-lite.exe" "dist\kenga-lite.exe"
+            Compress-Archive -Path "dist/${{ matrix.artifact }}.exe","dist\kenga-lite.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip" -Force
+          } else {
+            Compress-Archive -Path "dist/${{ matrix.artifact }}.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip" -Force
+          }
+
+      - name: Pack (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/kenga" "dist/${{ matrix.artifact }}"
+          chmod +x "dist/${{ matrix.artifact }}"
+          if command -v cc >/dev/null; then
+            mkdir -p bootstrap/bin
+            cc -O2 -std=c99 bootstrap/kenga_lite.c -o bootstrap/bin/kenga-lite || true
+          fi
+          if [ -f bootstrap/bin/kenga-lite ]; then
+            cp bootstrap/bin/kenga-lite dist/kenga-lite
+            chmod +x dist/kenga-lite
+            cd dist && tar -czf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}" kenga-lite
+          else
+            cd dist && tar -czf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

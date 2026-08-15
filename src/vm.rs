@@ -794,6 +794,304 @@ impl Vm {
                 let h = crate::memory::load_mind(std::path::Path::new(&path))?;
                 self.stack.push(Value::Memory(h));
             }
+            Op::TensorFill => {
+                let v = crate::tensor::as_f64(&self.pop()?)?;
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_fill(t, v)?);
+            }
+            Op::TensorGet => {
+                let idx = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("t_get index must be i64", None)),
+                };
+                let t = self.pop()?;
+                self.stack
+                    .push(Value::F64(crate::tensor::tensor_get(&t, idx)?));
+            }
+            Op::TensorSet => {
+                let v = crate::tensor::as_f64(&self.pop()?)?;
+                let idx = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("t_set index must be i64", None)),
+                };
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_set(t, idx, v)?);
+            }
+            Op::TensorShape => {
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_shape(&t)?);
+            }
+            Op::TensorAdd => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                self.stack
+                    .push(crate::tensor::tensor_ew(a, b, |x, y| x + y)?);
+            }
+            Op::TensorMul => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                self.stack
+                    .push(crate::tensor::tensor_ew(a, b, |x, y| x * y)?);
+            }
+            Op::TensorMatmul => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                self.stack.push(crate::tensor::tensor_matmul(a, b)?);
+            }
+            Op::TensorFrom => {
+                let data = self.pop()?;
+                let shape = self.pop()?;
+                self.stack.push(crate::tensor::tensor_from(shape, data)?);
+            }
+            Op::TensorReshape => {
+                let shape = self.pop()?;
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_reshape(t, shape)?);
+            }
+            Op::TensorTranspose => {
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_transpose(t)?);
+            }
+            Op::TensorExp => {
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_exp(t)?);
+            }
+            Op::TensorSoftmax => {
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_softmax(t)?);
+            }
+            Op::TensorDot => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                self.stack.push(crate::tensor::tensor_dot(a, b)?);
+            }
+            Op::TensorSub => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                self.stack.push(crate::tensor::tensor_sub(a, b)?);
+            }
+            Op::TensorScale => {
+                let s = crate::tensor::as_f64(&self.pop()?)?;
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_scale(t, s)?);
+            }
+            Op::TensorSum => {
+                let t = self.pop()?;
+                self.stack
+                    .push(Value::F64(crate::tensor::tensor_sum(&t)?));
+            }
+            Op::TensorSgdStep => {
+                let lr = crate::tensor::as_f64(&self.pop()?)?;
+                let y = self.pop()?;
+                let x = self.pop()?;
+                let w = self.pop()?;
+                self.stack
+                    .push(crate::tensor::tensor_sgd_step(w, x, y, lr)?);
+            }
+            Op::TensorMean => {
+                let t = self.pop()?;
+                self.stack.push(crate::tensor::tensor_mean(&t)?);
+            }
+            Op::TensorLinearGrad => {
+                let y = self.pop()?;
+                let x = self.pop()?;
+                let w = self.pop()?;
+                self.stack
+                    .push(crate::tensor::tensor_linear_grad(w, x, y)?);
+            }
+            Op::TensorMse => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                self.stack
+                    .push(Value::F64(crate::tensor::tensor_mse(a, b)?));
+            }
+            Op::TensorPatchMean => {
+                let gw = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("t_patch_mean gw must be i64", None)),
+                };
+                let gh = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("t_patch_mean gh must be i64", None)),
+                };
+                let t = self.pop()?;
+                self.stack
+                    .push(crate::tensor::tensor_patch_mean(t, gh, gw)?);
+            }
+            Op::AgClear => {
+                crate::autograd::ag_clear();
+            }
+            Op::AgParam => {
+                let t = self.pop()?;
+                self.stack
+                    .push(Value::I64(crate::autograd::ag_param(t)?));
+            }
+            Op::AgConst => {
+                let t = self.pop()?;
+                self.stack
+                    .push(Value::I64(crate::autograd::ag_const(t)?));
+            }
+            Op::AgAdd => {
+                let b = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_add expects node ids", None)),
+                };
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_add expects node ids", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_add(a, b)?));
+            }
+            Op::AgSub => {
+                let b = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_sub expects node ids", None)),
+                };
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_sub expects node ids", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_sub(a, b)?));
+            }
+            Op::AgMul => {
+                let b = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_mul expects node ids", None)),
+                };
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_mul expects node ids", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_mul(a, b)?));
+            }
+            Op::AgMatmul => {
+                let b = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_matmul expects node ids", None)),
+                };
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_matmul expects node ids", None)),
+                };
+                self.stack
+                    .push(Value::I64(crate::autograd::ag_matmul(a, b)?));
+            }
+            Op::AgScale => {
+                let s = crate::tensor::as_f64(&self.pop()?)?;
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_scale expects node id", None)),
+                };
+                self.stack
+                    .push(Value::I64(crate::autograd::ag_scale(a, s)?));
+            }
+            Op::AgRelu => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_relu expects node id", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_relu(a)?));
+            }
+            Op::AgNeg => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_neg expects node id", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_neg(a)?));
+            }
+            Op::AgTranspose => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_transpose expects node id", None)),
+                };
+                self.stack
+                    .push(Value::I64(crate::autograd::ag_transpose(a)?));
+            }
+            Op::AgReshape => {
+                let shape = self.pop()?;
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_reshape expects node id", None)),
+                };
+                self.stack
+                    .push(Value::I64(crate::autograd::ag_reshape(a, shape)?));
+            }
+            Op::AgExp => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_exp expects node id", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_exp(a)?));
+            }
+            Op::AgSoftmax => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_softmax expects node id", None)),
+                };
+                self.stack
+                    .push(Value::I64(crate::autograd::ag_softmax(a)?));
+            }
+            Op::AgMse => {
+                let t = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_mse expects node ids", None)),
+                };
+                let p = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_mse expects node ids", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_mse(p, t)?));
+            }
+            Op::AgSum => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_sum expects node id", None)),
+                };
+                self.stack.push(Value::I64(crate::autograd::ag_sum(a)?));
+            }
+            Op::AgValue => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_value expects node id", None)),
+                };
+                self.stack.push(crate::autograd::ag_value(a)?);
+            }
+            Op::AgGrad => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_grad expects node id", None)),
+                };
+                self.stack.push(crate::autograd::ag_grad(a)?);
+            }
+            Op::AgBackward => {
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_backward expects node id", None)),
+                };
+                crate::autograd::ag_backward(a)?;
+            }
+            Op::AgStep => {
+                let lr = crate::tensor::as_f64(&self.pop()?)?;
+                let a = match self.pop()? {
+                    Value::I64(n) => n,
+                    _ => return Err(KengaError::new("ag_step expects node id", None)),
+                };
+                self.stack.push(crate::autograd::ag_step(a, lr)?);
+            }
+            Op::LoadPpm => {
+                let path = match self.pop()? {
+                    Value::Str(s) => s,
+                    _ => return Err(KengaError::new("load_ppm path must be str", None)),
+                };
+                self.stack.push(crate::tensor::load_ppm(&path)?);
+            }
+            Op::LoadWav => {
+                let path = match self.pop()? {
+                    Value::Str(s) => s,
+                    _ => return Err(KengaError::new("load_wav path must be str", None)),
+                };
+                self.stack.push(crate::tensor::load_wav(&path)?);
+            }
             Op::BreakPlaceholder | Op::ContinuePlaceholder => {
                 return Err(KengaError::new(
                     "internal: unpatched break/continue",

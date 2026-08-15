@@ -1,0 +1,86 @@
+/* Event bus for kenga-lite: on/listen/emit/pump/pending — no Rust. */
+#ifndef KENGA_EVENTS_LITE_INC
+#define KENGA_EVENTS_LITE_INC
+
+#define EV_LISTEN_MAX 64
+#define EV_QUEUE_MAX 256
+
+typedef struct {
+  char *event;
+  int64_t addr;
+  int arity;
+} EvHandler;
+
+typedef struct {
+  char *event;
+  Value val;
+} EvItem;
+
+typedef struct {
+  EvHandler handlers[EV_LISTEN_MAX];
+  int nhandlers;
+  EvItem queue[EV_QUEUE_MAX];
+  int qh, qt, qn;
+} EvBus;
+
+static EvBus g_ev;
+
+static void ev_reset(void) {
+  int i;
+  for (i = 0; i < g_ev.nhandlers; i++) free(g_ev.handlers[i].event);
+  for (i = 0; i < g_ev.qn; i++) {
+    int idx = (g_ev.qh + i) % EV_QUEUE_MAX;
+    free(g_ev.queue[idx].event);
+  }
+  memset(&g_ev, 0, sizeof(g_ev));
+}
+
+static void ev_listen(const char *event, int64_t addr, int arity) {
+  int i;
+  if (arity > 1) die("event handler arity must be 0 or 1");
+  for (i = 0; i < g_ev.nhandlers; i++) {
+    if (strcmp(g_ev.handlers[i].event, event) == 0) {
+      g_ev.handlers[i].addr = addr;
+      g_ev.handlers[i].arity = arity;
+      return;
+    }
+  }
+  if (g_ev.nhandlers >= EV_LISTEN_MAX) die("too many listeners");
+  g_ev.handlers[g_ev.nhandlers].event = xstrdup(event);
+  g_ev.handlers[g_ev.nhandlers].addr = addr;
+  g_ev.handlers[g_ev.nhandlers].arity = arity;
+  g_ev.nhandlers++;
+}
+
+static EvHandler *ev_find(const char *event) {
+  int i;
+  for (i = 0; i < g_ev.nhandlers; i++)
+    if (strcmp(g_ev.handlers[i].event, event) == 0) return &g_ev.handlers[i];
+  return NULL;
+}
+
+static void ev_emit(const char *event, Value val) {
+  int idx;
+  if (g_ev.qn >= EV_QUEUE_MAX) die("event queue full");
+  idx = g_ev.qt;
+  g_ev.queue[idx].event = xstrdup(event);
+  g_ev.queue[idx].val = val;
+  g_ev.qt = (g_ev.qt + 1) % EV_QUEUE_MAX;
+  g_ev.qn++;
+}
+
+static int ev_dequeue(char **event_out, Value *val_out) {
+  int idx;
+  if (g_ev.qn < 1) return 0;
+  idx = g_ev.qh;
+  *event_out = g_ev.queue[idx].event;
+  *val_out = g_ev.queue[idx].val;
+  g_ev.queue[idx].event = NULL;
+  g_ev.qh = (g_ev.qh + 1) % EV_QUEUE_MAX;
+  g_ev.qn--;
+  return 1;
+}
+
+static int64_t ev_pending(void) { return (int64_t)g_ev.qn; }
+
+#endif /* KENGA_EVENTS_LITE_INC */

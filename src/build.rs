@@ -72,7 +72,6 @@ fn find_cc() -> Result<String> {
             return Ok(cand.into());
         }
     }
-    // cl often returns non-zero for --version; try where
     if which("gcc") {
         return Ok("gcc".into());
     }
@@ -82,10 +81,49 @@ fn find_cc() -> Result<String> {
     if which("cl") {
         return Ok("cl".into());
     }
+    // Windows: MSVC via vswhere / BuildTools (cl often not on PATH)
+    if let Some(cl) = find_msvc_cl() {
+        return Ok(cl);
+    }
+    // LLVM clang with absolute path (may still need CRT)
+    let llvm = Path::new(r"C:\Program Files\LLVM\bin\clang.exe");
+    if llvm.is_file() {
+        return Ok(llvm.display().to_string());
+    }
     Err(KengaError::new(
-        "no C compiler found (install gcc, clang, or MSVC cl)",
+        "no C compiler found (install gcc, clang, or MSVC Build Tools)",
         None,
     ))
+}
+
+fn find_msvc_cl() -> Option<String> {
+    let vswhere = Path::new(
+        r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe",
+    );
+    if vswhere.is_file() {
+        let out = Command::new(vswhere)
+            .args([
+                "-latest",
+                "-products",
+                "*",
+                "-requires",
+                "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-find",
+                r"VC\Tools\MSVC\*\bin\Hostx64\x64\cl.exe",
+            ])
+            .output()
+            .ok()?;
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Some(line) = text.lines().next() {
+                let p = line.trim();
+                if !p.is_empty() && Path::new(p).is_file() {
+                    return Some(p.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 fn which(name: &str) -> bool {

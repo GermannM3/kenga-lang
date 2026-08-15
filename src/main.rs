@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
+use std::process::Command;
 
 use kenga::build::{build, BuildOptions};
 use kenga::bytecode::dump_ir;
@@ -32,8 +33,16 @@ fn real_main() -> Result<()> {
     let cmd = args.remove(0);
     match cmd.as_str() {
         "run" | "parse" | "compile" => {
+            let use_lite = args.iter().any(|a| a == "--lite");
+            let args: Vec<String> = args
+                .into_iter()
+                .filter(|a| a != "--lite")
+                .collect();
             let path = args.first().ok_or_else(|| {
-                KengaError::new(format!("usage: kenga {cmd} <file.kenga>"), None)
+                KengaError::new(
+                    format!("usage: kenga {cmd} [--lite] <file.kenga>"),
+                    None,
+                )
             })?;
             let path = PathBuf::from(path);
             match cmd.as_str() {
@@ -46,11 +55,30 @@ fn real_main() -> Result<()> {
                     print!("{}", dump_ir(&module));
                 }
                 "run" => {
-                    let module = compile_file(&path)?;
-                    let result = interpret(module)?;
-                    if let kenga::bytecode::Value::I64(code) = result {
-                        if code != 0 {
-                            process::exit(code as i32);
+                    if use_lite || should_auto_lite(&path) {
+                        if let Err(e) = run_lite(&[
+                            "run".into(),
+                            path.to_string_lossy().into_owned(),
+                        ]) {
+                            if use_lite {
+                                return Err(e);
+                            }
+                            // auto-lite unavailable → fall back to Rust VM
+                            let module = compile_file(&path)?;
+                            let result = interpret(module)?;
+                            if let kenga::bytecode::Value::I64(code) = result {
+                                if code != 0 {
+                                    process::exit(code as i32);
+                                }
+                            }
+                        }
+                    } else {
+                        let module = compile_file(&path)?;
+                        let result = interpret(module)?;
+                        if let kenga::bytecode::Value::I64(code) = result {
+                            if code != 0 {
+                                process::exit(code as i32);
+                            }
                         }
                     }
                 }
@@ -91,24 +119,38 @@ fn real_main() -> Result<()> {
             println!("built {}", bin.display());
         }
         "talk" | "chat" => {
+            let use_lite = args.iter().any(|a| a == "--lite");
             let mind = args
                 .iter()
                 .find(|a| !a.starts_with('-') && a.ends_with(".km"))
                 .map(PathBuf::from);
             let script_path = flag_value(&args, "--script");
-            let script = if let Some(p) = script_path {
-                Some(
-                    fs::read_to_string(&p)
-                        .map_err(|e| KengaError::new(format!("cannot read {p}: {e}"), None))?,
-                )
+            if use_lite {
+                let mut lite_args = vec!["chat".to_string()];
+                if let Some(p) = &mind {
+                    lite_args.push(p.display().to_string());
+                }
+                if let Some(p) = &script_path {
+                    lite_args.push("--script".into());
+                    lite_args.push(p.clone());
+                }
+                run_lite(&lite_args)?;
             } else {
-                None
-            };
-            run_talk(mind, script.as_deref())?;
+                let script = if let Some(p) = script_path {
+                    Some(
+                        fs::read_to_string(&p)
+                            .map_err(|e| KengaError::new(format!("cannot read {p}: {e}"), None))?,
+                    )
+                } else {
+                    None
+                };
+                run_talk(mind, script.as_deref())?;
+            }
         }
         "demo" | "tour" => run_demo()?,
         "about" => run_about(),
         "which" => which_kenga()?,
+        "lite" => run_lite(&args)?,
         "eval" => {
             let src = args.join(" ");
             if src.is_empty() {
@@ -148,6 +190,60 @@ fn flag_value(args: &[String], flag: &str) -> Option<String> {
         .map(|w| w[1].clone())
 }
 
+/// Run Rust-free C99 bootstrap (`bootstrap/bin/kenga-lite`).
+fn run_lite(args: &[String]) -> Result<()> {
+    let exe = find_lite_bin()?;
+    let status = Command::new(&exe)
+        .args(args)
+        .status()
+        .map_err(|e| KengaError::new(format!("failed to spawn {}: {e}", exe.display()), None))?;
+    if !status.success() {
+        process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn find_lite_bin() -> Result<PathBuf> {
+    // Windows + Git Bash: accept both kenga-lite.exe and kenga-lite
+    let names: &[&str] = if cfg!(windows) {
+        &["kenga-lite.exe", "kenga-lite"]
+    } else {
+        &["kenga-lite"]
+    };
+    let mut candidates = Vec::new();
+    if let Ok(cwd) = env::current_dir() {
+        for name in names {
+            candidates.push(cwd.join("bootstrap/bin").join(name));
+        }
+    }
+    if let Ok(exe) = env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            for name in names {
+                candidates.push(dir.join(name));
+                candidates.push(dir.join("../bootstrap/bin").join(name));
+            }
+        }
+    }
+    for c in &candidates {
+        if c.is_file() {
+            return Ok(c.clone());
+        }
+    }
+    Err(KengaError::new(
+        "kenga-lite not built. Run: bash bootstrap/build.sh   (Windows: bootstrap\\build.cmd)\nSee docs/UNIX.md / docs/SELFHOST.md",
+        None,
+    ))
+}
+
+/// Heuristic: `*_lite.kenga` or `examples/selfhost/*` → prefer C bootstrap.
+fn should_auto_lite(path: &std::path::Path) -> bool {
+    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+    if name.ends_with("_lite.kenga") {
+        return true;
+    }
+    path.components().any(|c| c.as_os_str() == "selfhost")
+}
+
 fn print_usage() {
     eprintln!(
         "Kenga — язык для живого ИИ (friends-ready)
@@ -160,12 +256,14 @@ fn print_usage() {
 Команды:
   kenga demo|tour                  тур 5–6 минут
   kenga about                       что это / что нет
-  kenga run <file.kenga>
+  kenga run [--lite] <file.kenga>
+  kenga lite [run file|eval '..']   Rust-free lite (C99 bootstrap)
   kenga chat [mind.km]              диалог с world-model
+  kenga chat --lite [mind.km]       то же на C99 (без Rust)
   kenga eval / compile / emit-c / build
   kenga which | version
 
-Документация: docs/FOR_FRIENDS.md
+Документация: docs/FOR_FRIENDS.md · docs/SELFHOST.md · docs/LEARN.md
 https://github.com/GermannM3/kenga-lang"
     );
 }

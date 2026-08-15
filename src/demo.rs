@@ -86,16 +86,18 @@ pub fn run_about() {
         "kenga {} — язык для живого ИИ (friends-ready)
 
 Что это:
-  • свой язык: .kenga → bytecode VM (хост компилятора пока Rust)
-  • Prophet: episodic memory + residual MLP world-model
+  • свой язык: .kenga → bytecode VM (полный хост пока Rust)
+  • Rust-free lite: typed hello / else if / f64 — `kenga run --lite …`
+  • Unix/Mac: docs/UNIX.md · bash scripts/unix-smoke.sh
+  • тензоры + tape (`ag_*`, softmax/exp/reshape) + load_ppm/load_wav
   • агенты: on/emit/pump, ttl/sweep
-  • self-host ladder: Kenga-lite компилируется в bytecode на чистой Kenga
+  • self-host ladder на чистой Kenga (lab)
   • Python не нужен
 
 Что это НЕ:
   • не ChatGPT / не LLM из коробки
-  • не полный self-host (Rust ещё хост)
-  • не CUDA/PyTorch replacement
+  • не полный `kenga run` без Rust для Memory/Tensor/events
+  • не CUDA/PyTorch (CPU тензоры + tape + PPM/WAV)
 
 Для знакомых ML:
   git clone https://github.com/GermannM3/kenga-lang.git

@@ -1,27 +1,17 @@
 # Self-host ladder (pure Kenga)
 
+Канон теперь в **`kenga/`** (замена `src/`). Здесь — алиасы через `import`.
+
 | Step | File | What |
 |---|---|---|
-| 1 | `arith.kenga` | expr eval |
-| 2 | `mini.kenga` | variables |
-| 3 | `iffy.kenga` | if / cmp |
-| 4 | `loopfn.kenga` | while + fn |
-| 5 | `bytecode.kenga` | stack VM + emit assign/expr |
-| 6 | `bc_while.kenga` | bytecode while via JMP/JMPF |
-| 7 | `bc_fn.kenga` | bytecode functions CALL/RET |
-| 8 | `kenga_lite.kenga` | **диалект ближе к `.kenga`**: `let` / `while` / `if` / `fn` / `return` |
+| 1–7 | `arith` … `bc_fn` | лестница VM |
+| 8 | `kenga_lite.kenga` → `kenga/compiler/lite.kenga` | i64 compiler |
+| 9 | `kenga_more.kenga` → **`kenga/compiler/more.kenga`** | f64 / lists / str / true / ord |
+| — | `emit_c_seed.kenga` → `kenga/emit/c_seed.kenga` | Kenga пишет `.c` |
 
-```bash
-kenga run examples/selfhost/kenga_lite.kenga
+```bat
+bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
+bootstrap\bin\kenga-lite.exe run examples\selfhost\kenga_more.kenga
 ```
 
-На VM уже крутится:
-
-```
-fn main() -> i64 {
-  let n = 1;
-  let i = 1;
-  while i <= 5 { n = n * i; i = i + 1; }
-  return n;
-}
-```
+Карта вытеснения Rust: `docs/REPLACE_RUST.md`.

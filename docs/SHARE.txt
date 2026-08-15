@@ -1,16 +1,23 @@
 # Copy-paste для знакомых
 
 ```
-Kenga 2.0 — язык для живого ИИ (не LLM-обёртка).
+Kenga 2.8 — язык для живого ИИ.
 
-git clone https://github.com/GermannM3/kenga-lang.git
-cd kenga-lang
-cargo install --path . --force --locked
-kenga demo
+Без Rust:
+  1) git clone https://github.com/GermannM3/kenga-lang.git
+  2) скачай kenga-windows-x86_64.zip с Releases → kenga.exe в PATH
+  3) kenga demo
 
-Что внутри: свой язык + VM, Prophet memory/world-model, chat с mind,
-self-host ladder (Kenga-lite на чистой Kenga). Python не нужен.
+Lite без Rust вообще (C99):
+  bootstrap\build.cmd
+  kenga run examples/selfhost/fact_lite.kenga
 
-Честно: это не ChatGPT и не PyTorch. Это другой слой — семантика
-живого агента. Письмо: docs/FOR_FRIENDS.md
+Chicken-egg lite из .kenga:
+  bootstrap\rebuild-from-kenga.cmd
+
+Сборка из исходников (опционально):
+  cargo install --path . --force --locked
+
+Учить: docs/LEARN.md · справочник: docs/LANGUAGE.md
+Marketplace: docs/MARKETPLACE.md (нужен publisher-аккаунт)
 ```

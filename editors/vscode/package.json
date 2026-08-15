@@ -1,0 +1,50 @@
+{
+  "name": "kenga",
+  "displayName": "Kenga Language",
+  "description": "Syntax highlighting and file icons for the Kenga programming language",
+  "version": "3.10.0",
+  "publisher": "Kenga-ai",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "kenga",
+    "ai",
+    "ml",
+    "living memory"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GermannM3/kenga-lang"
+  },
+  "icon": "icons/kenga-marketplace.png",
+  "contributes": {
+    "languages": [
+      {
+        "id": "kenga",
+        "aliases": [
+          "Kenga",
+          "kenga"
+        ],
+        "extensions": [
+          ".kenga"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/kenga-file.svg",
+          "dark": "./icons/kenga-file.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "kenga",
+        "scopeName": "source.kenga",
+        "path": "./syntaxes/kenga.tmLanguage.json"
+      }
+    ]
+  }
+}

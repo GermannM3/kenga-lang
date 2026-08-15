@@ -1,0 +1,15 @@
+// Lite dialect — i64 lists
+//   kenga run --lite examples/selfhost/lists_lite.kenga
+
+fn main() {
+  let xs = [10, 20];
+  xs = push(xs, 30);
+  let s = 0;
+  let i = 0;
+  while i < len(xs) {
+    s = s + xs[i];
+    i = i + 1;
+  }
+  println(s);
+  return 0;
+}

@@ -340,7 +340,15 @@ impl Parser {
         let then_block = self.parse_block()?;
         let else_block = if self.check(&TokenKind::Else) {
             self.bump();
-            Some(self.parse_block()?)
+            if self.check(&TokenKind::If) {
+                // else if … → nested If as a one-statement block
+                let nested = self.parse_if()?;
+                Some(Block {
+                    stmts: vec![nested],
+                })
+            } else {
+                Some(self.parse_block()?)
+            }
         } else {
             None
         };

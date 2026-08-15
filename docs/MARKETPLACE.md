@@ -1,0 +1,39 @@
+# Publishing the VS Code / Cursor extension
+
+Publisher id in `editors/vscode/package.json`: **`Kenga-ai`**.
+
+## Ручная заливка (без Azure / без vsce login)
+
+Если PAT/Azure DevOps недоступны (нет карты, регион и т.п.) — этого достаточно:
+
+1. Собери VSIX:
+
+```bat
+cd editors\vscode
+npx --yes @vscode/vsce package --skip-license -o kenga-3.10.0.vsix
+```
+
+2. Открой https://marketplace.visualstudio.com/manage/publishers/Kenga-ai  
+3. Extension → **Update** → загрузи только `.vsix` (не `package.json`).
+
+Или локально: `.\editors\install-extension.cmd`
+
+## Опционально: vsce + PAT
+
+Нужен Azure DevOps org + Personal Access Token со scope **Marketplace**.  
+Платная Azure-подписка для токена обычно не нужна — но если org/карта блокируются, используй ручную заливку выше.
+
+```bash
+cd editors/vscode
+npm i -g @vscode/vsce   # или всегда через npx
+npx @vscode/vsce login Kenga-ai
+npx @vscode/vsce publish
+```
+
+## Open VSX
+
+```bash
+npx ovsx publish -p <OPEN_VSX_TOKEN>
+```
+
+https://open-vsx.org/

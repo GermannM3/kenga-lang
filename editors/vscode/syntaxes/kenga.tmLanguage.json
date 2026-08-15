@@ -1,0 +1,85 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Kenga",
+  "scopeName": "source.kenga",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#builtins" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.kenga",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.kenga",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.kenga",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.kenga",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.kenga",
+          "match": "\\b\\d+\\.\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.kenga",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.kenga",
+          "match": "\\b(fn|let|if|else|while|for|in|return|break|continue|struct|import|on|true|false)\\b"
+        },
+        {
+          "name": "keyword.operator.kenga",
+          "match": "(\\->|==|!=|<=|>=|&&|\\|\\||[+\-*/%<>=!])"
+        }
+      ]
+    },
+    "types": {
+      "name": "entity.name.type.kenga",
+      "match": "\\b(i64|f64|bool|str|list|Tensor|Memory|void)\\b"
+    },
+    "builtins": {
+      "name": "support.function.builtin.kenga",
+          "match": "\\b(print|println|len|push|assert|typeof|tensor|t_fill|t_get|t_set|t_shape|t_add|t_sub|t_mul|t_scale|t_sum|t_matmul|t_from|t_reshape|t_dot|t_mean|t_sgd_step|load_ppm|load_wav|sweep|sleep_ms|now_ms|listen|emit|pump|pending|memory|memory_config|remember|remember_next|surprise|foresee|predict|learn|unroll|foresee_n|consolidate|recall|mem_stats|round|ord|to_str|input|save_mind|load_mind)\\b"
+    },
+    "functions": {
+      "name": "meta.function.kenga",
+      "begin": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.kenga" },
+        "2": { "name": "entity.name.function.kenga" }
+      },
+      "end": "\\)",
+      "patterns": [
+        { "include": "#types" },
+        { "include": "#keywords" }
+      ]
+    }
+  }
+}

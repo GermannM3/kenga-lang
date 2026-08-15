@@ -1,0 +1,28 @@
+// Nested / hetero lists via tagged emit-c runtime
+//   kenga emit-c examples/selfhost/nested_lists.kenga -o target/nested_lists.c
+//   kenga build examples/selfhost/nested_lists.kenga
+
+fn main() -> i64 {
+    let nested: list = [[1, 2], 3];
+    println(nested);
+
+    let inner: list = nested[0];
+    println(len(inner));
+    println(inner);
+
+    let s: i64 = 0;
+    for v in inner {
+        s = s + v;
+    }
+    s = s + nested[1];
+    println(s);
+
+    let box: list = [];
+    box = push(box, inner);
+    box = push(box, 99);
+    box = push(box, "hi");
+    println(box);
+    println(len(box));
+
+    return s;
+}

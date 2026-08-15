@@ -19,9 +19,9 @@ pub fn run_talk(mind_path: Option<PathBuf>, scripted: Option<&str>) -> Result<()
         new_memory_config(0.05, 128, 48)?
     };
 
-    println!("Kenga chat — живой world-model");
-    println!("можно: «смотри 5 1 6», «что будет через 4», «обучи», «статус»");
-    println!("или команды: train | see | future | teach | sleep | save | quit");
+    println!("Kenga chat — живой world-model (не LLM)");
+    println!("разговор: «привет», «ты кто», «что умеешь», «поговорим», «честно»");
+    println!("модель: «смотри 5 1 6», «что будет через 4», «обучи», «статус»");
     println!();
 
     if let Some(script) = scripted {
@@ -73,6 +73,69 @@ fn normalize_line(line: &str) -> String {
     }
     if matches_any(&lower, &["привет", "hello", "hi", "здравств", "hey"]) {
         return "greet".into();
+    }
+    // who / what / capabilities / free talk — not command grammar
+    // caps/talk BEFORE about: «что ты умеешь» contains «что ты»
+    if matches_any(
+        &lower,
+        &[
+            "что умеешь",
+            "что ты умеешь",
+            "что можешь",
+            "возможности",
+            "capabilities",
+            "что умеет",
+            "на что способен",
+        ],
+    ) {
+        return "caps".into();
+    }
+    if matches_any(
+        &lower,
+        &[
+            "поговори",
+            "поговорим",
+            "давай поговорим",
+            "просто поговорить",
+            "хочу поговорить",
+            "узнать что ты",
+            "давай болтать",
+            "chat with me",
+            "let's talk",
+        ],
+    ) {
+        return "talk".into();
+    }
+    if matches_any(
+        &lower,
+        &[
+            "ты кто",
+            "кто ты",
+            "расскажи о себе",
+            "о себе",
+            "what are you",
+            "who are you",
+        ],
+    ) || trimmed == "что ты"
+        || trimmed.starts_with("что ты такое")
+    {
+        return "about".into();
+    }
+    if matches_any(
+        &lower,
+        &[
+            "честно",
+            "ты ии",
+            "ты llm",
+            "как grok",
+            "как gpt",
+            "как chatgpt",
+            "как человек",
+            "нейросеть",
+            "языковая модель",
+        ],
+    ) {
+        return "honest".into();
     }
     // "?" alone / help words — NOT every question mark in a sentence
     if trimmed == "?"
@@ -242,25 +305,83 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
         "greet" => {
             let m = mind.borrow();
             println!(
-                "привет. я world-model Kenga: steps={}, dim={}. скажи «смотри 5 1 6» или «помощь»",
+                "привет. я живой world-model Kenga (steps={}, dim={}).",
                 m.model.steps, m.model.dim
             );
+            if m.model.dim >= 9 {
+                println!("этот mind — multimodal: картинка+звук → вектор → предсказание.");
+            } else {
+                println!("этот mind — физика агента [pos vel fuel].");
+            }
+            println!("можешь: «что умеешь», «поговорим», «смотри …», «помощь».");
+        }
+        "about" => {
+            let m = mind.borrow();
+            println!(
+                "я Prophet-mind на языке Kenga: residual MLP, dim={}, hidden={}, steps={}.",
+                m.model.dim, m.model.hidden, m.model.steps
+            );
+            println!(
+                "episodic={}, core={}. учусь переходам obs→next, удивляюсь, сплю (consolidate).",
+                m.episodic.len(),
+                m.core.len()
+            );
+            if m.model.dim >= 9 {
+                println!("обучен на PPM+WAV сценах (living multimodal).");
+            }
+            println!("я ещё не чат-LLM вроде Grok — но я живу в цикле sense→learn→sleep.");
+        }
+        "caps" => {
+            let m = mind.borrow();
+            println!("умею сейчас:");
+            println!("  • предсказывать следующий вектор состояния (predict / unroll)");
+            println!("  • удивляться странному (surprise) и помнить эпизоды");
+            println!("  • спать: consolidate → ядро с EWC-lite");
+            println!("  • сохраняться в .km и подниматься в chat");
+            if m.model.dim >= 9 {
+                println!("  • multimodal obs: RGB + audio energy + time (dim=9)");
+                println!("    демо: kenga run examples/ml/living_multimodal.kenga");
+            } else {
+                println!("  • физика [pos, vel, fuel] — «смотри 5 1 6»");
+            }
+            println!("пока не умею: свободный диалог как у большой LLM (это следующий слой — tiny LM).");
+            println!("команды: статус | обучи | спи | сохрани | помощь");
+        }
+        "talk" => {
+            let m = mind.borrow();
+            println!("давай. я не болтаю про всё на свете — я говорю о том, что помню телом модели.");
+            println!(
+                "сейчас во мне: {} шагов обучения, dim={}, core={}.",
+                m.model.steps, m.model.dim, m.core.len()
+            );
+            if m.model.dim >= 9 {
+                println!("спроси «что умеешь» или дай кадр цифрами / переобучи multimodal demo.");
+            } else {
+                println!("скажи «смотри 5 1 6» — покажу, что жду дальше. или «что будет через 4».");
+            }
+            println!("если нужна честность про потолок — напиши «честно».");
+        }
+        "honest" => {
+            println!("честно: сейчас я world-model (векторы → векторы), не языковая модель.");
+            println!("«умная как Grok» = отдельный путь: tiny LM → больше данных → f32/GPU.");
+            println!("живой я уже: учусь, удивляюсь, сплю, пишусь на диск. это Kenga.");
+            println!("демо языка: kenga run examples/ml/tiny_lm.kenga");
         }
         "help" | "?" => {
-            println!("смотри 5 1 6     — что модель видит дальше");
-            println!("что будет через 4 — разворот будущего");
-            println!("обучи 10         — доучить физику");
-            println!("научи 5 1 6 станет 6 1 5");
-            println!("статус | спи | сохрани | выход");
+            println!("разговор:  привет | ты кто | что умеешь | поговорим | честно");
+            println!("модель:    смотри 5 1 6 | что будет через 4 | обучи 10");
+            println!("память:    научи 5 1 6 станет 6 1 5 | вспомни … | спи | сохрани");
+            println!("выход:     выход / quit");
         }
         "status" => {
             let m = mind.borrow();
             println!(
-                "я помню: ep={} core={} steps={} dim={} (lr={})",
+                "я помню: ep={} core={} steps={} dim={}x{} (lr={})",
                 m.episodic.len(),
                 m.core.len(),
                 m.model.steps,
                 m.model.dim,
+                m.model.hidden,
                 m.lr
             );
         }
@@ -369,7 +490,16 @@ fn handle_line(mind: &MemoryHandle, path: &Path, line: &str) -> Result<bool> {
             println!("загрузил {}", p.display());
         }
         other => {
-            println!("не понял «{other}». напиши «помощь»");
+            // parts[0] alone was misleading («я» from «я хочу…»)
+            let full = line.trim();
+            let m = mind.borrow();
+            println!("не распознал как команду: «{full}»");
+            println!(
+                "я world-model (dim={}, steps={}), не свободный чат-бот.",
+                m.model.dim, m.model.steps
+            );
+            println!("попробуй «что умеешь», «поговорим», «честно» или «помощь».");
+            let _ = other;
         }
     }
     Ok(true)

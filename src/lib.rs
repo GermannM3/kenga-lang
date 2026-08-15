@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod autograd;
 pub mod build;
 pub mod bytecode;
 pub mod codegen;
@@ -10,6 +11,7 @@ pub mod lexer;
 pub mod memory;
 pub mod parser;
 pub mod talk;
+pub mod tensor;
 pub mod token;
 pub mod vm;
 

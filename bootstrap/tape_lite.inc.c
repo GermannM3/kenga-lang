@@ -1,0 +1,516 @@
+/* Reverse-mode tape for kenga-lite — node ids are i64, values are Tensor/f64. */
+#ifndef KENGA_TAPE_LITE_INC
+#define KENGA_TAPE_LITE_INC
+
+#define AG_MAX_NODES 4096
+
+enum {
+  AG_LEAF = 0,
+  AG_ADD,
+  AG_SUB,
+  AG_MUL,
+  AG_MATMUL,
+  AG_SCALE,
+  AG_RELU,
+  AG_NEG,
+  AG_TRANSPOSE,
+  AG_RESHAPE,
+  AG_EXP,
+  AG_LOG,
+  AG_SOFTMAX,
+  AG_MSE,
+  AG_SUM
+};
+
+typedef struct {
+  int is_scalar;
+  int64_t th;
+  double scalar;
+  int has_grad;
+  int grad_is_scalar;
+  int64_t gth;
+  double gscalar;
+  int op;
+  int pa, pb;
+  double scale;
+  int old_rank;
+  int old_shape[TL_RANK_MAX];
+  int requires_grad;
+} AgNode;
+
+typedef struct {
+  AgNode nodes[AG_MAX_NODES];
+  int n;
+} AgTape;
+
+static AgTape g_ag;
+
+static void ag_clear(void) { g_ag.n = 0; }
+
+static AgNode *ag_node(int id) {
+  if (id < 0 || id >= g_ag.n) die("ag: bad node id");
+  return &g_ag.nodes[id];
+}
+
+static int64_t ag_push(AgNode node) {
+  if (g_ag.n >= AG_MAX_NODES) die("ag: tape full");
+  g_ag.nodes[g_ag.n] = node;
+  return (int64_t)g_ag.n++;
+}
+
+static int64_t ag_clone_tensor(int64_t th) {
+  Tensor *t = tl_get(th);
+  return tl_clone_shape_data(t->shape, t->rank, t->data, t->n);
+}
+
+static double tl_mse(int64_t ha, int64_t hb) {
+  Tensor *a = tl_get(ha), *b = tl_get(hb);
+  double s = 0.0;
+  int i, n;
+  if (a->n != b->n) die("ag_mse size mismatch");
+  n = a->n > 0 ? a->n : 1;
+  for (i = 0; i < a->n; i++) {
+    double d = a->data[i] - b->data[i];
+    s += d * d;
+  }
+  return s / (double)n;
+}
+
+static void ag_accum_tensor(AgNode *n, int64_t add_th) {
+  Tensor *add = tl_get(add_th);
+  int i;
+  if (!n->has_grad) {
+    n->has_grad = 1;
+    n->grad_is_scalar = 0;
+    n->gth = ag_clone_tensor(add_th);
+    return;
+  }
+  if (n->grad_is_scalar) die("ag: grad type mismatch");
+  {
+    Tensor *g = tl_get(n->gth);
+    if (g->n != add->n) die("ag: grad len mismatch");
+    for (i = 0; i < g->n; i++) g->data[i] += add->data[i];
+  }
+}
+
+static void ag_accum_scalar(AgNode *n, double add) {
+  if (!n->has_grad) {
+    n->has_grad = 1;
+    n->grad_is_scalar = 1;
+    n->gscalar = add;
+    return;
+  }
+  if (!n->grad_is_scalar) die("ag: grad type mismatch");
+  n->gscalar += add;
+}
+
+static int64_t ag_param(int64_t th) {
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  n.th = ag_clone_tensor(th);
+  n.op = AG_LEAF;
+  n.requires_grad = 1;
+  n.pa = n.pb = -1;
+  return ag_push(n);
+}
+
+static int64_t ag_const_t(int64_t th) {
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  n.th = ag_clone_tensor(th);
+  n.op = AG_LEAF;
+  n.pa = n.pb = -1;
+  return ag_push(n);
+}
+
+static int64_t ag_const_f(double x) {
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  n.is_scalar = 1;
+  n.scalar = x;
+  n.op = AG_LEAF;
+  n.pa = n.pb = -1;
+  return ag_push(n);
+}
+
+static int64_t tl_ew_add_ids(int64_t a, int64_t b) { return tl_ew(a, b, tl_op_add); }
+static int64_t tl_ew_sub_ids(int64_t a, int64_t b) { return tl_ew(a, b, tl_op_sub); }
+static int64_t tl_ew_mul_ids(int64_t a, int64_t b) { return tl_ew(a, b, tl_op_mul); }
+
+static int64_t ag_bin(int a, int b, int op, int64_t (*tf)(int64_t, int64_t)) {
+  AgNode *na = ag_node(a), *nb = ag_node(b);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar || nb->is_scalar) die("ag bin expects tensors");
+  n.th = tf(na->th, nb->th);
+  n.op = op;
+  n.pa = a;
+  n.pb = b;
+  n.requires_grad = na->requires_grad || nb->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_add_ids(int a, int b) { return ag_bin(a, b, AG_ADD, tl_ew_add_ids); }
+static int64_t ag_sub_ids(int a, int b) { return ag_bin(a, b, AG_SUB, tl_ew_sub_ids); }
+static int64_t ag_mul_ids(int a, int b) { return ag_bin(a, b, AG_MUL, tl_ew_mul_ids); }
+static int64_t ag_matmul_ids(int a, int b) { return ag_bin(a, b, AG_MATMUL, tl_matmul); }
+
+static int64_t ag_scale_n(int a, double s) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) {
+    n.is_scalar = 1;
+    n.scalar = na->scalar * s;
+  } else {
+    n.th = tl_scale(na->th, s);
+  }
+  n.op = AG_SCALE;
+  n.pa = a;
+  n.pb = -1;
+  n.scale = s;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_relu_n(int a) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) {
+    n.is_scalar = 1;
+    n.scalar = na->scalar > 0.0 ? na->scalar : 0.0;
+  } else {
+    int64_t h = ag_clone_tensor(na->th);
+    Tensor *o = tl_get(h);
+    int i;
+    for (i = 0; i < o->n; i++)
+      if (o->data[i] < 0.0) o->data[i] = 0.0;
+    n.th = h;
+  }
+  n.op = AG_RELU;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_neg_n(int a) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) {
+    n.is_scalar = 1;
+    n.scalar = -na->scalar;
+  } else
+    n.th = tl_scale(na->th, -1.0);
+  n.op = AG_NEG;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_transpose_n(int a) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) die("ag_transpose expects tensor");
+  n.th = tl_transpose(na->th);
+  n.op = AG_TRANSPOSE;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_reshape_n(int a, const int *shape, int rank) {
+  AgNode *na = ag_node(a);
+  Tensor *t;
+  AgNode n;
+  int i, need;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) die("ag_reshape expects tensor");
+  t = tl_get(na->th);
+  n.old_rank = t->rank;
+  for (i = 0; i < t->rank; i++) n.old_shape[i] = t->shape[i];
+  need = tl_product(shape, rank);
+  if (need != t->n) die("ag_reshape size mismatch");
+  n.th = tl_clone_shape_data(shape, rank, t->data, t->n);
+  n.op = AG_RESHAPE;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_exp_n(int a) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) {
+    n.is_scalar = 1;
+    n.scalar = exp(na->scalar);
+  } else
+    n.th = tl_exp(na->th);
+  n.op = AG_EXP;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_log_n(int a) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) {
+    double x = na->scalar < 1e-12 ? 1e-12 : na->scalar;
+    n.is_scalar = 1;
+    n.scalar = log(x);
+  } else
+    n.th = tl_log(na->th);
+  n.op = AG_LOG;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_softmax_n(int a) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (na->is_scalar) {
+    n.is_scalar = 1;
+    n.scalar = 1.0;
+  } else
+    n.th = tl_softmax(na->th);
+  n.op = AG_SOFTMAX;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_mse_n(int p, int t) {
+  AgNode *np = ag_node(p), *nt = ag_node(t);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  if (np->is_scalar || nt->is_scalar) die("ag_mse expects tensors");
+  n.is_scalar = 1;
+  n.scalar = tl_mse(np->th, nt->th);
+  n.op = AG_MSE;
+  n.pa = p;
+  n.pb = t;
+  n.requires_grad = np->requires_grad || nt->requires_grad;
+  return ag_push(n);
+}
+
+static int64_t ag_sum_n(int a) {
+  AgNode *na = ag_node(a);
+  AgNode n;
+  memset(&n, 0, sizeof(n));
+  n.is_scalar = 1;
+  n.scalar = na->is_scalar ? na->scalar : tl_sum(na->th);
+  n.op = AG_SUM;
+  n.pa = a;
+  n.pb = -1;
+  n.requires_grad = na->requires_grad;
+  return ag_push(n);
+}
+
+static void ag_backward(int loss_id) {
+  int i;
+  if (loss_id < 0 || loss_id >= g_ag.n) die("ag_backward: bad loss id");
+  for (i = 0; i < g_ag.n; i++) g_ag.nodes[i].has_grad = 0;
+  {
+    AgNode *loss = &g_ag.nodes[loss_id];
+    if (loss->is_scalar) {
+      loss->has_grad = 1;
+      loss->grad_is_scalar = 1;
+      loss->gscalar = 1.0;
+    } else {
+      Tensor *t = tl_get(loss->th);
+      int64_t h = tl_alloc(t->shape, t->rank, 0);
+      Tensor *o = tl_get(h);
+      int j;
+      for (j = 0; j < o->n; j++) o->data[j] = 1.0;
+      loss->has_grad = 1;
+      loss->grad_is_scalar = 0;
+      loss->gth = h;
+    }
+  }
+  for (i = loss_id; i >= 0; i--) {
+    AgNode *node = &g_ag.nodes[i];
+    if (!node->has_grad) continue;
+    switch (node->op) {
+    case AG_LEAF:
+      break;
+    case AG_ADD:
+      if (node->grad_is_scalar) die("ag add grad");
+      ag_accum_tensor(&g_ag.nodes[node->pa], node->gth);
+      ag_accum_tensor(&g_ag.nodes[node->pb], node->gth);
+      break;
+    case AG_SUB: {
+      int64_t neg;
+      if (node->grad_is_scalar) die("ag sub grad");
+      ag_accum_tensor(&g_ag.nodes[node->pa], node->gth);
+      neg = tl_scale(node->gth, -1.0);
+      ag_accum_tensor(&g_ag.nodes[node->pb], neg);
+      break;
+    }
+    case AG_MUL: {
+      AgNode *a = &g_ag.nodes[node->pa], *b = &g_ag.nodes[node->pb];
+      int64_t ga = tl_ew(node->gth, b->th, tl_op_mul);
+      int64_t gb = tl_ew(node->gth, a->th, tl_op_mul);
+      ag_accum_tensor(a, ga);
+      ag_accum_tensor(b, gb);
+      break;
+    }
+    case AG_MATMUL: {
+      AgNode *a = &g_ag.nodes[node->pa], *b = &g_ag.nodes[node->pb];
+      int64_t bt = tl_transpose(b->th);
+      int64_t at = tl_transpose(a->th);
+      int64_t ga = tl_matmul(node->gth, bt);
+      int64_t gb = tl_matmul(at, node->gth);
+      ag_accum_tensor(a, ga);
+      ag_accum_tensor(b, gb);
+      break;
+    }
+    case AG_SCALE:
+      if (node->grad_is_scalar)
+        ag_accum_scalar(&g_ag.nodes[node->pa], node->gscalar * node->scale);
+      else
+        ag_accum_tensor(&g_ag.nodes[node->pa], tl_scale(node->gth, node->scale));
+      break;
+    case AG_RELU: {
+      AgNode *a = &g_ag.nodes[node->pa];
+      if (node->grad_is_scalar) {
+        double v = a->is_scalar ? a->scalar : 0.0;
+        ag_accum_scalar(a, v > 0.0 ? node->gscalar : 0.0);
+      } else {
+        Tensor *av = tl_get(a->th);
+        int64_t h = ag_clone_tensor(node->gth);
+        Tensor *o = tl_get(h);
+        int j;
+        for (j = 0; j < o->n; j++)
+          if (av->data[j] <= 0.0) o->data[j] = 0.0;
+        ag_accum_tensor(a, h);
+      }
+      break;
+    }
+    case AG_NEG:
+      if (node->grad_is_scalar)
+        ag_accum_scalar(&g_ag.nodes[node->pa], -node->gscalar);
+      else
+        ag_accum_tensor(&g_ag.nodes[node->pa], tl_scale(node->gth, -1.0));
+      break;
+    case AG_TRANSPOSE:
+      ag_accum_tensor(&g_ag.nodes[node->pa], tl_transpose(node->gth));
+      break;
+    case AG_RESHAPE: {
+      Tensor *g = tl_get(node->gth);
+      int64_t h = tl_clone_shape_data(node->old_shape, node->old_rank, g->data, g->n);
+      ag_accum_tensor(&g_ag.nodes[node->pa], h);
+      break;
+    }
+    case AG_EXP:
+      if (node->is_scalar)
+        ag_accum_scalar(&g_ag.nodes[node->pa], node->gscalar * node->scalar);
+      else
+        ag_accum_tensor(&g_ag.nodes[node->pa], tl_ew(node->gth, node->th, tl_op_mul));
+      break;
+    case AG_LOG: {
+      /* g / x */
+      AgNode *a = &g_ag.nodes[node->pa];
+      if (node->grad_is_scalar) {
+        double x = a->is_scalar ? a->scalar : 1.0;
+        if (x < 1e-12) x = 1e-12;
+        ag_accum_scalar(a, node->gscalar / x);
+      } else {
+        Tensor *xv = tl_get(a->th);
+        Tensor *gg = tl_get(node->gth);
+        int64_t h = ag_clone_tensor(node->gth);
+        Tensor *o = tl_get(h);
+        int j;
+        for (j = 0; j < o->n; j++) {
+          double x = xv->data[j] < 1e-12 ? 1e-12 : xv->data[j];
+          o->data[j] = gg->data[j] / x;
+        }
+        ag_accum_tensor(a, h);
+      }
+      break;
+    }
+    case AG_SOFTMAX: {
+      Tensor *y = tl_get(node->th);
+      Tensor *gy = tl_get(node->gth);
+      double dot = 0.0;
+      int j;
+      int64_t h;
+      Tensor *o;
+      if (y->n != gy->n) die("ag softmax grad len");
+      for (j = 0; j < y->n; j++) dot += gy->data[j] * y->data[j];
+      h = ag_clone_tensor(node->th);
+      o = tl_get(h);
+      for (j = 0; j < o->n; j++) o->data[j] = y->data[j] * (gy->data[j] - dot);
+      ag_accum_tensor(&g_ag.nodes[node->pa], h);
+      break;
+    }
+    case AG_MSE: {
+      AgNode *p = &g_ag.nodes[node->pa], *t = &g_ag.nodes[node->pb];
+      double g = node->grad_is_scalar ? node->gscalar : 1.0;
+      int64_t err = tl_ew(p->th, t->th, tl_op_sub);
+      Tensor *e = tl_get(err);
+      double scale = 2.0 * g / (e->n > 0 ? (double)e->n : 1.0);
+      int64_t gp = tl_scale(err, scale);
+      int64_t gt = tl_scale(err, -scale);
+      ag_accum_tensor(p, gp);
+      ag_accum_tensor(t, gt);
+      break;
+    }
+    case AG_SUM: {
+      AgNode *a = &g_ag.nodes[node->pa];
+      double g = node->grad_is_scalar ? node->gscalar : 1.0;
+      if (a->is_scalar)
+        ag_accum_scalar(a, g);
+      else {
+        Tensor *t = tl_get(a->th);
+        int64_t h = tl_alloc(t->shape, t->rank, 0);
+        Tensor *o = tl_get(h);
+        int j;
+        for (j = 0; j < o->n; j++) o->data[j] = g;
+        ag_accum_tensor(a, h);
+      }
+      break;
+    }
+    default:
+      die("ag_backward: unknown op");
+    }
+  }
+}
+
+static int64_t ag_step_n(int param_id, double lr) {
+  AgNode *n = ag_node(param_id);
+  int64_t step, out;
+  if (!n->has_grad) die("ag_step: missing grad");
+  if (n->is_scalar || n->grad_is_scalar) die("ag_step expects tensor param");
+  step = tl_scale(n->gth, lr);
+  out = tl_ew(n->th, step, tl_op_sub);
+  return out;
+}
+
+static Value ag_value_v(int id) {
+  AgNode *n = ag_node(id);
+  if (n->is_scalar) return V_f64(n->scalar);
+  return V_tensor(ag_clone_tensor(n->th));
+}
+
+static Value ag_grad_v(int id) {
+  AgNode *n = ag_node(id);
+  if (!n->has_grad) die("ag_grad: no grad");
+  if (n->grad_is_scalar) return V_f64(n->gscalar);
+  return V_tensor(ag_clone_tensor(n->gth));
+}
+
+#endif /* KENGA_TAPE_LITE_INC */

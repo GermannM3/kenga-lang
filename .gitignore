@@ -1,11 +1,53 @@
-/target
+# === Build / native ===
+/target/
 **/*.rs.bk
+*.exe
+*.pdb
+*.obj
+*.o
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
+
+# C-lite build outputs (sources stay tracked)
+bootstrap/bin/
+bootstrap/*.gen.c
+bootstrap/kenga_lite.gen.c
+
+# emit-c / chicken-egg artifacts next to sources
+examples/**/*.kenga.c
+examples/*.c
+/native_*.c
+*.gen.c
+
+# === Generated minds / weights (demos stay: agent.km demo.km multi.km) ===
+minds/_*
+minds/word_lm_*.kt
+bootstrap/minds/
+
+# === Dev clutter ===
+tmp_*.py
+tmp_*.kenga
+examples/selfhost/_*.kenga
+examples/ml/_*.kenga
+.cursor/
 .idea/
 .vscode/
 *.swp
+*~
 .DS_Store
+Thumbs.db
+
+# === Node / packaging ===
+node_modules/
+npm-debug.log*
+editors/vscode/*.vsix
+!editors/vscode/kenga-3.10.0.vsix
+
+# Misc
 dist/
-*.exe
-*.pdb
-examples/*.c
-/native_hello.c
+*.log
+.env
+.env.*

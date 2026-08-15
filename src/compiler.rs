@@ -596,6 +596,250 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                     compile_expr(&args[0], ops)?;
                     ops.push(Op::LoadMind);
                 }
+                "t_fill" => {
+                    expect_argc("t_fill", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorFill);
+                }
+                "t_get" => {
+                    expect_argc("t_get", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorGet);
+                }
+                "t_set" => {
+                    expect_argc("t_set", args, 3, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    compile_expr(&args[2], ops)?;
+                    ops.push(Op::TensorSet);
+                }
+                "t_shape" => {
+                    expect_argc("t_shape", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::TensorShape);
+                }
+                "t_add" => {
+                    expect_argc("t_add", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorAdd);
+                }
+                "t_mul" => {
+                    expect_argc("t_mul", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorMul);
+                }
+                "t_matmul" => {
+                    expect_argc("t_matmul", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorMatmul);
+                }
+                "t_from" => {
+                    expect_argc("t_from", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorFrom);
+                }
+                "t_reshape" => {
+                    expect_argc("t_reshape", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorReshape);
+                }
+                "t_transpose" => {
+                    expect_argc("t_transpose", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::TensorTranspose);
+                }
+                "t_exp" => {
+                    expect_argc("t_exp", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::TensorExp);
+                }
+                "t_softmax" => {
+                    expect_argc("t_softmax", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::TensorSoftmax);
+                }
+                "t_dot" => {
+                    expect_argc("t_dot", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorDot);
+                }
+                "t_sub" => {
+                    expect_argc("t_sub", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorSub);
+                }
+                "t_scale" => {
+                    expect_argc("t_scale", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorScale);
+                }
+                "t_sum" => {
+                    expect_argc("t_sum", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::TensorSum);
+                }
+                "t_sgd_step" => {
+                    expect_argc("t_sgd_step", args, 4, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    compile_expr(&args[2], ops)?;
+                    compile_expr(&args[3], ops)?;
+                    ops.push(Op::TensorSgdStep);
+                }
+                "t_mean" => {
+                    expect_argc("t_mean", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::TensorMean);
+                }
+                "t_linear_grad" => {
+                    expect_argc("t_linear_grad", args, 3, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    compile_expr(&args[2], ops)?;
+                    ops.push(Op::TensorLinearGrad);
+                }
+                "t_mse" => {
+                    expect_argc("t_mse", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::TensorMse);
+                }
+                "t_patch_mean" => {
+                    expect_argc("t_patch_mean", args, 3, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    compile_expr(&args[2], ops)?;
+                    ops.push(Op::TensorPatchMean);
+                }
+                "ag_clear" => {
+                    expect_argc("ag_clear", args, 0, span)?;
+                    ops.push(Op::AgClear);
+                    ops.push(Op::Const(Value::Nil));
+                }
+                "ag_param" => {
+                    expect_argc("ag_param", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgParam);
+                }
+                "ag_const" => {
+                    expect_argc("ag_const", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgConst);
+                }
+                "ag_add" => {
+                    expect_argc("ag_add", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgAdd);
+                }
+                "ag_sub" => {
+                    expect_argc("ag_sub", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgSub);
+                }
+                "ag_mul" => {
+                    expect_argc("ag_mul", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgMul);
+                }
+                "ag_matmul" => {
+                    expect_argc("ag_matmul", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgMatmul);
+                }
+                "ag_scale" => {
+                    expect_argc("ag_scale", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgScale);
+                }
+                "ag_relu" => {
+                    expect_argc("ag_relu", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgRelu);
+                }
+                "ag_neg" => {
+                    expect_argc("ag_neg", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgNeg);
+                }
+                "ag_transpose" => {
+                    expect_argc("ag_transpose", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgTranspose);
+                }
+                "ag_reshape" => {
+                    expect_argc("ag_reshape", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgReshape);
+                }
+                "ag_exp" => {
+                    expect_argc("ag_exp", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgExp);
+                }
+                "ag_softmax" => {
+                    expect_argc("ag_softmax", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgSoftmax);
+                }
+                "ag_mse" => {
+                    expect_argc("ag_mse", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgMse);
+                }
+                "ag_sum" => {
+                    expect_argc("ag_sum", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgSum);
+                }
+                "ag_value" => {
+                    expect_argc("ag_value", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgValue);
+                }
+                "ag_grad" => {
+                    expect_argc("ag_grad", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgGrad);
+                }
+                "ag_backward" => {
+                    expect_argc("ag_backward", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::AgBackward);
+                    ops.push(Op::Const(Value::Nil));
+                }
+                "ag_step" => {
+                    expect_argc("ag_step", args, 2, span)?;
+                    compile_expr(&args[0], ops)?;
+                    compile_expr(&args[1], ops)?;
+                    ops.push(Op::AgStep);
+                }
+                "load_ppm" => {
+                    expect_argc("load_ppm", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::LoadPpm);
+                }
+                "load_wav" => {
+                    expect_argc("load_wav", args, 1, span)?;
+                    compile_expr(&args[0], ops)?;
+                    ops.push(Op::LoadWav);
+                }
                 _ => {
                     for a in args {
                         compile_expr(a, ops)?;

@@ -1,0 +1,13 @@
+// Lite dialect sample — run without Rust:
+//   kenga run --lite examples/selfhost/fact_lite.kenga
+
+fn main() -> i64 {
+  let n = 1;
+  let i = 1;
+  while i <= 6 {
+    n = n * i;
+    i = i + 1;
+  }
+  println(n);
+  return 0;
+}

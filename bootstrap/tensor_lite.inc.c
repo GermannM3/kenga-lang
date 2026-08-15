@@ -1,0 +1,609 @@
+/* Dense f64 tensors for kenga-lite — no Rust.
+ * Included into kenga_lite.c after Value/List helpers. */
+#ifndef KENGA_TENSOR_LITE_INC
+#define KENGA_TENSOR_LITE_INC
+
+#define TL_RANK_MAX 8
+#define TL_ELEMS_MAX (1 << 20) /* 1M doubles safety cap */
+
+typedef struct {
+  int rank;
+  int shape[TL_RANK_MAX];
+  int n;
+  double *data;
+} Tensor;
+
+typedef struct {
+  Tensor *data;
+  size_t len, cap;
+} TensorHeap;
+
+static TensorHeap g_tensors;
+
+static Value V_tensor(int64_t h) {
+  Value v;
+  v.tag = TAG_TENSOR;
+  v.payload = h;
+  return v;
+}
+
+static void tl_tensors_reset(void) {
+  size_t i;
+  for (i = 0; i < g_tensors.len; i++) free(g_tensors.data[i].data);
+  free(g_tensors.data);
+  g_tensors.data = NULL;
+  g_tensors.len = g_tensors.cap = 0;
+}
+
+static Tensor *tl_get(int64_t h) {
+  if (h < 0 || (size_t)h >= g_tensors.len) die("bad tensor handle");
+  return &g_tensors.data[h];
+}
+
+static int tl_product(const int *shape, int rank) {
+  int i, n = 1;
+  if (rank <= 0) return 0;
+  for (i = 0; i < rank; i++) {
+    if (shape[i] < 0) die("negative tensor dim");
+    if (shape[i] > 0 && n > TL_ELEMS_MAX / shape[i]) die("tensor too large");
+    n *= shape[i];
+  }
+  return n;
+}
+
+static int64_t tl_alloc(const int *shape, int rank, int zero) {
+  Tensor t;
+  int i, n;
+  memset(&t, 0, sizeof(t));
+  if (rank < 0 || rank > TL_RANK_MAX) die("tensor rank out of range");
+  t.rank = rank;
+  for (i = 0; i < rank; i++) t.shape[i] = shape[i];
+  n = tl_product(shape, rank);
+  t.n = n;
+  if (n > 0) {
+    t.data = (double *)malloc((size_t)n * sizeof(double));
+    if (!t.data) die("oom tensor");
+    if (zero) memset(t.data, 0, (size_t)n * sizeof(double));
+  }
+  if (g_tensors.len + 1 > g_tensors.cap) {
+    g_tensors.cap = g_tensors.cap ? g_tensors.cap * 2 : 8;
+    g_tensors.data = (Tensor *)xrealloc(g_tensors.data, g_tensors.cap * sizeof(Tensor));
+  }
+  g_tensors.data[g_tensors.len] = t;
+  return (int64_t)g_tensors.len++;
+}
+
+static int64_t tl_zeros(const int *shape, int rank) { return tl_alloc(shape, rank, 1); }
+
+static int64_t tl_clone_shape_data(const int *shape, int rank, const double *data, int n) {
+  int64_t h = tl_alloc(shape, rank, 0);
+  Tensor *t = tl_get(h);
+  if (t->n != n) die("internal tensor size");
+  if (n > 0) memcpy(t->data, data, (size_t)n * sizeof(double));
+  return h;
+}
+
+static void tl_shape_from_list(Value v, ListHeap *lists, int *shape, int *rank) {
+  ValA *L;
+  size_t i;
+  if (v.tag != TAG_LIST) die("tensor shape expects list");
+  if (v.payload < 0 || (size_t)v.payload >= lists->len) die("bad list");
+  L = &lists->data[v.payload];
+  if (L->len > (size_t)TL_RANK_MAX) die("tensor rank too high");
+  *rank = (int)L->len;
+  for (i = 0; i < L->len; i++) {
+    if (L->data[i].tag != TAG_I64) die("shape dim must be i64");
+    shape[i] = (int)L->data[i].payload;
+  }
+}
+
+static void tl_data_from_list(Value v, ListHeap *lists, double *out, int n) {
+  ValA *L;
+  size_t i;
+  if (v.tag != TAG_LIST) die("tensor data expects list");
+  if (v.payload < 0 || (size_t)v.payload >= lists->len) die("bad list");
+  L = &lists->data[v.payload];
+  if ((int)L->len != n) die("t_from data length mismatch");
+  for (i = 0; i < L->len; i++) out[i] = to_f64(L->data[i], "tensor data");
+}
+
+static Value tl_shape_to_list(const Tensor *t, ListHeap *lists) {
+  ValA empty = {0};
+  int64_t h = (int64_t)lists->len;
+  int i;
+  listh_push(lists, empty);
+  for (i = 0; i < t->rank; i++) vala_push(&lists->data[h], V_i64(t->shape[i]));
+  return V_list(h);
+}
+
+static int64_t tl_ew(int64_t ha, int64_t hb, double (*op)(double, double)) {
+  Tensor *a = tl_get(ha), *b = tl_get(hb);
+  int i;
+  int64_t h;
+  Tensor *o;
+  if (a->rank != b->rank || a->n != b->n) die("tensor shape mismatch");
+  for (i = 0; i < a->rank; i++)
+    if (a->shape[i] != b->shape[i]) die("tensor shape mismatch");
+  h = tl_alloc(a->shape, a->rank, 0);
+  o = tl_get(h);
+  for (i = 0; i < a->n; i++) o->data[i] = op(a->data[i], b->data[i]);
+  return h;
+}
+
+static double tl_op_add(double x, double y) { return x + y; }
+static double tl_op_sub(double x, double y) { return x - y; }
+static double tl_op_mul(double x, double y) { return x * y; }
+
+static int64_t tl_matmul(int64_t ha, int64_t hb) {
+  Tensor *a = tl_get(ha), *b = tl_get(hb);
+  int m, k, k2, n, i, j, t;
+  int shape[2];
+  int64_t h;
+  Tensor *o;
+  if (a->rank != 2 || b->rank != 2) die("t_matmul expects rank-2");
+  m = a->shape[0];
+  k = a->shape[1];
+  k2 = b->shape[0];
+  n = b->shape[1];
+  if (k != k2) die("t_matmul inner dim mismatch");
+  shape[0] = m;
+  shape[1] = n;
+  h = tl_zeros(shape, 2);
+  o = tl_get(h);
+  for (i = 0; i < m; i++)
+    for (j = 0; j < n; j++) {
+      double s = 0.0;
+      for (t = 0; t < k; t++) s += a->data[i * k + t] * b->data[t * n + j];
+      o->data[i * n + j] = s;
+    }
+  return h;
+}
+
+static int64_t tl_transpose(int64_t ha) {
+  Tensor *a = tl_get(ha);
+  int r, c, shape[2];
+  int64_t h;
+  Tensor *o;
+  if (a->rank != 2) die("t_transpose expects rank-2");
+  r = a->shape[0];
+  c = a->shape[1];
+  shape[0] = c;
+  shape[1] = r;
+  h = tl_zeros(shape, 2);
+  o = tl_get(h);
+  {
+    int i, j;
+    for (i = 0; i < r; i++)
+      for (j = 0; j < c; j++) o->data[j * r + i] = a->data[i * c + j];
+  }
+  return h;
+}
+
+static int64_t tl_scale(int64_t ha, double s) {
+  Tensor *a = tl_get(ha);
+  int64_t h = tl_clone_shape_data(a->shape, a->rank, a->data, a->n);
+  Tensor *o = tl_get(h);
+  int i;
+  for (i = 0; i < o->n; i++) o->data[i] *= s;
+  return h;
+}
+
+static double tl_sum(int64_t ha) {
+  Tensor *a = tl_get(ha);
+  double s = 0.0;
+  int i;
+  for (i = 0; i < a->n; i++) s += a->data[i];
+  return s;
+}
+
+static double tl_dot(int64_t ha, int64_t hb) {
+  Tensor *a = tl_get(ha), *b = tl_get(hb);
+  double s = 0.0;
+  int i;
+  if (a->n != b->n) die("t_dot length mismatch");
+  for (i = 0; i < a->n; i++) s += a->data[i] * b->data[i];
+  return s;
+}
+
+static int64_t tl_exp(int64_t ha) {
+  Tensor *a = tl_get(ha);
+  int64_t h = tl_clone_shape_data(a->shape, a->rank, a->data, a->n);
+  Tensor *o = tl_get(h);
+  int i;
+  for (i = 0; i < o->n; i++) o->data[i] = exp(o->data[i]);
+  return h;
+}
+
+static int64_t tl_log(int64_t ha) {
+  Tensor *a = tl_get(ha);
+  int64_t h = tl_clone_shape_data(a->shape, a->rank, a->data, a->n);
+  Tensor *o = tl_get(h);
+  int i;
+  for (i = 0; i < o->n; i++) {
+    double x = o->data[i];
+    if (x < 1e-12) x = 1e-12;
+    o->data[i] = log(x);
+  }
+  return h;
+}
+
+static int tl_save_tensor(int64_t ha, const char *path) {
+  Tensor *t = tl_get(ha);
+  FILE *f = fopen(path, "wb");
+  int i;
+  if (!f) return 0;
+  fprintf(f, "KENGA_TENSOR 1\n%d\n", t->rank);
+  for (i = 0; i < t->rank; i++) {
+    if (i) fputc(' ', f);
+    fprintf(f, "%d", t->shape[i]);
+  }
+  fputc('\n', f);
+  for (i = 0; i < t->n; i++) {
+    if (i) fputc(' ', f);
+    fprintf(f, "%.17g", t->data[i]);
+  }
+  fputc('\n', f);
+  fclose(f);
+  return 1;
+}
+
+static int64_t tl_load_tensor(const char *path) {
+  FILE *f = fopen(path, "rb");
+  char magic[32];
+  int ver = 0, rank = 0, i, shape[TL_RANK_MAX], n;
+  int64_t h;
+  Tensor *t;
+  if (!f) die("load_tensor: cannot open");
+  if (fscanf(f, "%31s %d", magic, &ver) != 2 || strcmp(magic, "KENGA_TENSOR") != 0 || ver != 1) {
+    fclose(f);
+    die("load_tensor: bad header");
+  }
+  if (fscanf(f, "%d", &rank) != 1 || rank < 0 || rank > TL_RANK_MAX) {
+    fclose(f);
+    die("load_tensor: bad rank");
+  }
+  for (i = 0; i < rank; i++) {
+    if (fscanf(f, "%d", &shape[i]) != 1) {
+      fclose(f);
+      die("load_tensor: bad shape");
+    }
+  }
+  n = tl_product(shape, rank);
+  h = tl_alloc(shape, rank, 0);
+  t = tl_get(h);
+  for (i = 0; i < n; i++) {
+    if (fscanf(f, "%lf", &t->data[i]) != 1) {
+      fclose(f);
+      die("load_tensor: bad data");
+    }
+  }
+  fclose(f);
+  return h;
+}
+
+static int64_t tl_softmax(int64_t ha) {
+  Tensor *a = tl_get(ha);
+  int64_t h = tl_clone_shape_data(a->shape, a->rank, a->data, a->n);
+  Tensor *o = tl_get(h);
+  double mx = -1e300, sum = 0.0;
+  int i;
+  if (o->n < 1) return h;
+  for (i = 0; i < o->n; i++)
+    if (o->data[i] > mx) mx = o->data[i];
+  for (i = 0; i < o->n; i++) {
+    o->data[i] = exp(o->data[i] - mx);
+    sum += o->data[i];
+  }
+  if (sum < 1e-300) sum = 1e-300;
+  for (i = 0; i < o->n; i++) o->data[i] /= sum;
+  return h;
+}
+
+static void tl_print(const Tensor *t) {
+  int i;
+  printf("Tensor(shape=[");
+  for (i = 0; i < t->rank; i++) {
+    if (i) printf(", ");
+    printf("%d", t->shape[i]);
+  }
+  printf("], len=%d)", t->n);
+}
+
+static unsigned char *tl_read_bytes(const char *path, size_t *out_len) {
+  FILE *f = fopen(path, "rb");
+  long sz;
+  unsigned char *buf;
+  if (!f) return NULL;
+  if (fseek(f, 0, SEEK_END) != 0) {
+    fclose(f);
+    return NULL;
+  }
+  sz = ftell(f);
+  if (sz < 0) {
+    fclose(f);
+    return NULL;
+  }
+  rewind(f);
+  buf = (unsigned char *)malloc((size_t)sz + 1);
+  if (!buf) {
+    fclose(f);
+    return NULL;
+  }
+  if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
+    free(buf);
+    fclose(f);
+    return NULL;
+  }
+  fclose(f);
+  if (out_len) *out_len = (size_t)sz;
+  return buf;
+}
+
+static void tl_skip_ws_comments(const unsigned char *b, size_t n, size_t *i) {
+  for (;;) {
+    while (*i < n && (b[*i] == ' ' || b[*i] == '\t' || b[*i] == '\r' || b[*i] == '\n')) (*i)++;
+    if (*i < n && b[*i] == '#') {
+      while (*i < n && b[*i] != '\n') (*i)++;
+      continue;
+    }
+    break;
+  }
+}
+
+static int tl_read_token(const unsigned char *b, size_t n, size_t *i, char *out, size_t outcap) {
+  size_t start, len;
+  tl_skip_ws_comments(b, n, i);
+  start = *i;
+  while (*i < n && b[*i] != ' ' && b[*i] != '\t' && b[*i] != '\r' && b[*i] != '\n' && b[*i] != '#')
+    (*i)++;
+  if (start == *i) return 0;
+  len = *i - start;
+  if (len + 1 > outcap) len = outcap - 1;
+  memcpy(out, b + start, len);
+  out[len] = 0;
+  return 1;
+}
+
+/* P6 binary PPM → Tensor [h,w,3] in 0..1 */
+static int64_t tl_load_ppm(const char *path) {
+  size_t n = 0, i = 0;
+  unsigned char *b = tl_read_bytes(path, &n);
+  char tok[64];
+  int w, h, maxv, need, p;
+  int shape[3];
+  int64_t th;
+  Tensor *t;
+  if (!b) die("load_ppm: cannot read file");
+  if (!tl_read_token(b, n, &i, tok, sizeof(tok)) || strcmp(tok, "P6") != 0) {
+    free(b);
+    die("load_ppm: only P6 binary PPM supported");
+  }
+  if (!tl_read_token(b, n, &i, tok, sizeof(tok))) {
+    free(b);
+    die("load_ppm: bad width");
+  }
+  w = atoi(tok);
+  if (!tl_read_token(b, n, &i, tok, sizeof(tok))) {
+    free(b);
+    die("load_ppm: bad height");
+  }
+  h = atoi(tok);
+  if (!tl_read_token(b, n, &i, tok, sizeof(tok))) {
+    free(b);
+    die("load_ppm: bad maxval");
+  }
+  maxv = atoi(tok);
+  if (w < 1 || h < 1 || maxv < 1) {
+    free(b);
+    die("load_ppm: bad header nums");
+  }
+  if (i < n && (b[i] == ' ' || b[i] == '\t' || b[i] == '\r' || b[i] == '\n')) i++;
+  need = w * h * 3;
+  if (n < i + (size_t)need) {
+    free(b);
+    die("load_ppm: truncated pixel data");
+  }
+  shape[0] = h;
+  shape[1] = w;
+  shape[2] = 3;
+  th = tl_alloc(shape, 3, 0);
+  t = tl_get(th);
+  for (p = 0; p < need; p++) t->data[p] = (double)b[i + (size_t)p] / (double)maxv;
+  free(b);
+  return th;
+}
+
+static uint32_t tl_u32le(const unsigned char *p) {
+  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static uint16_t tl_u16le(const unsigned char *p) {
+  return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+/* PCM16 WAV → Tensor [n] in -1..1 (first channel) */
+static int64_t tl_load_wav(const char *path) {
+  size_t n = 0, pos = 12;
+  unsigned char *b = tl_read_bytes(path, &n);
+  uint16_t channels = 1, bits = 16;
+  size_t data_off = 0, data_len = 0;
+  int samples, s, shape[1];
+  int64_t th;
+  Tensor *t;
+  if (!b) die("load_wav: cannot read file");
+  if (n < 44 || memcmp(b, "RIFF", 4) != 0 || memcmp(b + 8, "WAVE", 4) != 0) {
+    free(b);
+    die("load_wav: not a RIFF/WAVE file");
+  }
+  while (pos + 8 <= n) {
+    unsigned char *id = b + pos;
+    uint32_t size = tl_u32le(b + pos + 4);
+    size_t chunk = pos + 8;
+    if (memcmp(id, "fmt ", 4) == 0) {
+      uint16_t format;
+      if (size < 16 || chunk + 16 > n) {
+        free(b);
+        die("load_wav: bad fmt chunk");
+      }
+      format = tl_u16le(b + chunk);
+      if (format != 1) {
+        free(b);
+        die("load_wav: only PCM format=1");
+      }
+      channels = tl_u16le(b + chunk + 2);
+      bits = tl_u16le(b + chunk + 14);
+    } else if (memcmp(id, "data", 4) == 0) {
+      data_off = chunk;
+      data_len = size;
+      break;
+    }
+    pos = chunk + size + (size % 2);
+  }
+  if (data_off == 0 || bits != 16) {
+    free(b);
+    die("load_wav: need 16-bit PCM data chunk");
+  }
+  if (data_off + data_len > n) {
+    free(b);
+    die("load_wav: truncated data");
+  }
+  {
+    int step = channels < 1 ? 1 : (int)channels;
+    samples = (int)(data_len / 2 / (size_t)step);
+    if (samples < 1) samples = 0;
+    if (samples > TL_ELEMS_MAX) {
+      free(b);
+      die("load_wav: too many samples");
+    }
+    shape[0] = samples;
+    th = tl_alloc(shape, 1, 0);
+    t = tl_get(th);
+    for (s = 0; s < samples; s++) {
+      size_t off = data_off + (size_t)s * (size_t)step * 2;
+      int16_t sample = (int16_t)tl_u16le(b + off);
+      t->data[s] = (double)sample / 32768.0;
+    }
+  }
+  free(b);
+  return th;
+}
+
+/* Mean: rank3 → [c]; rank2 → [1]; else → caller gets F64 via out_is_f64 */
+static int64_t tl_mean_tensor(int64_t ha, double *out_f64, int *is_f64) {
+  Tensor *a = tl_get(ha);
+  *is_f64 = 0;
+  if (a->rank == 3) {
+    int h = a->shape[0], w = a->shape[1], c = a->shape[2];
+    double n = (double)(h * w);
+    int shape[1];
+    int64_t oh;
+    Tensor *o;
+    int y, x, ch;
+    shape[0] = c;
+    oh = tl_zeros(shape, 1);
+    o = tl_get(oh);
+    for (y = 0; y < h; y++)
+      for (x = 0; x < w; x++)
+        for (ch = 0; ch < c; ch++) o->data[ch] += a->data[(y * w + x) * c + ch];
+    for (ch = 0; ch < c; ch++) o->data[ch] /= n > 0.0 ? n : 1.0;
+    return oh;
+  }
+  if (a->rank == 2) {
+    double s = 0.0;
+    int i, shape[1] = {1};
+    int64_t oh;
+    for (i = 0; i < a->n; i++) s += a->data[i];
+    oh = tl_zeros(shape, 1);
+    tl_get(oh)->data[0] = s / (a->n > 0 ? (double)a->n : 1.0);
+    return oh;
+  }
+  {
+    double s = 0.0;
+    int i;
+    for (i = 0; i < a->n; i++) s += a->data[i];
+    *out_f64 = s / (a->n > 0 ? (double)a->n : 1.0);
+    *is_f64 = 1;
+    return -1;
+  }
+}
+
+static double tl_mse_ids(int64_t ha, int64_t hb) {
+  Tensor *a = tl_get(ha), *b = tl_get(hb);
+  double s = 0.0;
+  int i, n;
+  if (a->n != b->n) die("t_mse size mismatch");
+  n = a->n > 0 ? a->n : 1;
+  for (i = 0; i < a->n; i++) {
+    double d = a->data[i] - b->data[i];
+    s += d * d;
+  }
+  return s / (double)n;
+}
+
+static int64_t tl_clone_h(int64_t ha) {
+  Tensor *a = tl_get(ha);
+  return tl_clone_shape_data(a->shape, a->rank, a->data, a->n);
+}
+
+/* Ensure (n,) or (n,1) → (n,1) clone. */
+static int64_t tl_ensure_col(int64_t ha) {
+  Tensor *a = tl_get(ha);
+  int shape[2];
+  if (a->rank == 1) {
+    shape[0] = a->shape[0];
+    shape[1] = 1;
+    return tl_clone_shape_data(shape, 2, a->data, a->n);
+  }
+  if (a->rank == 2 && a->shape[1] == 1) return tl_clone_h(ha);
+  die("expected vector or column (n,)/(n,1)");
+  return -1;
+}
+
+/* dL/dW for pred=W@x, L=mse(pred,y): err @ x^T */
+static int64_t tl_linear_grad(int64_t hw, int64_t hx, int64_t hy) {
+  int64_t xcol = tl_ensure_col(hx);
+  int64_t ycol = tl_ensure_col(hy);
+  int64_t pred = tl_matmul(hw, xcol);
+  int64_t err = tl_ew(pred, ycol, tl_op_sub);
+  int64_t xt = tl_transpose(xcol);
+  return tl_matmul(err, xt);
+}
+
+/* Non-overlapping mean pool [h,w,c] → [gh,gw,c] */
+static int64_t tl_patch_mean(int64_t ha, int gh, int gw) {
+  Tensor *a = tl_get(ha);
+  int h, w, c, ph, pw, gy, gx, ch, y, x;
+  int oshape[3];
+  int64_t oh;
+  Tensor *o;
+  if (gh <= 0 || gw <= 0) die("t_patch_mean grid must be > 0");
+  if (a->rank != 3) die("t_patch_mean expects Tensor [h,w,c]");
+  h = a->shape[0];
+  w = a->shape[1];
+  c = a->shape[2];
+  ph = h / gh;
+  pw = w / gw;
+  if (ph == 0 || pw == 0) die("t_patch_mean: image smaller than grid");
+  oshape[0] = gh;
+  oshape[1] = gw;
+  oshape[2] = c;
+  oh = tl_zeros(oshape, 3);
+  o = tl_get(oh);
+  for (gy = 0; gy < gh; gy++) {
+    for (gx = 0; gx < gw; gx++) {
+      for (ch = 0; ch < c; ch++) {
+        double s = 0.0, n = 0.0;
+        for (y = gy * ph; y < (gy + 1) * ph; y++) {
+          for (x = gx * pw; x < (gx + 1) * pw; x++) {
+            s += a->data[(y * w + x) * c + ch];
+            n += 1.0;
+          }
+        }
+        o->data[(gy * gw + gx) * c + ch] = s / (n > 0.0 ? n : 1.0);
+      }
+    }
+  }
+  return oh;
+}
+
+#endif /* KENGA_TENSOR_LITE_INC */

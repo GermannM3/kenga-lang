@@ -1,0 +1,14 @@
+// Lite float: arith + round (no Rust)
+
+fn main() -> i64 {
+    let a = 1.5;
+    let b = 2.25;
+    let s = a + b;
+    println(s);
+    let r = round(s * 2.0);
+    println(r);
+    if r != 8 {
+        return 1;
+    }
+    return 0;
+}

@@ -1,0 +1,25 @@
+// Tiny linear model on tensor ops (no Prophet) — roadmap "model on tensors"
+// y = W @ x + b   (one dense layer)
+
+fn main() -> i64 {
+    // W: 2x3, x: 3x1, b: 2x1
+    let w = t_from([2, 3], [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+    let x = t_from([3, 1], [2.0, 3.0, 4.0]);
+    let b = t_from([2, 1], [0.5, -1.0]);
+    let y = t_add(t_matmul(w, x), b);
+    // [2.0, 3.0] + [0.5, -1.0] = [2.5, 2.0]
+    let y0 = t_get(y, 0);
+    let y1 = t_get(y, 1);
+    assert(round(y0 * 10.0) == 25);
+    assert(round(y1 * 10.0) == 20);
+
+    let flat = t_reshape(y, [2]);
+    let ones = t_from([2], [1.0, 1.0]);
+    let s = t_dot(flat, ones);
+    assert(round(s * 10.0) == 45);
+
+    println(t_shape(flat));
+    println(s);
+    println("mlp tensor ok");
+    return 0;
+}

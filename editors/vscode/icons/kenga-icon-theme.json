@@ -1,0 +1,20 @@
+{
+  "fonts": [],
+  "iconDefinitions": {
+    "_kenga_file": {
+      "iconPath": "./kenga-file.svg"
+    }
+  },
+  "file": "_kenga_file",
+  "folder": "_kenga_file",
+  "folderExpanded": "_kenga_file",
+  "fileExtensions": {
+    "kenga": "_kenga_file",
+    "km": "_kenga_file"
+  },
+  "fileNames": {},
+  "languageIds": {
+    "kenga": "_kenga_file"
+  },
+  "hidesExplorerArrows": false
+}

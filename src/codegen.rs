@@ -1,4 +1,4 @@
-//! C99 backend: i64, lists, structs, for/while, imports (via merged Program).
+//! C99 backend: tagged KVal runtime (i64 / f64 / str / list handles), structs, for/while.
 
 use std::collections::HashMap;
 
@@ -10,10 +10,13 @@ use crate::error::{KengaError, Result};
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum CTy {
     I64,
+    F64,
     List,
     Str,
     Void,
     Struct(String),
+    /// Dynamic tagged value (list index, for-loop elem over hetero list).
+    Val,
 }
 
 struct StructInfo {
@@ -24,6 +27,7 @@ struct EmitCtx<'a> {
     vars: HashMap<String, CTy>,
     structs: &'a HashMap<String, StructInfo>,
     sigs: &'a HashMap<String, (CTy, Vec<CTy>)>,
+    ret: CTy,
     tmp: usize,
 }
 
@@ -88,6 +92,18 @@ pub fn emit_c(program: &Program) -> Result<String> {
         body.push_str(&format!("}} {};\n\n", struct_c_name(&name)));
     }
 
+    // Forward declarations (mutual recursion in selfhost etc.)
+    for item in &program.items {
+        if let Item::Function(f) = item {
+            if f.name == "main" {
+                continue;
+            }
+            body.push_str(&emit_prototype(f, &structs)?);
+            body.push_str(";\n");
+        }
+    }
+    body.push('\n');
+
     for item in &program.items {
         if let Item::Function(f) = item {
             body.push_str(&emit_function(f, &structs, &sigs)?);
@@ -106,7 +122,8 @@ fn map_type(t: &Type, structs: &HashMap<String, StructInfo>) -> Result<CTy> {
         Type::Void => CTy::Void,
         Type::List => CTy::List,
         Type::Str => CTy::Str,
-        Type::I64 | Type::F64 | Type::Bool | Type::Tensor | Type::Memory => CTy::I64,
+        Type::F64 => CTy::F64,
+        Type::I64 | Type::Bool | Type::Tensor | Type::Memory => CTy::I64,
         Type::Named(n) => {
             if structs.contains_key(n) {
                 CTy::Struct(n.clone())
@@ -119,11 +136,34 @@ fn map_type(t: &Type, structs: &HashMap<String, StructInfo>) -> Result<CTy> {
 
 fn c_type(t: &CTy) -> String {
     match t {
-        CTy::I64 => "int64_t".into(),
-        CTy::List => "KList".into(),
+        CTy::I64 | CTy::List => "int64_t".into(),
+        CTy::F64 => "double".into(),
         CTy::Str => "const char*".into(),
         CTy::Void => "void".into(),
         CTy::Struct(n) => struct_c_name(n),
+        CTy::Val => "KVal".into(),
+    }
+}
+
+fn is_numeric(t: &CTy) -> bool {
+    matches!(t, CTy::I64 | CTy::F64)
+}
+
+fn promote_num(a: &CTy, b: &CTy) -> Option<CTy> {
+    match (a, b) {
+        (CTy::F64, CTy::F64)
+        | (CTy::F64, CTy::I64)
+        | (CTy::I64, CTy::F64) => Some(CTy::F64),
+        (CTy::I64, CTy::I64) => Some(CTy::I64),
+        _ => None,
+    }
+}
+
+fn c_float_lit(n: f64) -> String {
+    if n.is_finite() && n.fract() == 0.0 {
+        format!("{n:.1}")
+    } else {
+        format!("{n}")
     }
 }
 
@@ -140,7 +180,11 @@ fn c_ident(name: &str) -> String {
 }
 
 fn escape_c(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
 }
 
 fn indent_pre(pre: &str, indent: usize) -> String {
@@ -149,6 +193,64 @@ fn indent_pre(pre: &str, indent: usize) -> String {
     }
     let pad = "  ".repeat(indent);
     pre.lines().map(|l| format!("{pad}{l}\n")).collect()
+}
+
+fn wrap_as_val(expr: &str, from: &CTy) -> String {
+    match from {
+        CTy::Val => expr.to_string(),
+        CTy::I64 => format!("kval_i64({expr})"),
+        CTy::F64 => format!("kval_f64({expr})"),
+        CTy::Str => format!("kval_str({expr})"),
+        CTy::List => format!("kval_list({expr})"),
+        CTy::Void | CTy::Struct(_) => format!("kval_i64(0)"),
+    }
+}
+
+fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
+    if from == to {
+        return Ok(expr.to_string());
+    }
+    Ok(match (from, to) {
+        (CTy::Val, CTy::I64) => format!("kval_as_i64({expr})"),
+        (CTy::Val, CTy::F64) => format!("kval_as_f64({expr})"),
+        (CTy::Val, CTy::Str) => format!("kval_as_str({expr})"),
+        (CTy::Val, CTy::List) => format!("kval_as_list({expr})"),
+        (CTy::I64, CTy::Val) => format!("kval_i64({expr})"),
+        (CTy::F64, CTy::Val) => format!("kval_f64({expr})"),
+        (CTy::I64, CTy::F64) => format!("((double)({expr}))"),
+        (CTy::F64, CTy::I64) => format!("((int64_t)({expr}))"),
+        (CTy::I64, CTy::Str) => format!("kstr_from_i64({expr})"),
+        (CTy::F64, CTy::Str) => format!("kstr_from_f64({expr})"),
+        (CTy::Str, CTy::Val) => format!("kval_str({expr})"),
+        (CTy::List, CTy::Val) => format!("kval_list({expr})"),
+        // List is an int64_t handle; Val→List already covered. I64↔List is a handle misuse —
+        // allow only if both are int64_t at C level without conversion (should not happen).
+        _ if c_type(from) == c_type(to) => expr.to_string(),
+        _ => {
+            return Err(KengaError::new(
+                format!("emit-c: cannot coerce {:?} to {:?}", from, to),
+                None,
+            ))
+        }
+    })
+}
+
+fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>) -> Result<String> {
+    let ret = map_type(&f.ret, structs)?;
+    let mut s = format!("{} {}(", c_type(&ret), c_ident(&f.name));
+    if f.params.is_empty() {
+        s.push_str("void");
+    } else {
+        for (i, p) in f.params.iter().enumerate() {
+            if i > 0 {
+                s.push_str(", ");
+            }
+            let ty = map_type(&p.ty, structs)?;
+            s.push_str(&format!("{} {}", c_type(&ty), c_ident(&p.name)));
+        }
+    }
+    s.push(')');
+    Ok(s)
 }
 
 fn emit_function(
@@ -164,6 +266,7 @@ fn emit_function(
         vars: HashMap::new(),
         structs,
         sigs,
+        ret: ret.clone(),
         tmp: 0,
     };
     let mut s = format!("{} {}(", c_type(&ret), c_ident(&f.name));
@@ -206,10 +309,11 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
             let cty = if let Some(t) = ty {
                 map_type(t, ctx.structs)?
             } else {
-                inferred
+                inferred.clone()
             };
             ctx.vars.insert(name.clone(), cty.clone());
             let (pre, expr) = emit_expr(value, ctx)?;
+            let expr = coerce_expr(&expr, &inferred, &cty)?;
             Ok(format!(
                 "{}{pad}{} {} = {};\n",
                 indent_pre(&pre, indent),
@@ -221,6 +325,9 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
         Stmt::Assign { target, value, span } => match target {
             AssignTarget::Name(name) => {
                 let (pre, expr) = emit_expr(value, ctx)?;
+                let value_ty = infer_expr(value, ctx)?;
+                let target_ty = ctx.vars.get(name).cloned().unwrap_or(value_ty.clone());
+                let expr = coerce_expr(&expr, &value_ty, &target_ty)?;
                 Ok(format!(
                     "{}{pad}{} = {};\n",
                     indent_pre(&pre, indent),
@@ -232,14 +339,14 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
                 let (pt, te) = emit_expr(target, ctx)?;
                 let (pi, ie) = emit_expr(index, ctx)?;
                 let (pv, ve) = emit_expr(value, ctx)?;
-                let tmp = ctx.fresh("lst");
-                let assign = if let Expr::Ident(n, _) = target {
-                    format!("{pad}{} = {tmp};\n", c_ident(n))
-                } else {
-                    String::new()
-                };
+                let list_ty = infer_expr(target, ctx)?;
+                let idx_ty = infer_expr(index, ctx)?;
+                let val_ty = infer_expr(value, ctx)?;
+                let list_e = coerce_expr(&te, &list_ty, &CTy::List)?;
+                let idx_e = coerce_expr(&ie, &idx_ty, &CTy::I64)?;
+                let val_e = wrap_as_val(&ve, &val_ty);
                 Ok(format!(
-                    "{}{}{}{pad}KList {tmp} = {te};\n{pad}klist_set(&{tmp}, {ie}, {ve});\n{assign}",
+                    "{}{}{}{pad}klist_set_val({list_e}, {idx_e}, {val_e});\n",
                     indent_pre(&pt, indent),
                     indent_pre(&pi, indent),
                     indent_pre(&pv, indent),
@@ -275,6 +382,8 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
         Stmt::Return { value, .. } => match value {
             Some(e) => {
                 let (pre, expr) = emit_expr(e, ctx)?;
+                let ety = infer_expr(e, ctx)?;
+                let expr = coerce_expr(&expr, &ety, &ctx.ret)?;
                 Ok(format!(
                     "{}{pad}return {expr};\n",
                     indent_pre(&pre, indent)
@@ -289,6 +398,8 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
             ..
         } => {
             let (pre, c) = emit_expr(cond, ctx)?;
+            let cty = infer_expr(cond, ctx)?;
+            let c = coerce_expr(&c, &cty, &CTy::I64)?;
             let mut s = format!("{}{pad}if ({c}) {{\n", indent_pre(&pre, indent));
             for st in &then_block.stmts {
                 s.push_str(&emit_stmt(st, indent + 1, ctx)?);
@@ -308,6 +419,8 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
         Stmt::While { cond, body, .. } => {
             let mut s = format!("{pad}while (1) {{\n");
             let (pre, c) = emit_expr(cond, ctx)?;
+            let cty = infer_expr(cond, ctx)?;
+            let c = coerce_expr(&c, &cty, &CTy::I64)?;
             s.push_str(&indent_pre(&pre, indent + 1));
             s.push_str(&format!("{}if (!({c})) break;\n", "  ".repeat(indent + 1)));
             for st in &body.stmts {
@@ -352,15 +465,20 @@ fn emit_for(
         return Ok(s);
     }
     let (pre, list_e) = emit_expr(iter, ctx)?;
+    let iter_ty = infer_expr(iter, ctx)?;
+    let list_e = coerce_expr(&list_e, &iter_ty, &CTy::List)?;
     let lst = ctx.fresh("iter");
     let idx = ctx.fresh("i");
-    ctx.vars.insert(var.to_string(), CTy::I64);
-    let mut s = format!("{}{pad}KList {lst} = {list_e};\n", indent_pre(&pre, indent));
+    ctx.vars.insert(var.to_string(), CTy::Val);
+    let mut s = format!(
+        "{}{pad}int64_t {lst} = {list_e};\n",
+        indent_pre(&pre, indent)
+    );
     s.push_str(&format!(
-        "{pad}for (size_t {idx} = 0; {idx} < {lst}.len; {idx}++) {{\n"
+        "{pad}for (int64_t {idx} = 0; {idx} < klist_len({lst}); {idx}++) {{\n"
     ));
     s.push_str(&format!(
-        "{ip}int64_t {} = klist_get({lst}, (int64_t){idx});\n",
+        "{ip}KVal {} = klist_get_val({lst}, {idx});\n",
         c_ident(var)
     ));
     for st in &body.stmts {
@@ -383,6 +501,8 @@ fn emit_println(arg: &Expr, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<Stri
     let call = match &ty {
         CTy::List => format!("kenga_println_list({e})"),
         CTy::Str => format!("kenga_println_str({e})"),
+        CTy::Val => format!("kenga_println_val({e})"),
+        CTy::F64 => format!("kenga_println_f64({e})"),
         CTy::Struct(n) => format!("kenga_println_str(\"<struct {n}>\")"),
         _ => format!("kenga_println_i64({e})"),
     };
@@ -391,14 +511,55 @@ fn emit_println(arg: &Expr, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<Stri
 
 fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
     Ok(match expr {
-        Expr::Int(_, _) | Expr::Bool(_, _) | Expr::Float(_, _) => CTy::I64,
+        Expr::Int(_, _) | Expr::Bool(_, _) => CTy::I64,
+        Expr::Float(_, _) => CTy::F64,
         Expr::Str(_, _) => CTy::Str,
-        Expr::List(_, _) | Expr::Range { .. } => CTy::List,
+        Expr::List(_, _) => CTy::List,
+        Expr::Range { .. } => CTy::List,
         Expr::Ident(name, span) => ctx.vars.get(name).cloned().ok_or_else(|| {
             KengaError::at(format!("unknown variable '{name}'"), span.clone())
         })?,
-        Expr::Index { .. } => CTy::I64,
-        Expr::Unary { .. } | Expr::Binary { .. } => CTy::I64,
+        Expr::Index { .. } => CTy::Val,
+        Expr::Unary { op, expr, .. } => {
+            let t = infer_expr(expr, ctx)?;
+            match op {
+                UnaryOp::Neg if t == CTy::F64 => CTy::F64,
+                UnaryOp::Neg if is_numeric(&t) => CTy::I64,
+                UnaryOp::Not => CTy::I64,
+                _ => CTy::I64,
+            }
+        }
+        Expr::Binary {
+            op, left, right, ..
+        } => {
+            let lt = infer_expr(left, ctx)?;
+            let rt = infer_expr(right, ctx)?;
+            if *op == BinaryOp::Add {
+                if lt == CTy::List && rt == CTy::List {
+                    return Ok(CTy::List);
+                }
+                if lt == CTy::Str || rt == CTy::Str {
+                    return Ok(CTy::Str);
+                }
+            }
+            if matches!(
+                *op,
+                BinaryOp::Eq
+                    | BinaryOp::Ne
+                    | BinaryOp::Lt
+                    | BinaryOp::Le
+                    | BinaryOp::Gt
+                    | BinaryOp::Ge
+                    | BinaryOp::And
+                    | BinaryOp::Or
+            ) {
+                return Ok(CTy::I64);
+            }
+            if let Some(p) = promote_num(&lt, &rt) {
+                return Ok(p);
+            }
+            CTy::I64
+        }
         Expr::Field {
             target,
             field,
@@ -441,6 +602,8 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
                 CTy::I64
             } else if callee == "push" {
                 CTy::List
+            } else if callee == "round" {
+                CTy::I64
             } else if let Some((ret, _)) = ctx.sigs.get(callee) {
                 ret.clone()
             } else {
@@ -450,20 +613,38 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
     })
 }
 
+fn emit_as_i64(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
+    let (pre, e) = emit_expr(expr, ctx)?;
+    let ty = infer_expr(expr, ctx)?;
+    let e = coerce_expr(&e, &ty, &CTy::I64)?;
+    Ok((pre, e))
+}
+
+fn emit_as_num(expr: &Expr, ctx: &mut EmitCtx<'_>, want: &CTy) -> Result<(String, String)> {
+    let (pre, e) = emit_expr(expr, ctx)?;
+    let ty = infer_expr(expr, ctx)?;
+    let e = coerce_expr(&e, &ty, want)?;
+    Ok((pre, e))
+}
+
 fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
     match expr {
         Expr::Int(n, _) => Ok((String::new(), n.to_string())),
-        Expr::Float(n, _) => Ok((String::new(), format!("{}", *n as i64))),
+        Expr::Float(n, _) => Ok((String::new(), c_float_lit(*n))),
         Expr::Bool(b, _) => Ok((String::new(), if *b { "1" } else { "0" }.into())),
         Expr::Str(s, _) => Ok((String::new(), format!("\"{}\"", escape_c(s)))),
         Expr::Ident(name, _) => Ok((String::new(), c_ident(name))),
         Expr::List(elems, _) => {
             let tmp = ctx.fresh("list");
-            let mut pre = format!("KList {tmp} = klist_new();\n");
+            let mut pre = format!("int64_t {tmp} = klist_new();\n");
             for e in elems {
                 let (p, v) = emit_expr(e, ctx)?;
+                let ty = infer_expr(e, ctx)?;
                 pre.push_str(&p);
-                pre.push_str(&format!("klist_push(&{tmp}, {v});\n"));
+                pre.push_str(&format!(
+                    "klist_push_val({tmp}, {});\n",
+                    wrap_as_val(&v, &ty)
+                ));
             }
             Ok((pre, tmp))
         }
@@ -472,16 +653,33 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             let (pa, a) = emit_expr(start, ctx)?;
             let (pb, b) = emit_expr(end, ctx)?;
             let i = ctx.fresh("r");
-            let mut pre = format!("{pa}{pb}KList {tmp} = klist_new();\n");
+            let mut pre = format!("{pa}{pb}int64_t {tmp} = klist_new();\n");
             pre.push_str(&format!(
-                "for (int64_t {i} = {a}; {i} < {b}; {i}++) klist_push(&{tmp}, {i});\n"
+                "for (int64_t {i} = {a}; {i} < {b}; {i}++) klist_push_val({tmp}, kval_i64({i}));\n"
             ));
             Ok((pre, tmp))
         }
         Expr::Index { target, index, .. } => {
             let (pt, t) = emit_expr(target, ctx)?;
             let (pi, i) = emit_expr(index, ctx)?;
-            Ok((format!("{pt}{pi}"), format!("klist_get({t}, {i})")))
+            let tty = infer_expr(target, ctx)?;
+            let ity = infer_expr(index, ctx)?;
+            let i = coerce_expr(&i, &ity, &CTy::I64)?;
+            if tty == CTy::Str {
+                Ok((
+                    format!("{pt}{pi}"),
+                    format!("kstr_index_val({t}, {i})"),
+                ))
+            } else if tty == CTy::Val {
+                // dynamic: try list first via helper
+                Ok((
+                    format!("{pt}{pi}"),
+                    format!("kval_index({t}, {i})"),
+                ))
+            } else {
+                let t = coerce_expr(&t, &tty, &CTy::List)?;
+                Ok((format!("{pt}{pi}"), format!("klist_get_val({t}, {i})")))
+            }
         }
         Expr::Field { target, field, .. } => {
             let (p, t) = emit_expr(target, ctx)?;
@@ -494,7 +692,7 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             let field_defs = info.fields.clone();
             let mut pre = String::new();
             let mut parts = Vec::new();
-            for (fname, _) in &field_defs {
+            for (fname, fty) in &field_defs {
                 let val = fields
                     .iter()
                     .find(|(n, _)| n == fname)
@@ -506,6 +704,8 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                         )
                     })?;
                 let (p, e) = emit_expr(val, ctx)?;
+                let ety = infer_expr(val, ctx)?;
+                let e = coerce_expr(&e, &ety, fty)?;
                 pre.push_str(&p);
                 parts.push(format!(".{} = {e}", c_ident(fname)));
             }
@@ -515,7 +715,13 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             ))
         }
         Expr::Unary { op, expr, .. } => {
-            let (p, e) = emit_expr(expr, ctx)?;
+            let ty = infer_expr(expr, ctx)?;
+            let want = if *op == UnaryOp::Neg && ty == CTy::F64 {
+                CTy::F64
+            } else {
+                CTy::I64
+            };
+            let (p, e) = emit_as_num(expr, ctx, &want)?;
             let o = match op {
                 UnaryOp::Neg => "-",
                 UnaryOp::Not => "!",
@@ -525,19 +731,64 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
         Expr::Binary {
             op, left, right, ..
         } => {
-            let (pl, l) = emit_expr(left, ctx)?;
-            let (pr, r) = emit_expr(right, ctx)?;
+            let lt = infer_expr(left, ctx)?;
+            let rt = infer_expr(right, ctx)?;
             if *op == BinaryOp::Add {
-                let lt = infer_expr(left, ctx)?;
-                let rt = infer_expr(right, ctx)?;
                 if lt == CTy::List && rt == CTy::List {
+                    let (pl, l) = emit_expr(left, ctx)?;
+                    let (pr, r) = emit_expr(right, ctx)?;
                     let tmp = ctx.fresh("cat");
                     return Ok((
-                        format!("{pl}{pr}KList {tmp} = klist_concat({l}, {r});\n"),
+                        format!("{pl}{pr}int64_t {tmp} = klist_concat({l}, {r});\n"),
+                        tmp,
+                    ));
+                }
+                // String concat only when at least one side is known Str
+                if lt == CTy::Str || rt == CTy::Str {
+                    let (pl, l) = emit_expr(left, ctx)?;
+                    let (pr, r) = emit_expr(right, ctx)?;
+                    let l = coerce_expr(&l, &lt, &CTy::Str)?;
+                    let r = coerce_expr(&r, &rt, &CTy::Str)?;
+                    let tmp = ctx.fresh("scat");
+                    return Ok((
+                        format!("{pl}{pr}const char *{tmp} = kstr_concat({l}, {r});\n"),
                         tmp,
                     ));
                 }
             }
+            if matches!(*op, BinaryOp::Eq | BinaryOp::Ne)
+                && (lt == CTy::Str || rt == CTy::Str)
+            {
+                let (pl, l) = emit_expr(left, ctx)?;
+                let (pr, r) = emit_expr(right, ctx)?;
+                let l = coerce_expr(&l, &lt, &CTy::Str)?;
+                let r = coerce_expr(&r, &rt, &CTy::Str)?;
+                let cmp = if *op == BinaryOp::Eq {
+                    format!("(strcmp({l}, {r}) == 0)")
+                } else {
+                    format!("(strcmp({l}, {r}) != 0)")
+                };
+                return Ok((format!("{pl}{pr}"), cmp));
+            }
+            // Val == Val: strcmp if both strings at runtime, else i64
+            if matches!(*op, BinaryOp::Eq | BinaryOp::Ne) && lt == CTy::Val && rt == CTy::Val {
+                let (pl, l) = emit_expr(left, ctx)?;
+                let (pr, r) = emit_expr(right, ctx)?;
+                let cmp = if *op == BinaryOp::Eq {
+                    format!("kval_eq({l}, {r})")
+                } else {
+                    format!("(!kval_eq({l}, {r}))")
+                };
+                return Ok((format!("{pl}{pr}"), cmp));
+            }
+            if *op == BinaryOp::Rem {
+                let (pl, l) = emit_as_i64(left, ctx)?;
+                let (pr, r) = emit_as_i64(right, ctx)?;
+                return Ok((format!("{pl}{pr}"), format!("({l} % {r})")));
+            }
+            let want = promote_num(&lt, &rt).unwrap_or(CTy::I64);
+            let (pl, l) = emit_as_num(left, ctx, &want)?;
+            let (pr, r) = emit_as_num(right, ctx, &want)?;
             let o = match op {
                 BinaryOp::Add => "+",
                 BinaryOp::Sub => "-",
@@ -560,12 +811,43 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 "println must be a statement",
                 span.clone(),
             )),
+            "assert" => {
+                if args.len() != 1 {
+                    return Err(KengaError::at("assert takes 1 arg", span.clone()));
+                }
+                let (p, e) = emit_as_i64(&args[0], ctx)?;
+                Ok((format!("{p}k_assert({e});\n"), "0".into()))
+            }
+            "ord" => {
+                if args.len() != 1 {
+                    return Err(KengaError::at("ord takes 1 arg", span.clone()));
+                }
+                let (p, e) = emit_expr(&args[0], ctx)?;
+                let ty = infer_expr(&args[0], ctx)?;
+                let e = coerce_expr(&e, &ty, &CTy::Str)?;
+                Ok((p, format!("k_ord({e})")))
+            }
             "len" => {
                 if args.len() != 1 {
                     return Err(KengaError::at("len takes 1 arg", span.clone()));
                 }
                 let (p, e) = emit_expr(&args[0], ctx)?;
-                Ok((p, format!("((int64_t){e}.len)")))
+                let ty = infer_expr(&args[0], ctx)?;
+                match ty {
+                    CTy::Str => Ok((p, format!("((int64_t)strlen({e}))"))),
+                    CTy::Val => Ok((p, format!("kval_len({e})"))),
+                    _ => {
+                        let e = coerce_expr(&e, &ty, &CTy::List)?;
+                        Ok((p, format!("klist_len({e})")))
+                    }
+                }
+            }
+            "round" => {
+                if args.len() != 1 {
+                    return Err(KengaError::at("round takes 1 arg", span.clone()));
+                }
+                let (p, e) = emit_as_num(&args[0], ctx, &CTy::F64)?;
+                Ok((p, format!("((int64_t)llround({e}))")))
             }
             "push" => {
                 if args.len() != 2 {
@@ -573,18 +855,33 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 }
                 let (pl, l) = emit_expr(&args[0], ctx)?;
                 let (pv, v) = emit_expr(&args[1], ctx)?;
+                let lty = infer_expr(&args[0], ctx)?;
+                let vty = infer_expr(&args[1], ctx)?;
+                let l = coerce_expr(&l, &lty, &CTy::List)?;
+                let v = wrap_as_val(&v, &vty);
                 let tmp = ctx.fresh("push");
                 Ok((
-                    format!("{pl}{pv}KList {tmp} = {l};\nklist_push(&{tmp}, {v});\n"),
+                    format!("{pl}{pv}int64_t {tmp} = {l};\nklist_push_val({tmp}, {v});\n"),
                     tmp,
                 ))
             }
             other => {
                 let mut pre = String::new();
                 let mut parts = Vec::new();
-                for a in args {
+                let param_tys = ctx.sigs.get(other).map(|(_, ps)| ps.clone());
+                for (i, a) in args.iter().enumerate() {
                     let (p, e) = emit_expr(a, ctx)?;
+                    let aty = infer_expr(a, ctx)?;
                     pre.push_str(&p);
+                    let e = if let Some(ref ps) = param_tys {
+                        if let Some(pty) = ps.get(i) {
+                            coerce_expr(&e, &aty, pty)?
+                        } else {
+                            e
+                        }
+                    } else {
+                        e
+                    };
                     parts.push(e);
                 }
                 Ok((
@@ -596,53 +893,240 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
     }
 }
 
-const RUNTIME: &str = r#"/* Generated by Kenga emit-c */
+const RUNTIME: &str = r#"/* Generated by Kenga emit-c — tagged KVal runtime */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
+
+enum { KV_I64 = 0, KV_STR = 1, KV_LIST = 2, KV_F64 = 3 };
 
 typedef struct {
-  int64_t *data;
+  int tag;
+  union {
+    int64_t i;
+    double f;
+    const char *s;
+    int64_t list_id;
+  } u;
+} KVal;
+
+typedef struct {
+  KVal *data;
   size_t len;
   size_t cap;
-} KList;
+} KListObj;
 
-static KList klist_new(void) {
-  KList l; l.data = NULL; l.len = 0; l.cap = 0; return l;
+static KListObj *g_lists = NULL;
+static size_t g_lists_len = 0;
+static size_t g_lists_cap = 0;
+
+static void k_die(const char *msg) {
+  fprintf(stderr, "kenga: %s\n", msg);
+  exit(1);
 }
-static void klist_push(KList *l, int64_t v) {
+
+static KVal kval_i64(int64_t x) {
+  KVal v; v.tag = KV_I64; v.u.i = x; return v;
+}
+static KVal kval_f64(double x) {
+  KVal v; v.tag = KV_F64; v.u.f = x; return v;
+}
+static KVal kval_str(const char *s) {
+  KVal v; v.tag = KV_STR; v.u.s = s ? s : ""; return v;
+}
+static KVal kval_list(int64_t id) {
+  KVal v; v.tag = KV_LIST; v.u.list_id = id; return v;
+}
+
+static int64_t kval_as_i64(KVal v) {
+  if (v.tag == KV_I64) return v.u.i;
+  if (v.tag == KV_F64) return (int64_t)v.u.f;
+  k_die("expected i64");
+  return 0;
+}
+static double kval_as_f64(KVal v) {
+  if (v.tag == KV_F64) return v.u.f;
+  if (v.tag == KV_I64) return (double)v.u.i;
+  k_die("expected f64");
+  return 0.0;
+}
+static const char *kval_as_str(KVal v) {
+  if (v.tag != KV_STR) k_die("expected str");
+  return v.u.s;
+}
+static int64_t kval_as_list(KVal v) {
+  if (v.tag != KV_LIST) k_die("expected list");
+  return v.u.list_id;
+}
+
+static KListObj *klist_obj(int64_t id) {
+  if (id < 0 || (size_t)id >= g_lists_len) k_die("bad list handle");
+  return &g_lists[id];
+}
+
+static int64_t klist_new(void) {
+  if (g_lists_len + 1 > g_lists_cap) {
+    size_t ncap = g_lists_cap ? g_lists_cap * 2 : 8;
+    KListObj *nd = (KListObj *)realloc(g_lists, ncap * sizeof(KListObj));
+    if (!nd) k_die("oom");
+    g_lists = nd;
+    g_lists_cap = ncap;
+  }
+  KListObj *o = &g_lists[g_lists_len];
+  o->data = NULL;
+  o->len = 0;
+  o->cap = 0;
+  return (int64_t)g_lists_len++;
+}
+
+static void klist_push_val(int64_t id, KVal v) {
+  KListObj *l = klist_obj(id);
   if (l->len + 1 > l->cap) {
     size_t ncap = l->cap ? l->cap * 2 : 8;
-    int64_t *nd = (int64_t *)realloc(l->data, ncap * sizeof(int64_t));
-    if (!nd) { fprintf(stderr, "oom\n"); exit(1); }
-    l->data = nd; l->cap = ncap;
+    KVal *nd = (KVal *)realloc(l->data, ncap * sizeof(KVal));
+    if (!nd) k_die("oom");
+    l->data = nd;
+    l->cap = ncap;
   }
   l->data[l->len++] = v;
 }
-static int64_t klist_get(KList l, int64_t i) {
-  if (i < 0 || (size_t)i >= l.len) { fprintf(stderr, "index oob\n"); exit(1); }
-  return l.data[i];
+
+static KVal klist_get_val(int64_t id, int64_t i) {
+  KListObj *l = klist_obj(id);
+  if (i < 0 || (size_t)i >= l->len) k_die("index oob");
+  return l->data[i];
 }
-static void klist_set(KList *l, int64_t i, int64_t v) {
-  if (i < 0 || (size_t)i >= l->len) { fprintf(stderr, "index oob\n"); exit(1); }
+
+static void klist_set_val(int64_t id, int64_t i, KVal v) {
+  KListObj *l = klist_obj(id);
+  if (i < 0 || (size_t)i >= l->len) k_die("index oob");
   l->data[i] = v;
 }
-static KList klist_concat(KList a, KList b) {
-  KList o = klist_new();
-  for (size_t i = 0; i < a.len; i++) klist_push(&o, a.data[i]);
-  for (size_t i = 0; i < b.len; i++) klist_push(&o, b.data[i]);
+
+static int64_t klist_len(int64_t id) {
+  return (int64_t)klist_obj(id)->len;
+}
+
+static int64_t klist_concat(int64_t a, int64_t b) {
+  int64_t o = klist_new();
+  KListObj *la = klist_obj(a);
+  KListObj *lb = klist_obj(b);
+  for (size_t i = 0; i < la->len; i++) klist_push_val(o, la->data[i]);
+  for (size_t i = 0; i < lb->len; i++) klist_push_val(o, lb->data[i]);
   return o;
 }
+
+static const char *kstr_from_i64(int64_t x) {
+  char *o = (char *)malloc(32);
+  if (!o) k_die("oom");
+  snprintf(o, 32, "%lld", (long long)x);
+  return o;
+}
+
+static const char *kstr_from_f64(double x) {
+  char *o = (char *)malloc(64);
+  if (!o) k_die("oom");
+  snprintf(o, 64, "%g", x);
+  return o;
+}
+
+static const char *kstr_concat(const char *a, const char *b) {
+  if (!a) a = "";
+  if (!b) b = "";
+  size_t na = strlen(a), nb = strlen(b);
+  char *o = (char *)malloc(na + nb + 1);
+  if (!o) k_die("oom");
+  memcpy(o, a, na);
+  memcpy(o + na, b, nb);
+  o[na + nb] = 0;
+  return o;
+}
+
+static int64_t kval_eq(KVal a, KVal b) {
+  if (a.tag == KV_I64 && b.tag == KV_F64) return (double)a.u.i == b.u.f;
+  if (a.tag == KV_F64 && b.tag == KV_I64) return a.u.f == (double)b.u.i;
+  if (a.tag != b.tag) return 0;
+  if (a.tag == KV_I64) return a.u.i == b.u.i;
+  if (a.tag == KV_F64) return a.u.f == b.u.f;
+  if (a.tag == KV_STR) return strcmp(a.u.s ? a.u.s : "", b.u.s ? b.u.s : "") == 0;
+  if (a.tag == KV_LIST) return a.u.list_id == b.u.list_id;
+  return 0;
+}
+
+static KVal kstr_index_val(const char *s, int64_t i) {
+  if (!s) k_die("str index on null");
+  size_t n = strlen(s);
+  if (i < 0 || (size_t)i >= n) k_die("str index oob");
+  char *o = (char *)malloc(2);
+  if (!o) k_die("oom");
+  o[0] = s[i];
+  o[1] = 0;
+  return kval_str(o);
+}
+
+static KVal kval_index(KVal v, int64_t i) {
+  if (v.tag == KV_LIST) return klist_get_val(v.u.list_id, i);
+  if (v.tag == KV_STR) return kstr_index_val(v.u.s, i);
+  k_die("index on non-list/str");
+  return kval_i64(0);
+}
+
+static int64_t kval_len(KVal v) {
+  if (v.tag == KV_LIST) return klist_len(v.u.list_id);
+  if (v.tag == KV_STR) return (int64_t)strlen(v.u.s ? v.u.s : "");
+  k_die("len on non-list/str");
+  return 0;
+}
+
 static void kenga_println_i64(int64_t v) { printf("%lld\n", (long long)v); }
-static void kenga_println_str(const char *s) { puts(s); }
-static void kenga_println_list(KList l) {
+static void kenga_println_f64(double v) { printf("%g\n", v); }
+static void kenga_println_str(const char *s) { puts(s ? s : ""); }
+
+static void kenga_print_val(KVal v);
+
+static void kenga_println_list(int64_t id) {
+  KListObj *l = klist_obj(id);
   putchar('[');
-  for (size_t i = 0; i < l.len; i++) {
+  for (size_t i = 0; i < l->len; i++) {
     if (i) printf(", ");
-    printf("%lld", (long long)l.data[i]);
+    kenga_print_val(l->data[i]);
   }
   puts("]");
+}
+
+static void kenga_print_val(KVal v) {
+  if (v.tag == KV_I64) {
+    printf("%lld", (long long)v.u.i);
+  } else if (v.tag == KV_F64) {
+    printf("%g", v.u.f);
+  } else if (v.tag == KV_STR) {
+    printf("%s", v.u.s ? v.u.s : "");
+  } else if (v.tag == KV_LIST) {
+    KListObj *l = klist_obj(v.u.list_id);
+    putchar('[');
+    for (size_t i = 0; i < l->len; i++) {
+      if (i) printf(", ");
+      kenga_print_val(l->data[i]);
+    }
+    putchar(']');
+  } else {
+    k_die("bad value tag");
+  }
+}
+
+static void kenga_println_val(KVal v) {
+  kenga_print_val(v);
+  putchar('\n');
+}
+
+static void k_assert(int64_t c) {
+  if (!c) k_die("assert failed");
+}
+static int64_t k_ord(const char *s) {
+  if (!s || !s[0]) return 0;
+  return (unsigned char)s[0];
 }
 
 "#;

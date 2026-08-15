@@ -1,0 +1,108 @@
+// Tiny word-LM on Kenga tape: next-token with softmax + MSE.
+// Зерно «говорить текстом», не замена большой LLM. CPU, секунды.
+
+fn vocab_size() -> i64 {
+    return 10;
+}
+
+fn onehot(idx: i64) -> list {
+    let v = vocab_size();
+    let xs = [];
+    let j: i64 = 0;
+    while j < v {
+        if j == idx {
+            xs = push(xs, 1.0);
+        } else {
+            xs = push(xs, 0.0);
+        }
+        j = j + 1;
+    }
+    return xs;
+}
+
+fn argmax(t: Tensor) -> i64 {
+    let v = vocab_size();
+    let best: i64 = 0;
+    let best_v = t_get(t, 0);
+    let i: i64 = 1;
+    while i < v {
+        let x = t_get(t, i);
+        if x > best_v {
+            best_v = x;
+            best = i;
+        }
+        i = i + 1;
+    }
+    return best;
+}
+
+fn word(i: i64) -> str {
+    if i == 0 { return "я"; }
+    if i == 1 { return "kenga"; }
+    if i == 2 { return "живу"; }
+    if i == 3 { return "вижу"; }
+    if i == 4 { return "слышу"; }
+    if i == 5 { return "помню"; }
+    if i == 6 { return "учусь"; }
+    if i == 7 { return "сплю"; }
+    if i == 8 { return "и"; }
+    return ".";
+}
+
+fn train_pair(w: Tensor, a: i64, b: i64, lr: f64) -> Tensor {
+    ag_clear();
+    let wid = ag_param(w);
+    let x = t_from([vocab_size(), 1], onehot(a));
+    let y = t_from([vocab_size(), 1], onehot(b));
+    let xid = ag_const(x);
+    let yid = ag_const(y);
+    let logits = ag_matmul(wid, xid);
+    let probs = ag_softmax(logits);
+    let loss = ag_mse(probs, yid);
+    ag_backward(loss);
+    return ag_step(wid, lr);
+}
+
+fn main() -> i64 {
+    println("=== tiny word-LM (tape) ===");
+    // bigrams: я→kenga→живу→. | kenga→вижу→и→слышу→. | я→помню→и→учусь→. | kenga→сплю→.
+    let lefts = [0, 1, 2, 1, 3, 8, 4, 0, 5, 8, 6, 1, 7];
+    let rights = [1, 2, 9, 3, 8, 4, 9, 5, 8, 6, 9, 7, 9];
+
+    let n = vocab_size() * vocab_size();
+    let data = [];
+    let k: i64 = 0;
+    while k < n {
+        data = push(data, 0.01);
+        k = k + 1;
+    }
+    let w = t_from([vocab_size(), vocab_size()], data);
+
+    let ep: i64 = 0;
+    while ep < 150 {
+        let pi: i64 = 0;
+        while pi < len(lefts) {
+            w = train_pair(w, lefts[pi], rights[pi], 0.4);
+            pi = pi + 1;
+        }
+        ep = ep + 1;
+    }
+
+    let cur: i64 = 0;
+    let out: str = word(cur);
+    let step: i64 = 0;
+    while step < 6 {
+        let x = t_from([vocab_size(), 1], onehot(cur));
+        let probs = t_softmax(t_matmul(w, x));
+        cur = argmax(probs);
+        out = out + " " + word(cur);
+        if cur == 9 {
+            break;
+        }
+        step = step + 1;
+    }
+    println(out);
+    assert(len(out) > 3);
+    println("tiny lm ok");
+    return 0;
+}

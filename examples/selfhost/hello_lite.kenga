@@ -1,0 +1,7 @@
+// Lite dialect — println + string literal
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\hello_lite.kenga
+
+fn main() {
+  println("hello");
+  return 0;
+}

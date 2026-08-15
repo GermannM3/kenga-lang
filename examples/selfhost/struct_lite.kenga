@@ -1,0 +1,13 @@
+// Lite dialect — structs (i64 fields)
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\struct_lite.kenga
+
+struct Point { x, y }
+
+fn main() {
+  let p = Point { x: 3, y: 4 };
+  println(p.x);
+  p.x = 6;
+  println(p.x * p.x + p.y * p.y);
+  println(p);
+  return 0;
+}

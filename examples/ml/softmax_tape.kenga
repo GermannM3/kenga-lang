@@ -1,0 +1,31 @@
+// Softmax + exp on tape: classify [logit0, logit1] → [0, 1]
+
+fn main() -> i64 {
+    let w = t_from([2, 2], [0.0, 0.0, 0.0, 0.0]);
+    let x = t_from([2, 1], [1.0, 0.0]);
+    let target = t_from([2, 1], [0.0, 1.0]);
+
+    let i = 0;
+    while i < 60 {
+        ag_clear();
+        let wid = ag_param(w);
+        let xid = ag_const(x);
+        let tid = ag_const(target);
+        let logits = ag_matmul(wid, xid);
+        let probs = ag_softmax(ag_reshape(logits, [2]));
+        let pred = ag_reshape(probs, [2, 1]);
+        let loss = ag_mse(pred, tid);
+        ag_backward(loss);
+        w = ag_step(wid, 0.5);
+        i = i + 1;
+    }
+
+    let logits = t_matmul(w, x);
+    let flat = t_reshape(logits, [2]);
+    let p = t_softmax(flat);
+    assert(t_get(p, 1) > t_get(p, 0));
+    println(round(t_get(p, 0) * 100.0));
+    println(round(t_get(p, 1) * 100.0));
+    println("softmax tape ok");
+    return 0;
+}

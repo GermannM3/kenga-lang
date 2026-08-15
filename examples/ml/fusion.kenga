@@ -1,0 +1,17 @@
+// Fusion: image embedding + audio stats + text-ish vector → score
+
+fn main() -> i64 {
+    let img = t_mean(load_ppm("examples/ml/assets/dot.ppm")); // [3]
+    let wav = load_wav("examples/ml/assets/beep.wav");
+    let a_mean = t_mean(wav); // f64
+    // pad audio scalar into 3-d "text-like" channel bias
+    let audio = t_from([3], [a_mean, a_mean, a_mean]);
+    let text = t_from([3], [0.1, 0.0, -0.1]);
+    let fused = t_add(t_add(img, audio), text);
+    let w = t_from([1, 3], [1.0, 1.0, 1.0]);
+    let score = t_get(t_matmul(w, t_reshape(fused, [3, 1])), 0);
+    println(t_shape(wav));
+    println(score);
+    println("fusion ok");
+    return 0;
+}

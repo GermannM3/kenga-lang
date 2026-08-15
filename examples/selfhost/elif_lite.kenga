@@ -1,0 +1,19 @@
+// Lite: else if + assert + float
+
+fn main() -> i64 {
+    let n = 2;
+    let label = 0;
+    if n == 0 {
+        label = 10;
+    } else if n == 1 {
+        label = 20;
+    } else if n == 2 {
+        label = 30;
+    } else {
+        label = 40;
+    }
+    assert(label == 30);
+    assert(round(1.4 + 0.2) == 2);
+    println(label);
+    return 0;
+}

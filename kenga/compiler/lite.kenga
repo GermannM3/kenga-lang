@@ -1,0 +1,494 @@
+// Self-host step 8: Kenga-lite → bytecode VM.
+// Dialect closer to real Kenga:
+//   fn main() { let x = 2 + 3; let y = x * 4; y }
+//   fn add(a, b) { a + b }
+
+fn OP_CONST() -> i64 { return 1; }
+fn OP_LOAD() -> i64 { return 2; }
+fn OP_STORE() -> i64 { return 3; }
+fn OP_ADD() -> i64 { return 4; }
+fn OP_SUB() -> i64 { return 5; }
+fn OP_MUL() -> i64 { return 6; }
+fn OP_DIV() -> i64 { return 7; }
+fn OP_LT() -> i64 { return 8; }
+fn OP_GT() -> i64 { return 9; }
+fn OP_EQ() -> i64 { return 10; }
+fn OP_JMP() -> i64 { return 11; }
+fn OP_JMPF() -> i64 { return 12; }
+fn OP_HALT() -> i64 { return 13; }
+fn OP_LE() -> i64 { return 14; }
+fn OP_CALL() -> i64 { return 15; }
+fn OP_RET() -> i64 { return 16; }
+
+fn list_pop(xs: list) -> list {
+    let n: i64 = len(xs);
+    assert(n > 0);
+    let v: i64 = xs[n - 1];
+    let out: list = [];
+    let i: i64 = 0;
+    while i < n - 1 { out = push(out, xs[i]); i = i + 1; }
+    return [out, v];
+}
+fn ensure_slot(slots: list, si: i64) -> list {
+    while len(slots) <= si { slots = push(slots, 0); }
+    return slots;
+}
+
+fn vm_exec(code: list) -> i64 {
+    let stack: list = [];
+    let slots: list = [];
+    let ret_ips: list = [];
+    let slot_bases: list = [];
+    let ip: i64 = 0;
+    let slot_base: i64 = 0;
+    while ip < len(code) {
+        let op: i64 = code[ip]; ip = ip + 1;
+        if op == OP_HALT() {
+            if len(stack) == 0 { return 0; }
+            return stack[len(stack) - 1];
+        }
+        if op == OP_CONST() { stack = push(stack, code[ip]); ip = ip + 1; }
+        if op == OP_LOAD() {
+            let si: i64 = slot_base + code[ip]; ip = ip + 1;
+            slots = ensure_slot(slots, si); stack = push(stack, slots[si]);
+        }
+        if op == OP_STORE() {
+            let si: i64 = slot_base + code[ip]; ip = ip + 1;
+            slots = ensure_slot(slots, si);
+            let p = list_pop(stack); stack = p[0]; slots[si] = p[1]; stack = push(stack, p[1]);
+        }
+        if op == OP_ADD() { let b=list_pop(stack); let a=list_pop(b[0]); stack=push(a[0], a[1]+b[1]); }
+        if op == OP_SUB() { let b=list_pop(stack); let a=list_pop(b[0]); stack=push(a[0], a[1]-b[1]); }
+        if op == OP_MUL() { let b=list_pop(stack); let a=list_pop(b[0]); stack=push(a[0], a[1]*b[1]); }
+        if op == OP_DIV() { let b=list_pop(stack); let a=list_pop(b[0]); stack=push(a[0], a[1]/b[1]); }
+        if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
+        if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
+        if op == OP_EQ() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]==b[1]{r=1;} stack=push(a[0],r); }
+        if op == OP_LE() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<=b[1]{r=1;} stack=push(a[0],r); }
+        if op == OP_JMP() { ip = code[ip]; }
+        if op == OP_JMPF() {
+            let t: i64 = code[ip]; ip = ip + 1;
+            let p = list_pop(stack); stack = p[0]; if p[1] == 0 { ip = t; }
+        }
+        if op == OP_CALL() {
+            let addr: i64 = code[ip]; ip = ip + 1;
+            let argc: i64 = code[ip]; ip = ip + 1;
+            let args: list = []; let ai: i64 = 0;
+            while ai < argc { let p=list_pop(stack); stack=p[0]; args=push(args,p[1]); ai=ai+1; }
+            let args2: list = []; ai = len(args)-1;
+            while ai >= 0 { args2=push(args2, args[ai]); ai=ai-1; }
+            ret_ips = push(ret_ips, ip);
+            slot_bases = push(slot_bases, slot_base);
+            slot_base = len(slots);
+            ai = 0;
+            while ai < argc {
+                slots = ensure_slot(slots, slot_base + ai);
+                slots[slot_base + ai] = args2[ai]; ai = ai + 1;
+            }
+            ip = addr;
+        }
+        if op == OP_RET() {
+            let p = list_pop(stack); let retv: i64 = p[1]; stack = p[0];
+            let new_slots: list = []; let si: i64 = 0;
+            while si < slot_base { new_slots = push(new_slots, slots[si]); si = si + 1; }
+            slots = new_slots;
+            let rb = list_pop(slot_bases); slot_bases = rb[0]; slot_base = rb[1];
+            let ri = list_pop(ret_ips); ret_ips = ri[0]; ip = ri[1];
+            stack = push(stack, retv);
+        }
+    }
+    if len(stack) == 0 { return 0; }
+    return stack[len(stack) - 1];
+}
+
+fn is_space(ch: str) -> i64 {
+    if ch == " " { return 1; }
+    if ch == "\t" { return 1; }
+    if ch == "\n" { return 1; }
+    return 0;
+}
+fn is_digit(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn is_alpha(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 122 { return 1; } }
+    if c >= 65 { if c <= 90 { return 1; } }
+    if ch == "_" { return 1; }
+    return 0;
+}
+fn skip(s: str, i: i64) -> i64 {
+    while i < len(s) { if is_space(s[i]) == 0 { break; } i = i + 1; }
+    return i;
+}
+fn starts_with(s: str, i: i64, w: str) -> i64 {
+    let j: i64 = 0;
+    while j < len(w) {
+        if i + j >= len(s) { return 0; }
+        if s[i + j] != w[j] { return 0; }
+        j = j + 1;
+    }
+    return 1;
+}
+fn starts_kw(s: str, i: i64, w: str) -> i64 {
+    if starts_with(s, i, w) == 0 { return 0; }
+    if i + len(w) < len(s) {
+        let n: str = s[i + len(w)];
+        if is_alpha(n) == 1 { return 0; }
+        if is_digit(n) == 1 { return 0; }
+    }
+    return 1;
+}
+fn parse_ident(s: str, i: i64) -> list {
+    i = skip(s, i); let name: str = "";
+    while i < len(s) {
+        let ch: str = s[i];
+        if is_alpha(ch) == 0 { if is_digit(ch) == 0 { break; } }
+        name = name + ch; i = i + 1;
+    }
+    return [name, i];
+}
+fn parse_number(s: str, i: i64) -> list {
+    i = skip(s, i); let v: i64 = 0;
+    while i < len(s) {
+        if is_digit(s[i]) == 0 { break; }
+        v = v * 10 + (ord(s[i]) - 48); i = i + 1;
+    }
+    return [v, i];
+}
+fn slot_of(vnames: list, name: str) -> list {
+    let i: i64 = 0;
+    while i < len(vnames) { if vnames[i] == name { return [i, vnames]; } i = i + 1; }
+    vnames = push(vnames, name);
+    return [len(vnames) - 1, vnames];
+}
+fn emit2(code: list, a: i64, b: i64) -> list { code = push(code, a); return push(code, b); }
+fn emit3(code: list, a: i64, b: i64, c: i64) -> list {
+    code = push(code, a); code = push(code, b); return push(code, c);
+}
+
+fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+    i = skip(s, i);
+    if s[i] == "(" {
+        let r = emit_cmp(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        code = r[0]; i = skip(s, r[1]); vnames = r[2]; assert(s[i] == ")");
+        return [code, i + 1, vnames];
+    }
+    if s[i] == "-" {
+        code = emit2(code, OP_CONST(), 0);
+        let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        return [push(r[0], OP_SUB()), r[1], r[2]];
+    }
+    if is_alpha(s[i]) == 1 {
+        let id = parse_ident(s, i);
+        let j: i64 = skip(s, id[1]);
+        if j < len(s) {
+            if s[j] == "(" {
+                j = j + 1; let argc: i64 = 0; j = skip(s, j);
+                if s[j] != ")" {
+                    while true {
+                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc);
+                        code = ar[0]; j = ar[1]; vnames = ar[2]; argc = argc + 1;
+                        j = skip(s, j);
+                        if s[j] == "," { j = j + 1; continue; }
+                        break;
+                    }
+                }
+                assert(s[j] == ")"); j = j + 1;
+                let fi: i64 = 0; let found: i64 = 0; let addr: i64 = 0;
+                while fi < len(fnames) {
+                    if fnames[fi] == id[0] { found = 1; addr = faddrs[fi]; assert(fargc[fi] == argc); }
+                    fi = fi + 1;
+                }
+                assert(found == 1);
+                return [emit3(code, OP_CALL(), addr, argc), j, vnames];
+            }
+        }
+        let sl = slot_of(vnames, id[0]);
+        return [emit2(code, OP_LOAD(), sl[0]), id[1], sl[1]];
+    }
+    let n = parse_number(s, i);
+    return [emit2(code, OP_CONST(), n[0]), n[1], vnames];
+}
+
+fn emit_term(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+    let r = emit_factor(s, i, code, vnames, fnames, faddrs, fargc);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "*" {
+            r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc);
+            code = push(r[0], OP_MUL()); i = r[1]; vnames = r[2];
+        } else {
+            if s[i] == "/" {
+                r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc);
+                code = push(r[0], OP_DIV()); i = r[1]; vnames = r[2];
+            } else { break; }
+        }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+    let r = emit_term(s, i, code, vnames, fnames, faddrs, fargc);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "+" {
+            r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc);
+            code = push(r[0], OP_ADD()); i = r[1]; vnames = r[2];
+        } else {
+            if s[i] == "-" {
+                r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc);
+                code = push(r[0], OP_SUB()); i = r[1]; vnames = r[2];
+            } else { break; }
+        }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+    let r = emit_sum(s, i, code, vnames, fnames, faddrs, fargc);
+    code = r[0]; i = r[1]; vnames = r[2]; i = skip(s, i);
+    if i >= len(s) { return [code, i, vnames]; }
+    if starts_with(s, i, "<=") == 1 {
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        return [push(r[0], OP_LE()), r[1], r[2]];
+    }
+    if starts_with(s, i, "==") == 1 {
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        return [push(r[0], OP_EQ()), r[1], r[2]];
+    }
+    if s[i] == "<" {
+        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        return [push(r[0], OP_LT()), r[1], r[2]];
+    }
+    if s[i] == ">" {
+        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc);
+        return [push(r[0], OP_GT()), r[1], r[2]];
+    }
+    return [code, i, vnames];
+}
+
+fn emit_block(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+    i = skip(s, i); assert(s[i] == "{"); i = i + 1;
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "}" { break; }
+        let st = emit_stmt(s, i, code, vnames, fnames, faddrs, fargc);
+        code = st[0]; i = st[1]; vnames = st[2];
+    }
+    assert(s[i] == "}");
+    return [code, i + 1, vnames];
+}
+
+fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list) -> list {
+    i = skip(s, i);
+    if starts_kw(s, i, "let") == 1 {
+        i = skip(s, i + 3);
+        let id = parse_ident(s, i);
+        i = skip(s, id[1]); assert(s[i] == "="); i = i + 1;
+        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
+        code = r[0]; i = r[1]; vnames = r[2];
+        let sl = slot_of(vnames, id[0]); vnames = sl[1];
+        code = emit2(code, OP_STORE(), sl[0]);
+        i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "return") == 1 {
+        let r = emit_cmp(s, i + 6, code, vnames, fnames, faddrs, fargc);
+        code = r[0]; i = r[1]; vnames = r[2];
+        code = push(code, OP_RET());
+        i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "while") == 1 {
+        let loop_start: i64 = len(code);
+        let r = emit_cmp(s, i + 5, code, vnames, fnames, faddrs, fargc);
+        code = r[0]; i = r[1]; vnames = r[2];
+        let jmpf_at: i64 = len(code);
+        code = emit2(code, OP_JMPF(), 0);
+        let bl = emit_block(s, i, code, vnames, fnames, faddrs, fargc);
+        code = bl[0]; i = bl[1]; vnames = bl[2];
+        code = emit2(code, OP_JMP(), loop_start);
+        code[jmpf_at + 1] = len(code);
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "if") == 1 {
+        let r = emit_cmp(s, i + 2, code, vnames, fnames, faddrs, fargc);
+        code = r[0]; i = r[1]; vnames = r[2];
+        let jmpf_at: i64 = len(code);
+        code = emit2(code, OP_JMPF(), 0);
+        let th = emit_block(s, i, code, vnames, fnames, faddrs, fargc);
+        code = th[0]; i = th[1]; vnames = th[2];
+        i = skip(s, i);
+        if starts_kw(s, i, "else") == 1 {
+            let jmp_at: i64 = len(code);
+            code = emit2(code, OP_JMP(), 0);
+            code[jmpf_at + 1] = len(code);
+            let el = emit_block(s, i + 4, code, vnames, fnames, faddrs, fargc);
+            code = el[0]; i = el[1]; vnames = el[2];
+            code[jmp_at + 1] = len(code);
+        } else {
+            code[jmpf_at + 1] = len(code);
+        }
+        return [code, i, vnames];
+    }
+    // bare assign or expr
+    if is_alpha(s[i]) == 1 {
+        let id = parse_ident(s, i);
+        let j: i64 = skip(s, id[1]);
+        if j < len(s) {
+            if s[j] == "=" {
+                let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc);
+                code = r[0]; i = r[1]; vnames = r[2];
+                let sl = slot_of(vnames, id[0]); vnames = sl[1];
+                code = emit2(code, OP_STORE(), sl[0]);
+                i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+                return [code, i, vnames];
+            }
+        }
+    }
+    let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc);
+    code = r[0]; i = r[1]; vnames = r[2];
+    i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+    return [code, i, vnames];
+}
+
+fn match_brace(src: str, i: i64) -> i64 {
+    assert(src[i] == "{");
+    let depth: i64 = 0;
+    let n: i64 = len(src);
+    while i < n {
+        let ch: str = src[i];
+        if ch == "/" {
+            if i + 1 < n {
+                if src[i + 1] == "/" {
+                    i = i + 2;
+                    while i < n {
+                        if src[i] == "\n" { break; }
+                        i = i + 1;
+                    }
+                    continue;
+                }
+            }
+        }
+        if ch == "\"" {
+            i = i + 1;
+            while i < n {
+                if src[i] == "\\" { i = i + 2; continue; }
+                if src[i] == "\"" { i = i + 1; break; }
+                i = i + 1;
+            }
+            continue;
+        }
+        if ch == "{" { depth = depth + 1; i = i + 1; continue; }
+        if ch == "}" {
+            depth = depth - 1;
+            i = i + 1;
+            if depth == 0 { return i; }
+            continue;
+        }
+        i = i + 1;
+    }
+    assert(1 == 0);
+    return i;
+}
+
+fn compile_lite(src: str) -> list {
+    let fnames: list = [];
+    let fparams: list = [];
+    let fbodies: list = []; // body strings
+    let i: i64 = 0;
+    while i < len(src) {
+        i = skip(src, i);
+        if i >= len(src) { break; }
+        assert(starts_kw(src, i, "fn") == 1);
+        i = skip(src, i + 2);
+        let id = parse_ident(src, i);
+        i = skip(src, id[1]);
+        assert(src[i] == "("); i = i + 1;
+        let params: list = [];
+        i = skip(src, i);
+        if src[i] != ")" {
+            while true {
+                let pn = parse_ident(src, i);
+                params = push(params, pn[0]);
+                i = skip(src, pn[1]);
+                if src[i] == "," { i = i + 1; continue; }
+                break;
+            }
+        }
+        assert(src[i] == ")");
+        i = skip(src, i + 1);
+        if starts_with(src, i, "->") == 1 {
+            i = skip(src, i + 2);
+            let ty = parse_ident(src, i);
+            i = ty[1];
+        }
+        i = skip(src, i);
+        assert(src[i] == "{");
+        let start: i64 = i;
+        i = match_brace(src, i);
+        let body: str = "";
+        let bi: i64 = start;
+        while bi < i { body = body + src[bi]; bi = bi + 1; }
+        fnames = push(fnames, id[0]);
+        fparams = push(fparams, params);
+        fbodies = push(fbodies, body);
+    }
+
+    // measure + assign addresses
+    let fargc: list = [];
+    let fi: i64 = 0;
+    while fi < len(fnames) { fargc = push(fargc, len(fparams[fi])); fi = fi + 1; }
+
+    let code: list = emit2([], OP_JMP(), 0);
+    let faddrs: list = [];
+    fi = 0;
+    while fi < len(fnames) {
+        faddrs = push(faddrs, len(code));
+        let vnames: list = [];
+        let pi: i64 = 0;
+        while pi < len(fparams[fi]) { vnames = push(vnames, fparams[fi][pi]); pi = pi + 1; }
+        // body is "{ ... }"; emit_block consumes it
+        // if last expr without return, keep on stack then RET
+        let bl = emit_block(fbodies[fi], 0, code, vnames, fnames, faddrs, fargc);
+        code = bl[0];
+        // if function didn't RET explicitly, RET top of stack
+        code = push(code, OP_RET());
+        fi = fi + 1;
+    }
+    code[1] = len(code);
+
+    // call main()
+    let mi: i64 = 0; let found: i64 = 0; let maddr: i64 = 0;
+    while mi < len(fnames) {
+        if fnames[mi] == "main" { found = 1; maddr = faddrs[mi]; assert(fargc[mi] == 0); }
+        mi = mi + 1;
+    }
+    assert(found == 1);
+    code = emit3(code, OP_CALL(), maddr, 0);
+    code = push(code, OP_HALT());
+    return code;
+}
+
+fn run_lite(src: str) -> i64 {
+    return vm_exec(compile_lite(src));
+}
+
+fn main() -> i64 {
+    println("kenga-lite → bytecode");
+    assert(run_lite("fn main() { 2 + 3 * 4 }") == 14);
+    assert(run_lite("fn main() { let x = 2 + 3; let y = x * 4; y }") == 20);
+    assert(run_lite("fn add(a, b) { a + b } fn main() { add(20, 22) }") == 42);
+    assert(run_lite("fn main() { let x = 0; while x < 5 { x = x + 1; } x }") == 5);
+    assert(run_lite("fn main() { let x = 3; if x > 2 { 10 } else { 20 } }") == 10);
+    assert(run_lite("fn main() -> i64 { let n = 1; let i = 1; while i <= 5 { n = n * i; i = i + 1; } return n; }") == 120);
+    println(run_lite("fn main() { let x = 2 + 3; x * 4 }"));
+    println("kenga-lite ok");
+    return 0;
+}

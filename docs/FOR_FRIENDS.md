@@ -44,14 +44,30 @@ World-model предсказывает динамику векторов сос�
 
 ## Если сломалось
 
-- `kenga version` → должно быть **2.0.x**
+- `kenga version` → должно быть **2.8.x**
+- Linux/Mac/Git Bash: `docs/UNIX.md` · `bash scripts/unix-smoke.sh`
 - `unknown command chat` → старый бинарник: `cargo install --path . --force`
-- нет `examples/` → запускай из корня клона, не из пустой папки
-- `kenga which` — покажет какой exe в PATH
+- `kenga-lite not built` → `bootstrap\build.cmd` (нужен MSVC/gcc)
+- нет `examples/` → запускай из корня клона
+- `kenga which` — какой exe в PATH
+
+## Иконки `.kenga` в Cursor / VS Code
+
+Без расширения файлы выглядят как «голый текст». Поставь локальное расширение из репо:
+
+```powershell
+.\editors\install-extension.cmd
+# или: cursor --install-extension .\editors\vscode\kenga-2.3.0.vsix
+```
+
+Reload Window — у `.kenga` появится свой значок (K) и подсветка.
 
 ## Ссылки
 
 - Репо: https://github.com/GermannM3/kenga-lang  
 - Язык: `docs/LANGUAGE.md`  
-- Self-host: `docs/SELFHOST.md`  
-- Bootstrap: `docs/BOOTSTRAP.md`
+- Self-host / Rust-free: `docs/SELFHOST.md`  
+- Roadmap: `docs/ROADMAP.md`  
+- Exercises: `docs/EXERCISES.md`  
+- Bootstrap: `docs/BOOTSTRAP.md`  
+- Editor: `editors/vscode/`
