@@ -69,6 +69,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }
     else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }
     else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }
+    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }
     else if (op == OP_ROUND) { V x=stack[--sp]; stack[sp++]=Vi((int64_t)llround(as_f(x))); }
     else if (op == OP_JMP) { ip = code[ip]; }
     else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=as_i(stack[--sp]); if (!c) ip = t; }
@@ -103,6 +104,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     }
     else if (op == OP_RET) {
       V val = sp > 0 ? stack[--sp] : Vi(0);
+      if (rsp == 0) return as_i(val);
       rsp--; slot_base = slot_bases[rsp]; ip = ret_ips[rsp];
       stack[sp++] = val;
     }
@@ -113,7 +115,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 }
 
 int main(void) {
-  static const int64_t code[] = { 11, 2, 1, 2, 3, 0, 1, 0, 3, 1, 2, 0, 1, 0, 10, 12, 23, 1, 10, 3, 1, 11, 53, 2, 0, 1, 1, 10, 12, 36, 1, 20, 3, 1, 11, 53, 2, 0, 1, 2, 10, 12, 49, 1, 30, 3, 1, 11, 53, 1, 40, 3, 1, 2, 1, 1, 30, 10, 18, 2, 1, 17, 32, 0, 1, 0, 13 };
+  static const int64_t code[] = { 11, 2, 1, 2, 3, 0, 1, 0, 3, 1, 2, 0, 1, 0, 10, 12, 23, 1, 10, 3, 1, 11, 53, 2, 0, 1, 1, 10, 12, 36, 1, 20, 3, 1, 11, 53, 2, 0, 1, 2, 10, 12, 49, 1, 30, 3, 1, 11, 53, 1, 40, 3, 1, 2, 1, 1, 30, 10, 18, 2, 1, 17, 32, 0, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

@@ -69,6 +69,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }
     else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }
     else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }
+    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }
     else if (op == OP_ROUND) { V x=stack[--sp]; stack[sp++]=Vi((int64_t)llround(as_f(x))); }
     else if (op == OP_JMP) { ip = code[ip]; }
     else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=as_i(stack[--sp]); if (!c) ip = t; }
@@ -103,6 +104,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     }
     else if (op == OP_RET) {
       V val = sp > 0 ? stack[--sp] : Vi(0);
+      if (rsp == 0) return as_i(val);
       rsp--; slot_base = slot_bases[rsp]; ip = ret_ips[rsp];
       stack[sp++] = val;
     }
@@ -113,7 +115,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 }
 
 int main(void) {
-  static const int64_t code[] = { 11, 48, 1, 0, 3, 1, 2, 0, 3, 2, 1, 0, 3, 3, 2, 3, 2, 2, 23, 8, 12, 45, 2, 2, 2, 3, 24, 3, 4, 2, 1, 2, 4, 4, 3, 1, 2, 3, 1, 1, 4, 3, 3, 11, 14, 2, 1, 16, 21, 1, 1, 22, 1, 2, 22, 1, 3, 22, 1, 4, 22, 3, 0, 2, 0, 1, 0, 1, 10, 28, 2, 0, 15, 2, 1, 17, 1, 0, 3, 1, 1, 0, 3, 2, 1, 5, 3, 3, 2, 2, 2, 3, 8, 12, 122, 2, 2, 1, 3, 10, 12, 106, 11, 122, 11, 106, 2, 1, 2, 2, 4, 3, 1, 2, 2, 1, 1, 4, 3, 2, 11, 88, 2, 1, 17, 1, 0, 3, 4, 1, 0, 3, 2, 1, 5, 3, 5, 2, 2, 2, 5, 8, 12, 171, 2, 2, 1, 2, 10, 12, 155, 11, 162, 11, 155, 2, 4, 2, 2, 4, 3, 4, 2, 2, 1, 1, 4, 3, 2, 11, 137, 2, 4, 17, 2, 0, 15, 2, 1, 1, 19, 10, 18, 2, 1, 1, 3, 10, 18, 2, 4, 1, 8, 10, 18, 32, 0, 1, 0, 13 };
+  static const int64_t code[] = { 11, 49, 1, 0, 3, 1, 2, 0, 3, 2, 1, 0, 3, 3, 2, 3, 2, 2, 23, 8, 12, 45, 2, 2, 2, 3, 24, 3, 4, 2, 1, 2, 4, 4, 3, 1, 2, 3, 1, 1, 4, 3, 3, 11, 14, 2, 1, 16, 16, 21, 1, 1, 22, 1, 2, 22, 1, 3, 22, 1, 4, 22, 3, 0, 2, 0, 1, 0, 1, 10, 28, 2, 0, 15, 2, 1, 17, 1, 0, 3, 1, 1, 0, 3, 2, 1, 5, 3, 3, 2, 2, 2, 3, 8, 12, 123, 2, 2, 1, 3, 10, 12, 107, 11, 123, 11, 107, 2, 1, 2, 2, 4, 3, 1, 2, 2, 1, 1, 4, 3, 2, 11, 89, 2, 1, 17, 1, 0, 3, 4, 1, 0, 3, 2, 1, 5, 3, 5, 2, 2, 2, 5, 8, 12, 172, 2, 2, 1, 2, 10, 12, 156, 11, 163, 11, 156, 2, 4, 2, 2, 4, 3, 4, 2, 2, 1, 1, 4, 3, 2, 11, 138, 2, 4, 17, 2, 0, 15, 2, 1, 1, 19, 10, 18, 2, 1, 1, 3, 10, 18, 2, 4, 1, 8, 10, 18, 32, 0, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

@@ -48,7 +48,7 @@ static int64_t llen(int64_t id) {
 
 static const char *g_strs[] = { "" };
 
-static const double g_f64s[] = { 0.0 };
+static const double g_f64s[] = { 1.5, 2.25, 2.0 };
 
 static int64_t vm_run(const int64_t *code, int64_t n) {
   V stack[256]; int sp = 0;
@@ -115,7 +115,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 }
 
 int main(void) {
-  static const int64_t code[] = { 11, 9, 2, 0, 2, 1, 4, 16, 16, 1, 20, 1, 22, 15, 2, 2, 17, 1, 0, 16, 13 };
+  static const int64_t code[] = { 11, 2, 33, 0, 3, 0, 33, 1, 3, 1, 2, 0, 2, 1, 4, 3, 2, 2, 2, 17, 2, 2, 33, 2, 6, 19, 3, 3, 2, 3, 17, 2, 3, 1, 8, 25, 12, 43, 1, 1, 16, 11, 43, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

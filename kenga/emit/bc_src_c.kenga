@@ -9,6 +9,7 @@ fn OP_MUL() -> i64 { return 6; }
 fn OP_LT() -> i64 { return 8; }
 fn OP_GT() -> i64 { return 9; }
 fn OP_EQ() -> i64 { return 10; }
+fn OP_NE() -> i64 { return 25; }
 fn OP_JMP() -> i64 { return 11; }
 fn OP_JMPF() -> i64 { return 12; }
 fn OP_HALT() -> i64 { return 13; }
@@ -402,6 +403,11 @@ fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
         code = push(r[0], OP_EQ());
         return [code, r[1], r[2]];
     }
+    if starts_with(s, i, "!=") == 1 {
+        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+        code = push(r[0], OP_NE());
+        return [code, r[1], r[2]];
+    }
     if s[i] == "<" {
         r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_LT());
@@ -661,6 +667,7 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         i = skip(s, i + 6);
         let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, strbox);
         code = r[0]; i = r[1]; vnames = r[2];
+        code = push(code, OP_RET());
         i = skip(s, i);
         if i < len(s) { if s[i] == ";" { i = i + 1; } }
         return [code, i, vnames];
@@ -918,6 +925,7 @@ fn write_c_driver(code: list, strs: list, floats: list) -> str {
     s = s + "    else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }\n";
     s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
     s = s + "    else if (op == OP_EQ) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)==as_f(b)); else stack[sp++]=Vi(a.i==b.i); }\n";
+    s = s + "    else if (op == OP_NE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag||b.tag) stack[sp++]=Vi(as_f(a)!=as_f(b)); else stack[sp++]=Vi(a.i!=b.i); }\n";
     s = s + "    else if (op == OP_ROUND) { V x=stack[--sp]; stack[sp++]=Vi((int64_t)llround(as_f(x))); }\n";
     s = s + "    else if (op == OP_JMP) { ip = code[ip]; }\n";
     s = s + "    else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=as_i(stack[--sp]); if (!c) ip = t; }\n";
@@ -952,6 +960,7 @@ fn write_c_driver(code: list, strs: list, floats: list) -> str {
     s = s + "    }\n";
     s = s + "    else if (op == OP_RET) {\n";
     s = s + "      V val = sp > 0 ? stack[--sp] : Vi(0);\n";
+    s = s + "      if (rsp == 0) return as_i(val);\n";
     s = s + "      rsp--; slot_base = slot_bases[rsp]; ip = ret_ips[rsp];\n";
     s = s + "      stack[sp++] = val;\n";
     s = s + "    }\n";
@@ -1008,7 +1017,11 @@ fn main() -> i64 {
     let r10 = compile_src(src10);
     assert(write_file("bootstrap/generated/bc_from_elif_lite.c", write_c_driver(r10[0], r10[1], r10[2])) == true);
 
-    println("wrote bootstrap/generated/bc_from_*.c incl for_lite/lists_lite/elif/elif_lite");
+    let src11: str = read_file("examples/selfhost/float_lite.kenga");
+    let r11 = compile_src(src11);
+    assert(write_file("bootstrap/generated/bc_from_float_lite.c", write_c_driver(r11[0], r11[1], r11[2])) == true);
+
+    println("wrote bootstrap/generated/bc_from_*.c incl for_lite/lists_lite/elif/elif_lite/float_lite");
     println("bc_src_c ok");
     return 0;
 }
