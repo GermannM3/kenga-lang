@@ -81,7 +81,7 @@ if exist "%VCVARS%" (
     if errorlevel 1 exit /b 1
   )
   pushd bootstrap\generated
-  for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag bc_vm_seed bc_while_sum bc_from_src bc_from_for bc_from_fn bc_from_lists bc_from_for_list bc_from_break) do (
+  for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag bc_vm_seed bc_while_sum bc_from_src bc_from_for bc_from_fn bc_from_lists bc_from_for_list bc_from_break bc_from_for_lite) do (
     cl /nologo /O2 /TC %%f.c /Fe:%%f.exe /Fo:%%f.obj
     if errorlevel 1 exit /b 1
     %%f.exe
