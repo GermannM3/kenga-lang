@@ -106,6 +106,7 @@ scripts\freedom-smoke.cmd
 
 - `lower_c` — i64/struct/float/agent → `bootstrap/bin/lower_*.c`  
 - `lower_kv` — tagged KVal (str/ord/hetero lists) + **lex_frag** → `bootstrap/generated/`  
+- `bc_src_c` — **парсит** Kenga-исходник → bytecode → native VM (`bc_from_src.exe` печатает `15`)
 
 Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.
 

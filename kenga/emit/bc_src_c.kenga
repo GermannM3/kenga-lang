@@ -1,0 +1,318 @@
+// Parse tiny Kenga source → bytecode → C VM driver (no hand-assembled ops).
+// Run: bootstrap\bin\kenga-lite.exe run kenga\emit\bc_src_c.kenga
+
+fn OP_CONST() -> i64 { return 1; }
+fn OP_LOAD() -> i64 { return 2; }
+fn OP_STORE() -> i64 { return 3; }
+fn OP_ADD() -> i64 { return 4; }
+fn OP_LT() -> i64 { return 8; }
+fn OP_JMP() -> i64 { return 11; }
+fn OP_JMPF() -> i64 { return 12; }
+fn OP_HALT() -> i64 { return 13; }
+fn OP_PRINTLN() -> i64 { return 17; }
+
+fn itoa(n: i64) -> str {
+    let digs: str = "0123456789";
+    if n == 0 { return "0"; }
+    let s: str = "";
+    let x: i64 = n;
+    if x < 0 { x = 0 - x; }
+    while x > 0 {
+        let d: i64 = x - (x / 10) * 10;
+        s = digs[d] + s;
+        x = x / 10;
+    }
+    if n < 0 { return "-" + s; }
+    return s;
+}
+
+fn emit_code(code: list) -> str {
+    let s: str = "";
+    let i: i64 = 0;
+    while i < len(code) {
+        if i > 0 { s = s + ", "; }
+        s = s + itoa(code[i]);
+        i = i + 1;
+    }
+    return s;
+}
+
+fn is_space(ch: str) -> i64 {
+    if ch == " " { return 1; }
+    if ch == "\t" { return 1; }
+    if ch == "\n" { return 1; }
+    return 0;
+}
+fn is_digit(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn is_alpha(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 122 { return 1; } }
+    if c >= 65 { if c <= 90 { return 1; } }
+    return 0;
+}
+fn skip(s: str, i: i64) -> i64 {
+    while i < len(s) {
+        if is_space(s[i]) == 0 { break; }
+        i = i + 1;
+    }
+    return i;
+}
+fn starts_with(s: str, i: i64, w: str) -> i64 {
+    let j: i64 = 0;
+    while j < len(w) {
+        if i + j >= len(s) { return 0; }
+        if s[i + j] != w[j] { return 0; }
+        j = j + 1;
+    }
+    return 1;
+}
+fn starts_kw(s: str, i: i64, w: str) -> i64 {
+    if starts_with(s, i, w) == 0 { return 0; }
+    if i + len(w) < len(s) {
+        let n: str = s[i + len(w)];
+        if is_alpha(n) == 1 { return 0; }
+        if is_digit(n) == 1 { return 0; }
+    }
+    return 1;
+}
+
+fn slot_of(vnames: list, name: str) -> list {
+    let i: i64 = 0;
+    while i < len(vnames) {
+        if vnames[i] == name { return [i, vnames]; }
+        i = i + 1;
+    }
+    vnames = push(vnames, name);
+    return [len(vnames) - 1, vnames];
+}
+fn emit2(code: list, a: i64, b: i64) -> list {
+    code = push(code, a);
+    return push(code, b);
+}
+
+fn parse_ident(s: str, i: i64) -> list {
+    i = skip(s, i);
+    let name: str = "";
+    while i < len(s) {
+        let ch: str = s[i];
+        if is_alpha(ch) == 0 { if is_digit(ch) == 0 { break; } }
+        name = name + ch;
+        i = i + 1;
+    }
+    return [name, i];
+}
+fn parse_number(s: str, i: i64) -> list {
+    i = skip(s, i);
+    let v: i64 = 0;
+    while i < len(s) {
+        if is_digit(s[i]) == 0 { break; }
+        v = v * 10 + (ord(s[i]) - 48);
+        i = i + 1;
+    }
+    return [v, i];
+}
+
+fn emit_factor(s: str, i: i64, code: list, vnames: list) -> list {
+    i = skip(s, i);
+    if is_alpha(s[i]) == 1 {
+        let id = parse_ident(s, i);
+        let sl = slot_of(vnames, id[0]);
+        code = emit2(code, OP_LOAD(), sl[0]);
+        return [code, id[1], sl[1]];
+    }
+    let n = parse_number(s, i);
+    code = emit2(code, OP_CONST(), n[0]);
+    return [code, n[1], vnames];
+}
+
+fn emit_sum(s: str, i: i64, code: list, vnames: list) -> list {
+    let r = emit_factor(s, i, code, vnames);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "+" {
+            r = emit_factor(s, i + 1, code, vnames);
+            code = push(r[0], OP_ADD());
+            i = r[1]; vnames = r[2];
+        } else { break; }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_cmp(s: str, i: i64, code: list, vnames: list) -> list {
+    let r = emit_sum(s, i, code, vnames);
+    code = r[0]; i = r[1]; vnames = r[2];
+    i = skip(s, i);
+    if i >= len(s) { return [code, i, vnames]; }
+    if s[i] == "<" {
+        r = emit_sum(s, i + 1, code, vnames);
+        code = push(r[0], OP_LT());
+        return [code, r[1], r[2]];
+    }
+    return [code, i, vnames];
+}
+
+fn emit_stmt(s: str, i: i64, code: list, vnames: list) -> list {
+    i = skip(s, i);
+    if starts_kw(s, i, "let") == 1 {
+        i = skip(s, i + 3);
+        let id = parse_ident(s, i);
+        i = skip(s, id[1]);
+        assert(s[i] == "=");
+        i = i + 1;
+        let r = emit_cmp(s, i, code, vnames);
+        code = r[0]; i = r[1]; vnames = r[2];
+        let sl = slot_of(vnames, id[0]);
+        vnames = sl[1];
+        code = emit2(code, OP_STORE(), sl[0]);
+        i = skip(s, i);
+        if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "while") == 1 {
+        let loop_start: i64 = len(code);
+        i = skip(s, i + 5);
+        let r = emit_cmp(s, i, code, vnames);
+        code = r[0]; i = r[1]; vnames = r[2];
+        let jmpf_at: i64 = len(code);
+        code = emit2(code, OP_JMPF(), 0);
+        i = skip(s, i);
+        assert(s[i] == "{");
+        i = i + 1;
+        while true {
+            i = skip(s, i);
+            if i >= len(s) { break; }
+            if s[i] == "}" { break; }
+            let st = emit_stmt(s, i, code, vnames);
+            code = st[0]; i = st[1]; vnames = st[2];
+        }
+        assert(s[i] == "}");
+        i = i + 1;
+        code = emit2(code, OP_JMP(), loop_start);
+        code[jmpf_at + 1] = len(code);
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "println") == 1 {
+        i = skip(s, i + 7);
+        assert(s[i] == "(");
+        i = i + 1;
+        let r = emit_cmp(s, i, code, vnames);
+        code = r[0]; i = r[1]; vnames = r[2];
+        i = skip(s, i);
+        assert(s[i] == ")");
+        i = i + 1;
+        code = push(code, OP_PRINTLN());
+        i = skip(s, i);
+        if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames];
+    }
+    if starts_kw(s, i, "return") == 1 {
+        i = skip(s, i + 6);
+        let r = emit_cmp(s, i, code, vnames);
+        code = r[0]; i = r[1]; vnames = r[2];
+        i = skip(s, i);
+        if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames];
+    }
+    if is_alpha(s[i]) == 1 {
+        let id = parse_ident(s, i);
+        let j: i64 = skip(s, id[1]);
+        if j < len(s) {
+            if s[j] == "=" {
+                let r = emit_cmp(s, j + 1, code, vnames);
+                code = r[0]; i = r[1]; vnames = r[2];
+                let sl = slot_of(vnames, id[0]);
+                vnames = sl[1];
+                code = emit2(code, OP_STORE(), sl[0]);
+                i = skip(s, i);
+                if i < len(s) { if s[i] == ";" { i = i + 1; } }
+                return [code, i, vnames];
+            }
+        }
+    }
+    let r = emit_cmp(s, i, code, vnames);
+    code = r[0]; i = r[1]; vnames = r[2];
+    i = skip(s, i);
+    if i < len(s) { if s[i] == ";" { i = i + 1; } }
+    return [code, i, vnames];
+}
+
+fn compile_body(s: str, i: i64, code: list, vnames: list) -> list {
+    i = skip(s, i);
+    assert(s[i] == "{");
+    i = i + 1;
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "}" { break; }
+        let st = emit_stmt(s, i, code, vnames);
+        code = st[0]; i = st[1]; vnames = st[2];
+    }
+    assert(s[i] == "}");
+    return [code, i + 1, vnames];
+}
+
+fn compile_src(src: str) -> list {
+    let i: i64 = skip(src, 0);
+    assert(starts_kw(src, i, "fn") == 1);
+    i = skip(src, i + 2);
+    let id = parse_ident(src, i);
+    assert(id[0] == "main");
+    i = skip(src, id[1]);
+    assert(src[i] == "(");
+    i = skip(src, i + 1);
+    assert(src[i] == ")");
+    i = skip(src, i + 1);
+    let code: list = [];
+    let vnames: list = [];
+    let r = compile_body(src, i, code, vnames);
+    code = r[0];
+    code = push(code, OP_HALT());
+    return code;
+}
+
+fn write_c_driver(code: list) -> str {
+    let s: str = "";
+    s = s + "/* GENERATED by kenga/emit/bc_src_c.kenga — parsed source → bytecode */\n";
+    s = s + "#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n";
+    s = s + "#include \"opcodes.inc.c\"\n\n";
+    s = s + "static int64_t vm_run(const int64_t *code, int64_t n) {\n";
+    s = s + "  int64_t stack[256]; int sp = 0; int64_t slots[16]; int64_t ip = 0; int i;\n";
+    s = s + "  for (i = 0; i < 16; i++) slots[i] = 0;\n";
+    s = s + "  while (ip < n) {\n";
+    s = s + "    int64_t op = code[ip++];\n";
+    s = s + "    if (op == OP_CONST) { stack[sp++] = code[ip++]; }\n";
+    s = s + "    else if (op == OP_LOAD) { stack[sp++] = slots[code[ip++]]; }\n";
+    s = s + "    else if (op == OP_STORE) { slots[code[ip++]] = stack[--sp]; }\n";
+    s = s + "    else if (op == OP_ADD) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]=a+b; }\n";
+    s = s + "    else if (op == OP_LT) { int64_t b=stack[--sp]; int64_t a=stack[--sp]; stack[sp++]= a<b; }\n";
+    s = s + "    else if (op == OP_JMP) { ip = code[ip]; }\n";
+    s = s + "    else if (op == OP_JMPF) { int64_t t=code[ip++]; int64_t c=stack[--sp]; if (!c) ip = t; }\n";
+    s = s + "    else if (op == OP_PRINTLN) { printf(\"%lld\\n\", (long long)stack[--sp]); }\n";
+    s = s + "    else if (op == OP_HALT) { return 0; }\n";
+    s = s + "    else { fprintf(stderr, \"bad op %lld\\n\", (long long)op); exit(1); }\n";
+    s = s + "  }\n";
+    s = s + "  return 0;\n}\n\n";
+    s = s + "int main(void) {\n";
+    s = s + "  static const int64_t code[] = { " + emit_code(code) + " };\n";
+    s = s + "  vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));\n";
+    s = s + "  return 0;\n}\n";
+    return s;
+}
+
+fn main() -> i64 {
+    let src: str = "fn main() {\n  let n = 0;\n  let i = 1;\n  while i < 6 {\n    n = n + i;\n    i = i + 1;\n  }\n  println(n);\n  return 0;\n}\n";
+    let code = compile_src(src);
+    assert(len(code) > 10);
+
+    let out = write_c_driver(code);
+    assert(write_file("bootstrap/generated/bc_from_src.c", out) == true);
+    println("wrote bootstrap/generated/bc_from_src.c");
+    println("bc_src_c ok");
+    return 0;
+}
