@@ -1,0 +1,5 @@
+// Shared fn for lower_c import smoke (no Rust).
+
+fn double(x: i64) -> i64 {
+    return x * 2;
+}

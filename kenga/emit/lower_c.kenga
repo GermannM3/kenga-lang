@@ -1,5 +1,6 @@
 // General lowerer: Kenga i64/str/list subset → C99 (no Rust).
-// + multi-fn, string literals, list [ ] / push / len / index.
+// + multi-fn, string literals, list [ ] / push / len / index,
+//   events (on/emit/pump), import flatten, for-in-list, true/false.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
 
 fn is_space(ch: str) -> i64 {
@@ -281,6 +282,8 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
     assert(is_alpha(s[i]) == 1);
     let id = parse_ident(s, i);
     let j: i64 = skip(s, id[1]);
+    if id[0] == "true" { return ["1LL", id[1], 0]; }
+    if id[0] == "false" { return ["0LL", id[1], 0]; }
     if j < len(s) {
         if s[j] == "(" {
             j = j + 1; j = skip(s, j);
@@ -485,12 +488,25 @@ fn lower_stmt(s: str, i: i64, ind: i64, decls: list) -> list {
         i = skip(s, i + 2);
         let lo = lower_cmp(s, i, decls);
         i = skip(s, lo[1]);
-        assert(starts_with(s, i, "..") == 1);
-        i = i + 2;
-        let hi = lower_cmp(s, i, decls);
+        if starts_with(s, i, "..") == 1 {
+            i = i + 2;
+            let hi = lower_cmp(s, i, decls);
+            decls = ensure_decl(decls, var[0], 0);
+            let bl = lower_block(s, hi[1], ind + 1, decls);
+            let out: str = pad + "for (" + var[0] + " = " + lo[0] + "; " + var[0] + " < " + hi[0] + "; " + var[0] + " = " + var[0] + " + 1) {\n";
+            out = out + bl[0] + pad + "}\n";
+            return [out, bl[1], bl[2]];
+        }
+        // for v in xs { ... }
+        let ti: str = "_fi" + itoa(i);
+        let tl: str = "_fl" + itoa(i);
         decls = ensure_decl(decls, var[0], 0);
-        let bl = lower_block(s, hi[1], ind + 1, decls);
-        let out: str = pad + "for (" + var[0] + " = " + lo[0] + "; " + var[0] + " < " + hi[0] + "; " + var[0] + " = " + var[0] + " + 1) {\n";
+        decls = ensure_decl(decls, ti, 0);
+        decls = ensure_decl(decls, tl, 1);
+        let bl = lower_block(s, i, ind + 1, decls);
+        let out: str = pad + tl + " = " + lo[0] + ";\n";
+        out = out + pad + "for (" + ti + " = 0; " + ti + " < klist_len(&(" + tl + ")); " + ti + " = " + ti + " + 1) {\n";
+        out = out + pad + "  " + var[0] + " = klist_get(&(" + tl + "), " + ti + ");\n";
         out = out + bl[0] + pad + "}\n";
         return [out, bl[1], bl[2]];
     }
@@ -591,6 +607,49 @@ fn lower_fn_body(body: str, params: list) -> list {
         li = li + 1;
     }
     return [pre + bl[0]];
+}
+
+fn dirname_of(path: str) -> str {
+    let i: i64 = len(path) - 1;
+    while i >= 0 {
+        if path[i] == "/" { break; }
+        if path[i] == "\\" { break; }
+        i = i - 1;
+    }
+    if i < 0 { return "."; }
+    let out: str = "";
+    let j: i64 = 0;
+    while j < i { out = out + path[j]; j = j + 1; }
+    if len(out) == 0 { return "."; }
+    return out;
+}
+fn join_path(dir: str, rel: str) -> str {
+    if len(dir) == 0 { return rel; }
+    if dir == "." { return rel; }
+    return dir + "/" + rel;
+}
+fn resolve_imports(path: str, depth: i64) -> str {
+    assert(depth < 32);
+    let src: str = read_file(path);
+    let dir: str = dirname_of(path);
+    let i: i64 = 0;
+    let acc: str = "";
+    while true {
+        i = skip(src, i);
+        if starts_kw(src, i, "import") == 0 { break; }
+        i = skip(src, i + 6);
+        assert(src[i] == "\"");
+        let ps = parse_string(src, i);
+        i = ps[1];
+        i = skip(src, i);
+        if i < len(src) { if src[i] == ";" { i = i + 1; } }
+        let dep_path: str = join_path(dir, ps[0]);
+        acc = acc + resolve_imports(dep_path, depth + 1);
+        acc = acc + "\n";
+    }
+    let rest: str = "";
+    while i < len(src) { rest = rest + src[i]; i = i + 1; }
+    return acc + rest;
 }
 
 fn lower_program(src: str) -> str {
@@ -770,10 +829,13 @@ fn main() -> i64 {
     let ping: str = "on \"ping\"(x) { emit(\"pong\", x); } on \"pong\"(x) { println(x); } fn main() { emit(\"ping\", 7); assert(pump(8) == 2); assert(pending() == 0); return 0; }";
     assert(write_file("bootstrap/bin/lower_events.c", lower_program(ping)) == true);
 
-    let agent = read_file("examples/agent.kenga");
+    let agent = resolve_imports("examples/agent.kenga", 0);
     assert(write_file("bootstrap/bin/lower_agent.c", lower_program(agent)) == true);
 
-    println("wrote bootstrap/bin/lower_*.c incl events+agent");
+    let imp = resolve_imports("examples/selfhost/lower_import.kenga", 0);
+    assert(write_file("bootstrap/bin/lower_import.c", lower_program(imp)) == true);
+
+    println("wrote bootstrap/bin/lower_*.c incl events+agent+import");
     println("lower_c ok");
     return 0;
 }

@@ -1,0 +1,17 @@
+// Import flattening → native C via lower_c.
+
+import "lower_dep.kenga";
+
+fn main() -> i64 {
+    let xs: list = [1, 2, 3, 4];
+    let s: i64 = 0;
+    for v in xs {
+        s = s + v;
+    }
+    let x: i64 = double(21);
+    println(x);
+    println(s);
+    assert(x == 42);
+    assert(s == 10);
+    return 0;
+}

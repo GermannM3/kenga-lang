@@ -50,7 +50,7 @@ if exist "%VCVARS%" (
   if errorlevel 1 exit /b 1
   bootstrap\bin\core_from_kenga.exe
   if errorlevel 1 exit /b 1
-  for %%f in (lower_fact lower_for lower_if lower_fn lower_list lower_str) do (
+  for %%f in (lower_fact lower_for lower_if lower_fn lower_list lower_str lower_events lower_agent lower_import) do (
     cl /nologo /O2 /TC bootstrap\bin\%%f.c /Fe:bootstrap\bin\%%f.exe /Fo:bootstrap\bin\%%f.obj
     if errorlevel 1 exit /b 1
     bootstrap\bin\%%f.exe
@@ -74,7 +74,7 @@ if exist "%VCVARS%" (
     if errorlevel 1 exit /b 1
     bootstrap\bin\core_from_kenga.exe
     if errorlevel 1 exit /b 1
-    for %%f in (lower_fact lower_for lower_if lower_fn lower_list lower_str) do (
+    for %%f in (lower_fact lower_for lower_if lower_fn lower_list lower_str lower_events lower_agent lower_import) do (
       gcc -O2 -std=c99 bootstrap\bin\%%f.c -o bootstrap\bin\%%f.exe
       if errorlevel 1 exit /b 1
       bootstrap\bin\%%f.exe

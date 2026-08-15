@@ -31,9 +31,9 @@
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
 | ✅ | **`kenga/emit/core_c.kenga`** — while / if / for / list → C99 self-check |
-| ✅ | **`kenga/emit/lower_c.kenga`** — lowerer: control + **multi-fn** + **str** + **lists** → native C |
+| ✅ | **`kenga/emit/lower_c.kenga`** — control + fn + str + lists + **events/agent** + import + for-in-list → native C |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
-| ⬜ | Emit events / полный lite runtime → убрать ручной `kenga_lite.c` |
+| ⬜ | Emit полный lite runtime → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 
