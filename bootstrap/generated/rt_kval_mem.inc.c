@@ -6,6 +6,7 @@
 
 #define KM_DIM_MAX 64
 #define KM_HID_MAX 64
+#define KM_EP_MAX 16
 
 typedef struct {
   int dim, hidden;
@@ -21,9 +22,20 @@ typedef struct {
 } KmWorld;
 
 typedef struct {
+  double pattern[KM_DIM_MAX];
+  double target[KM_DIM_MAX];
+  int dim;
+  int target_dim;
+  int has_target;
+} KmEpisode;
+
+typedef struct {
   KmWorld model;
   double threshold;
   double lr;
+  KmEpisode ep[KM_EP_MAX];
+  int nep;
+  int ep_head;
 } KmMind;
 
 static KmMind *g_minds = NULL;
@@ -177,6 +189,87 @@ static KmMind *km_get(KVal v) {
   return &g_minds[id];
 }
 
+static double km_dist(const double *a, int an, const double *b, int bn) {
+  int n = an > bn ? an : bn;
+  int i;
+  double sum = 0.0;
+  if (n < 1) n = 1;
+  for (i = 0; i < n; i++) {
+    double xa = i < an ? a[i] : 0.0;
+    double yb = i < bn ? b[i] : 0.0;
+    double d = xa - yb;
+    sum += d * d;
+  }
+  return sqrt(sum / (double)n);
+}
+
+static void km_ep_push(KmMind *m, const double *x, int xn, const double *y, int yn) {
+  KmEpisode *e;
+  int i, slot;
+  if (xn < 0) xn = 0;
+  if (yn < 0) yn = 0;
+  if (xn > KM_DIM_MAX) xn = KM_DIM_MAX;
+  if (yn > KM_DIM_MAX) yn = KM_DIM_MAX;
+  if (m->nep < KM_EP_MAX) {
+    slot = m->nep;
+    m->nep++;
+  } else {
+    slot = m->ep_head;
+    m->ep_head++;
+    if (m->ep_head >= KM_EP_MAX) m->ep_head = 0;
+  }
+  e = &m->ep[slot];
+  memset(e, 0, sizeof(*e));
+  e->dim = xn;
+  for (i = 0; i < xn; i++) e->pattern[i] = x[i];
+  e->has_target = yn > 0 ? 1 : 0;
+  e->target_dim = yn;
+  for (i = 0; i < yn; i++) e->target[i] = y[i];
+}
+
+/* blend nearby episode patterns -- inverse-distance weights, top-3 */
+static void km_blend_ep(const KmMind *m, const double *obs, int on, double *out, int *out_n) {
+  int i, t, dim = on;
+  double wsum = 0.0;
+  double ws[KM_EP_MAX];
+  int idx[KM_EP_MAX];
+  int n = m->nep;
+  if (n == 0) {
+    *out_n = 0;
+    return;
+  }
+  for (i = 0; i < n; i++) {
+    double d = km_dist(m->ep[i].pattern, m->ep[i].dim, obs, on);
+    ws[i] = 1.0 / (0.05 + d);
+    idx[i] = i;
+    if (m->ep[i].dim > dim) dim = m->ep[i].dim;
+  }
+  for (i = 0; i < n; i++) {
+    int j;
+    for (j = i + 1; j < n; j++) {
+      if (ws[idx[j]] > ws[idx[i]]) {
+        int tmp = idx[i];
+        idx[i] = idx[j];
+        idx[j] = tmp;
+      }
+    }
+  }
+  t = n < 3 ? n : 3;
+  for (i = 0; i < dim; i++) out[i] = 0.0;
+  for (i = 0; i < t; i++) {
+    int ei = idx[i];
+    int k;
+    wsum += ws[ei];
+    for (k = 0; k < dim; k++) {
+      double p = k < m->ep[ei].dim ? m->ep[ei].pattern[k] : 0.0;
+      out[k] += ws[ei] * p;
+    }
+  }
+  if (wsum < 1e-9) wsum = 1e-9;
+  for (i = 0; i < dim; i++) out[i] /= wsum;
+  *out_n = dim;
+}
+
 static KVal k_memory_config(int64_t dim, int64_t threshold, int64_t hidden) {
   KmMind m;
   int d = (int)dim;
@@ -198,9 +291,12 @@ static KVal k_memory_config(int64_t dim, int64_t threshold, int64_t hidden) {
 static KVal k_learn(KVal mem, KVal x, KVal y) {
   KmMind *m = km_get(mem);
   double xp[KM_DIM_MAX], yp[KM_DIM_MAX];
+  double loss;
   int xn = kval_list_to_pat(x, xp, KM_DIM_MAX);
   int yn = kval_list_to_pat(y, yp, KM_DIM_MAX);
-  return kval_f64(km_train_step(&m->model, xp, xn, yp, yn, m->lr));
+  loss = km_train_step(&m->model, xp, xn, yp, yn, m->lr);
+  km_ep_push(m, xp, xn, yp, yn);
+  return kval_f64(loss);
 }
 
 static KVal k_predict(KVal mem, KVal x) {
@@ -218,6 +314,35 @@ static KVal k_predict(KVal mem, KVal x) {
   return pat_to_kval_list(out, n);
 }
 
-/* foresee is a predict-alias this slice: no core/episode hybrid blend */
-static KVal k_foresee(KVal mem, KVal x) { return k_predict(mem, x); }
+/* foresee: neural + episode-pattern blend -- same mix as lite pl_foresee */
+static KVal k_foresee(KVal mem, KVal x) {
+  KmMind *m = km_get(mem);
+  KmWorld tmp;
+  double xp[KM_DIM_MAX], hh[KM_HID_MAX];
+  double neural[KM_DIM_MAX], core[KM_DIM_MAX], out[KM_DIM_MAX];
+  int xn, nn, cn, dim, i;
+  double nw, cw;
+  xn = kval_list_to_pat(x, xp, KM_DIM_MAX);
+  tmp = m->model;
+  km_wm_ensure(&tmp, xn > 0 ? xn : 1);
+  km_forward(&tmp, xp, xn, hh, neural);
+  nn = xn > 0 ? xn : tmp.dim;
+  if (nn > tmp.dim) nn = tmp.dim;
+  km_blend_ep(m, xp, xn, core, &cn);
+  if (cn == 0) {
+    if (m->model.steps == 0) return pat_to_kval_list(xp, xn);
+    return pat_to_kval_list(neural, nn);
+  }
+  dim = nn > cn ? nn : cn;
+  if (xn > dim) dim = xn;
+  nw = m->model.steps > 0 ? 0.6 : 0.15;
+  cw = 1.0 - nw;
+  for (i = 0; i < dim; i++) {
+    double n = i < nn ? neural[i] : 0.0;
+    double c = i < cn ? core[i] : 0.0;
+    double o = i < xn ? xp[i] : 0.0;
+    out[i] = nw * n + cw * c * 0.8 + o * 0.2;
+  }
+  return pat_to_kval_list(out, dim);
+}
 #endif /* KENGA_RT_KVAL_MEM_INC */
