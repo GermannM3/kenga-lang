@@ -2014,7 +2014,6 @@ fn main() -> i64 {
     assert(run_lite("on \"ping\"(x) { emit(\"pong\", x); } on \"pong\"(x) { println(x); } fn main() { emit(\"ping\", 7); assert(pump(8) == 2); assert(pending() == 0); 0 }") == 0);
     assert(run_file("examples/agent.kenga") == 0);
     assert(run_file("examples/selfhost/fact_lite.kenga") == 0);
-    assert(run_file("examples/ml/kenga_net.kenga") == 0);
     assert(run_lite("fn main() { assert(write_file(\"minds/_more_io.txt\", \"hi\") == 1); ord(read_file(\"minds/_more_io.txt\")[0]) }") == 104);
     assert(run_lite("fn main() { let s = \"a\\nb\"; len(s) }") == 3);
     assert(run_lite("fn main() { 10 % 3 }") == 1);
@@ -2033,6 +2032,7 @@ fn main() -> i64 {
     assert(run_file("examples/selfhost/typeof_lite.kenga") == 0);
     assert(run_file("examples/ml/kenga_birth.kenga") == 0);
     assert(run_file("examples/ml/kenga_born.kenga") == 0);
+    assert(run_file("examples/ml/kenga_net.kenga") == 0);
     assert(run_file("kenga/emit/c_seed.kenga") == 0);
     assert(run_file("kenga/emit/expr_c.kenga") == 0);
     assert(run_file("examples/selfhost/tensor_more.kenga") == 0);

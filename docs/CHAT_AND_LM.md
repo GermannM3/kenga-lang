@@ -11,7 +11,7 @@
 | Chat intents | ✅ `kenga-lite chat` |
 | Bigram LM | ✅ `examples/ml/tiny_lm.kenga` |
 | **2-layer word-LM + CE** | ✅ `examples/ml/word_lm.kenga` → `minds/word_lm_*.kt` |
-| **Своя MLP (XOR)** | ✅ `examples/ml/kenga_net.kenga` — list/f64, без tensor host |
+| **Своя MLP (XOR)** | ✅ `examples/ml/kenga_net.kenga` — list/f64, без tensor host; lite, bc→C и `more` VM |
 | **Decoder GPT-формы** | ✅ `examples/ml/kenga_lm.kenga` — attn + FFN + RMS, next-token |
 | **Char-LM на нашем `.kenga`** | ✅ `examples/ml/kenga_charlm.kenga` + `kenga_char_talk.kenga` |
 | **Триграмма на нашем `.kenga`** | ✅ `examples/ml/kenga_trigram.kenga` — list/i64, `fn add(a: i64` |

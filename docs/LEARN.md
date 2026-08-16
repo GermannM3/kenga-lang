@@ -89,7 +89,7 @@ kenga run --lite examples/ml/kenga_mm_lm.kenga
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
 
-`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `print_more.kenga`, `learn_more.kenga`, `unroll_more.kenga`, `foresee_n_more.kenga`, `examples/prophet.kenga`, `examples/ml/living_multimodal.kenga`.
+`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `print_more.kenga`, `learn_more.kenga`, `unroll_more.kenga`, `foresee_n_more.kenga`, `examples/prophet.kenga`, `examples/ml/living_multimodal.kenga`, `examples/ml/kenga_net.kenga`.
 
 `kenga_mm_lm` — картинка + звук → подпись (`kenga vidit … i slyshit ton`). Это сид большой модели, не CLIP.
 

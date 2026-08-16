@@ -104,7 +104,7 @@ i64, f64, `round`, `assert`, строки, списки, `print`/`println`, `str
 **Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / `load_ppm` / `load_wav` / …),
 tape `ag_*`, `sweep`, `now_ms` wall clock, `sleep_ms`, `foresee_n`.
 
-Тот же диалект на VM **`more.kenga`**: birth→24, `print`/`sleep_ms`, `learn`/`predict`/`unroll`/`remember_next`/`foresee_n`, `examples/prophet.kenga`, `mlp_autograd.kenga`, `examples/selfhost/vision_more.kenga`, `examples/ml/living_multimodal.kenga`.
+Тот же диалект на VM **`more.kenga`**: birth→24, `print`/`sleep_ms`, `learn`/`predict`/`unroll`/`remember_next`/`foresee_n`, `examples/prophet.kenga`, `mlp_autograd.kenga`, `examples/ml/kenga_net.kenga`, `examples/selfhost/vision_more.kenga`, `examples/ml/living_multimodal.kenga`.
 
 ```bash
 bash bootstrap/build.sh

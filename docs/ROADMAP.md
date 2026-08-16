@@ -78,7 +78,7 @@
 | ✅ | Chat intents + tiny word-LM seed (`tiny_lm.kenga`) |
 | ✅ | 2-layer word-LM + CE + weight files (`word_lm.kenga`) |
 | ⬜ | f32 / tiled matmul (efficiency под рост) |
-| ✅ | **`kenga_net.kenga`** — 2-2-1 MLP + SGD на list/f64 (XOR), lite и bytecode→C |
+| ✅ | **`kenga_net.kenga`** — 2-2-1 MLP + SGD на list/f64 (XOR), lite, bytecode→C и **`more` VM** |
 | ✅ | **`kenga_lm.kenga`** — decoder (causal attn / FFN / RMS / residual), next-token на lite |
 | ✅ | **`kenga_charlm.kenga`** — тот же decoder, корпус = наши `.kenga` (не GGUF) |
 | ✅ | **`kenga_char_talk.kenga`** — generate из сохранённых весов |
