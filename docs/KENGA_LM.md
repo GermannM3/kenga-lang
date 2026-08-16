@@ -9,7 +9,7 @@ Kenga уже выражает эту машину. Три файла:
 - `examples/ml/kenga_trigram.kenga` — char-триграмма на list/i64 (без Tensor), тот же корпус
 - `examples/ml/kenga_birth.kenga` — suffix LM пишет `kenga_born.kenga`, lite его запускает → **24**
 - `examples/ml/kenga_mm_lm.kenga` — PPM+WAV → подпись (linear)
-- `examples/ml/kenga_mm_gen.kenga` — тот же decoder, vis-bias, next-char цвета
+- `examples/ml/kenga_mm_gen.kenga` — decoder пишет стебель цвета (kra/ze/si)
 
 Скачанный GGUF из папки «kenga ai» сюда не кладём. Это чужой граф и чужие веса. Доказательство языка — сеть, написанная на Kenga и обученная на Kenga.
 

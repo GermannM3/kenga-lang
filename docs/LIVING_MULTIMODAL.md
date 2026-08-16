@@ -52,4 +52,4 @@ Fusion-smoke: `beep.wav` + `dot.ppm` (`examples/ml/fusion.kenga`).
 ## Текст из кадра и звука
 
 `examples/ml/kenga_mm_lm.kenga` — linear head, три готовые подписи.  
-`examples/ml/kenga_mm_gen.kenga` — тот же decoder, что char-LM: vis-bias на логитах, после `"kenga vidit "` ставит k / z / s. Карточка: `docs/HUGGINGFACE.md`.
+`examples/ml/kenga_mm_gen.kenga` — тот же decoder: зрение выбирает развилку, текст пишет стебель (`kra` / `ze` / `si`). Карточка: `docs/HUGGINGFACE.md`.

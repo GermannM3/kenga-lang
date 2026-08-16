@@ -16,7 +16,7 @@
 | **Char-LM на нашем `.kenga`** | ✅ `examples/ml/kenga_charlm.kenga` + `kenga_char_talk.kenga` |
 | **Триграмма на нашем `.kenga`** | ✅ `examples/ml/kenga_trigram.kenga` — list/i64, `fn add(a: i64` |
 | **Birth → run** | ✅ lite и **native C** (`bc-run` / `bc_from_birth.c`) → **24** |
-| **Vision+audio → text** | ✅ linear `kenga_mm_lm` + decoder `kenga_mm_gen` (next-char k/z/s) |
+| **Vision+audio → text** | ✅ linear `kenga_mm_lm` + decoder `kenga_mm_gen` (стебель kra/ze/si) |
 | Hugging Face | ⬜ большая модель → `Kenga-ai/kenga-mm`; сид: `docs/HUGGINGFACE.md` |
 | Половина Grok / GPU | ⬜ те же блоки × D/L/V + корпус + GPU; см. `docs/KENGA_LM.md` |
 

@@ -1,4 +1,5 @@
-// Decoder next-char + visual logit bias. whead trains only at the color fork.
+// Vision picks the first letter; the decoder writes the rest of the color word.
+// Same CTX window at train and generate. Not GGUF.
 //
 //   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
 
@@ -24,6 +25,12 @@ fn caption(i: i64) -> str {
     return "kenga vidit sinij kadr i slyshit ton";
 }
 
+fn color_word(i: i64) -> str {
+    if i == 0 { return "krasnyj"; }
+    if i == 1 { return "zelenyj"; }
+    return "sinij";
+}
+
 fn train_text(e: Tensor, wlm: Tensor, ids: list, vv: i64, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list) -> list {
     let ctxn: i64 = CTX();
     let p: i64 = 1;
@@ -36,8 +43,23 @@ fn train_text(e: Tensor, wlm: Tensor, ids: list, vv: i64, wq: list, wk: list, wv
     return [e, wlm];
 }
 
+fn train_color_text(e: Tensor, wlm: Tensor, prefix: str, word: str, alpha: str, vv: i64, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list) -> list {
+    let ctxn: i64 = CTX();
+    let ctx = clip_ctx(encode(prefix, alpha), ctxn);
+    let i: i64 = 0;
+    while i < len(word) {
+        let tid = ch_id(alpha, word[i]);
+        let packed = train_last(e, wlm, ctx, tid, 0.16, vv, wq, wk, wv, wo, wf1, wf2);
+        e = packed[0];
+        wlm = packed[1];
+        ctx = clip_ctx(push(ctx, tid), ctxn);
+        i = i + 1;
+    }
+    return [e, wlm];
+}
+
 fn main() -> i64 {
-    println("=== kenga mm-gen (decoder writes caption from PPM+WAV) ===");
+    println("=== kenga mm-gen (decoder writes the color word) ===");
     let text: str = caption(0) + "\n" + caption(1) + "\n" + caption(2) + "\n";
     let alpha: str = build_alpha(text);
     let vv: i64 = len(alpha);
@@ -62,9 +84,11 @@ fn main() -> i64 {
     let id0 = encode(caption(0), alpha);
     let id1 = encode(caption(1), alpha);
     let id2 = encode(caption(2), alpha);
+    let prefix: str = "kenga vidit ";
+    let fork = clip_ctx(encode(prefix, alpha), CTX());
 
     let ep: i64 = 0;
-    while ep < 6 {
+    while ep < 8 {
         let p = train_text(e, wlm, id0, vv, wq, wk, wv, wo, wf1, wf2);
         e = p[0];
         wlm = p[1];
@@ -74,41 +98,52 @@ fn main() -> i64 {
         p = train_text(e, wlm, id2, vv, wq, wk, wv, wo, wf1, wf2);
         e = p[0];
         wlm = p[1];
+        p = train_color_text(e, wlm, prefix, color_word(0), alpha, vv, wq, wk, wv, wo, wf1, wf2);
+        e = p[0];
+        wlm = p[1];
+        p = train_color_text(e, wlm, prefix, color_word(1), alpha, vv, wq, wk, wv, wo, wf1, wf2);
+        e = p[0];
+        wlm = p[1];
+        p = train_color_text(e, wlm, prefix, color_word(2), alpha, vv, wq, wk, wv, wo, wf1, wf2);
+        e = p[0];
+        wlm = p[1];
         ep = ep + 1;
     }
 
-    let branch = encode("kenga vidit ", alpha);
-    let tk = ch_id(alpha, "k");
-    let tz = ch_id(alpha, "z");
-    let ts = ch_id(alpha, "s");
     let br: i64 = 0;
     while br < 80 {
-        whead = train_whead_only(whead, branch, tk, 0.35, vv, f0, e, wq, wk, wv, wo, wf1, wf2, wlm);
-        whead = train_whead_only(whead, branch, tz, 0.35, vv, f1, e, wq, wk, wv, wo, wf1, wf2, wlm);
-        whead = train_whead_only(whead, branch, ts, 0.35, vv, f2, e, wq, wk, wv, wo, wf1, wf2, wlm);
+        whead = train_whead_only(whead, fork, ch_id(alpha, "k"), 0.35, vv, f0, e, wq, wk, wv, wo, wf1, wf2, wlm);
+        whead = train_whead_only(whead, fork, ch_id(alpha, "z"), 0.35, vv, f1, e, wq, wk, wv, wo, wf1, wf2, wlm);
+        whead = train_whead_only(whead, fork, ch_id(alpha, "s"), 0.35, vv, f2, e, wq, wk, wv, wo, wf1, wf2, wlm);
         br = br + 1;
     }
 
-    let prompt: str = "kenga vidit ";
-    let g0 = generate_vis(prompt, alpha, e, f0, whead, wq, wk, wv, wo, wf1, wf2, wlm, 10);
-    let g1 = generate_vis(prompt, alpha, e, f1, whead, wq, wk, wv, wo, wf1, wf2, wlm, 10);
-    let g2 = generate_vis(prompt, alpha, e, f2, whead, wq, wk, wv, wo, wf1, wf2, wlm, 10);
+    let more: i64 = 0;
+    while more < 40 {
+        let q = train_color_text(e, wlm, prefix, color_word(0), alpha, vv, wq, wk, wv, wo, wf1, wf2);
+        e = q[0];
+        wlm = q[1];
+        q = train_color_text(e, wlm, prefix, color_word(1), alpha, vv, wq, wk, wv, wo, wf1, wf2);
+        e = q[0];
+        wlm = q[1];
+        q = train_color_text(e, wlm, prefix, color_word(2), alpha, vv, wq, wk, wv, wo, wf1, wf2);
+        e = q[0];
+        wlm = q[1];
+        more = more + 1;
+    }
+
+    let g0 = generate_vis_greedy(prefix, alpha, e, f0, whead, wq, wk, wv, wo, wf1, wf2, wlm, 7);
+    let g1 = generate_vis_greedy(prefix, alpha, e, f1, whead, wq, wk, wv, wo, wf1, wf2, wlm, 7);
+    let g2 = generate_vis_greedy(prefix, alpha, e, f2, whead, wq, wk, wv, wo, wf1, wf2, wlm, 5);
     println(g0);
     println(g1);
     println(g2);
-    let ctxp = encode(prompt, alpha);
-    let n0 = argmax(forward_vis(ctxp, e, f0, whead, wq, wk, wv, wo, wf1, wf2, wlm), vv);
-    let n1 = argmax(forward_vis(ctxp, e, f1, whead, wq, wk, wv, wo, wf1, wf2, wlm), vv);
-    let n2 = argmax(forward_vis(ctxp, e, f2, whead, wq, wk, wv, wo, wf1, wf2, wlm), vv);
-    println(alpha[n0]);
-    println(alpha[n1]);
-    println(alpha[n2]);
-    assert(n0 == tk);
-    assert(n1 == tz);
-    assert(n2 == ts);
-    assert(len(g0) > 12);
-    assert(len(g1) > 12);
-    assert(len(g2) > 12);
+    assert(teacher_word(prefix, "kra", alpha, e, f0, whead, wq, wk, wv, wo, wf1, wf2, wlm) == 1);
+    assert(teacher_word(prefix, "ze", alpha, e, f1, whead, wq, wk, wv, wo, wf1, wf2, wlm) == 1);
+    assert(teacher_word(prefix, "si", alpha, e, f2, whead, wq, wk, wv, wo, wf1, wf2, wlm) == 1);
+    assert(has_sub(g0, "kra") == 1);
+    assert(has_sub(g1, "ze") == 1);
+    assert(has_sub(g2, "si") == 1);
     assert(write_file("minds/kenga_mm_alpha.txt", alpha) == 1);
     assert(write_file("examples/ml/kenga_mm_gen_sample.txt", g0 + "\n" + g1 + "\n" + g2 + "\n") == 1);
     assert(save_tensor(e, "minds/kenga_mm_e.kt") == 1);

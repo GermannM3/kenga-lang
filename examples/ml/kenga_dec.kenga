@@ -408,6 +408,60 @@ fn train_whead_only(whead: Tensor, ids: list, target: i64, lr: f64, vv: i64, fus
     return whead;
 }
 
+fn has_sub(s: str, needle: str) -> i64 {
+    let i: i64 = 0;
+    while i + len(needle) <= len(s) {
+        let ok: i64 = 1;
+        let j: i64 = 0;
+        while j < len(needle) {
+            if s[i + j] != needle[j] { ok = 0; }
+            j = j + 1;
+        }
+        if ok == 1 { return 1; }
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn teacher_word(prefix: str, word: str, alpha: str, e: Tensor, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor) -> i64 {
+    let vv: i64 = len(alpha);
+    let ctxn: i64 = CTX();
+    let ctx = clip_ctx(encode(prefix, alpha), ctxn);
+    let i: i64 = 0;
+    while i < len(word) {
+        let tid = ch_id(alpha, word[i]);
+        let pred: i64 = 0;
+        if i == 0 {
+            pred = argmax(forward_vis(ctx, e, fuse, whead, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+        } else {
+            pred = argmax(forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+        }
+        if pred != tid { return 0; }
+        ctx = clip_ctx(push(ctx, tid), ctxn);
+        i = i + 1;
+    }
+    return 1;
+}
+
+fn generate_vis_greedy(prompt: str, alpha: str, e: Tensor, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor, steps: i64) -> str {
+    let vv: i64 = len(alpha);
+    let ctxn: i64 = CTX();
+    let ctx = clip_ctx(encode(prompt, alpha), ctxn);
+    let out: str = prompt;
+    if steps <= 0 { return out; }
+    let nxt = argmax(forward_vis(ctx, e, fuse, whead, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+    out = out + alpha[nxt];
+    ctx = clip_ctx(push(ctx, nxt), ctxn);
+    let step: i64 = 1;
+    while step < steps {
+        nxt = argmax(forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+        out = out + alpha[nxt];
+        ctx = clip_ctx(push(ctx, nxt), ctxn);
+        step = step + 1;
+    }
+    return out;
+}
+
 fn generate_vis(prompt: str, alpha: str, e: Tensor, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor, steps: i64) -> str {
     let vv: i64 = len(alpha);
     let ctxn: i64 = CTX();

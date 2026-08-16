@@ -67,7 +67,7 @@
 | ✅ | **`kenga_trigram.kenga`** — char-триграмма на list/i64, корпус наш |
 | ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
 | ✅ | **`kenga_mm_lm.kenga`** / **`kenga_mm_talk.kenga`** — PPM+WAV → caption |
-| ✅ | **`kenga_mm_gen.kenga`** — тот же decoder, vis-bias на логитах, next-char k/z/s |
+| ✅ | **`kenga_mm_gen.kenga`** — decoder пишет стебель цвета (kra/ze/si); birth ещё и native C |
 | ✅ | Карточка HF: `hf/kenga-seed/` + `scripts\hf-pack.cmd` |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |

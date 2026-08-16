@@ -26,15 +26,15 @@ fn main() -> i64 {
     let whead = load_tensor("minds/kenga_mm_whead.kt");
     let att = frozen_attn(D(), FF());
     let prompt: str = "kenga vidit ";
-    let g0 = generate_vis(prompt, alpha, e, scene_col(0), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 10);
-    let g1 = generate_vis(prompt, alpha, e, scene_col(1), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 10);
-    let g2 = generate_vis(prompt, alpha, e, scene_col(2), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 10);
+    let g0 = generate_vis_greedy(prompt, alpha, e, scene_col(0), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 7);
+    let g1 = generate_vis_greedy(prompt, alpha, e, scene_col(1), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 7);
+    let g2 = generate_vis_greedy(prompt, alpha, e, scene_col(2), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 5);
     println(g0);
     println(g1);
     println(g2);
-    assert(len(g0) > 12);
-    assert(len(g1) > 12);
-    assert(len(g2) > 12);
+    assert(has_sub(g0, "kra") == 1);
+    assert(has_sub(g1, "ze") == 1);
+    assert(has_sub(g2, "si") == 1);
     println("kenga mm-gen-talk ok");
     return 0;
 }

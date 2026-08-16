@@ -128,7 +128,7 @@ scripts\kenga-mm.cmd
 ```
 
 Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).  
-`kenga_mm_gen` — decoder, не 3-классовый softmax: после `"kenga vidit "` следующий символ k / z / s по кадру.  
+`kenga_mm_gen` — decoder: зрение ставит первую букву, текст дописывает стебель (`kra` / `ze` / `si`). Полное слово на D=16 ещё плывёт.  
 Шкала: `docs/KENGA_LM.md`. Куда потом большую: `docs/HUGGINGFACE.md`.
 
 ## 9. Упражнения
