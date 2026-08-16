@@ -1,0 +1,10 @@
+// typeof / to_str on more.kenga (lite already has typeof)
+//   bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
+
+fn main() -> i64 {
+    assert(typeof(1) == "i64");
+    assert(typeof("a") == "str");
+    assert("n=" + to_str(42) == "n=42");
+    println("typeof ok");
+    return 0;
+}

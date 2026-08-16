@@ -39,7 +39,7 @@ kenga run --lite examples/hello.kenga
 - `while cond { … }`
 - `for i in 0..n { … }` / `for x in xs { … }`
 - `break` / `continue`
-- `&&` `||` `!` `%` (lite и `more`)
+- `&&` `||` `!` `%` (lite и `more`); `typeof` / `to_str` в `more`
 - комментарии `//` и `/* … */`
 
 ## 3. Списки и struct
