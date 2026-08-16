@@ -131,7 +131,7 @@ scripts\kenga-mm.cmd
 
 Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).  
 `kenga_mm_gen` — по буквам, стебель `kra`/`ze`/`si`.  
-`kenga_mm_words` — тот же decoder, цвет одним токеном: полные `krasnyj` / `zelenyj` / `sinij`. Talk грузит веса без обучения.  
+`kenga_mm_words` — цвет одним токеном (`krasnyj` / `zelenyj` / `sinij`) и текст `kenga zhivet v yazyke`. Talk грузит веса.  
 Шкала: `docs/KENGA_LM.md`. Куда потом большую: `docs/HUGGINGFACE.md`.
 
 ## 9. Упражнения

@@ -17,10 +17,13 @@ fn main() -> i64 {
     let g2 = generate_words(prompt, vocab, e, scene_col(2), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 5);
     println(g0);
     println(g1);
+    let gl = generate_text(["kenga", "zhivet"], vocab, e, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 2);
     println(g2);
+    println(gl);
     assert(has_sub(g0, color_of(0)) == 1);
     assert(has_sub(g1, color_of(1)) == 1);
     assert(has_sub(g2, color_of(2)) == 1);
+    assert(has_sub(gl, "yazyke") == 1);
     println("kenga mm-words-talk ok");
     return 0;
 }

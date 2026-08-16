@@ -16,7 +16,7 @@ fn scene_col(i: i64) -> Tensor {
 }
 
 fn vocab_of() -> list {
-    return ["kenga", "vidit", "krasnyj", "zelenyj", "sinij", "kadr", "i", "slyshit", "ton"];
+    return ["kenga", "vidit", "krasnyj", "zelenyj", "sinij", "kadr", "i", "slyshit", "ton", "zhivet", "v", "yazyke"];
 }
 
 fn word_id(vocab: list, w: str) -> i64 {
@@ -42,6 +42,10 @@ fn caption_words(i: i64) -> list {
     if i == 0 { return ["kenga", "vidit", "krasnyj", "kadr", "i", "slyshit", "ton"]; }
     if i == 1 { return ["kenga", "vidit", "zelenyj", "kadr", "i", "slyshit", "ton"]; }
     return ["kenga", "vidit", "sinij", "kadr", "i", "slyshit", "ton"];
+}
+
+fn lang_words() -> list {
+    return ["kenga", "zhivet", "v", "yazyke"];
 }
 
 fn color_of(i: i64) -> str {
@@ -73,6 +77,21 @@ fn generate_words(prompt: list, vocab: list, e: Tensor, fuse: Tensor, whead: Ten
     let step: i64 = 1;
     while step < steps {
         nxt = argmax(forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+        out = push(out, nxt);
+        ctx = clip_ctx(push(ctx, nxt), ctxn);
+        step = step + 1;
+    }
+    return join_words(out, vocab);
+}
+
+fn generate_text(prompt: list, vocab: list, e: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor, steps: i64) -> str {
+    let vv: i64 = len(vocab);
+    let ctxn: i64 = CTX();
+    let ctx = clip_ctx(encode_words(prompt, vocab), ctxn);
+    let out = encode_words(prompt, vocab);
+    let step: i64 = 0;
+    while step < steps {
+        let nxt = argmax(forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm), vv);
         out = push(out, nxt);
         ctx = clip_ctx(push(ctx, nxt), ctxn);
         step = step + 1;

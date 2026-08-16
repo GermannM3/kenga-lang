@@ -33,6 +33,8 @@ kenga vidit zelenyj kadr i slyshit ton
 kenga vidit sinij kadr i slyshit ton
 ```
 
+Text-only (same decoder, no vis): `kenga zhivet v yazyke`. Vocab 12 tokens.
+
 ## What it is not
 
 Not half of Grok. D/L/V are toy. No 50k tokenizer, no GPU kernels, no foreign weights.

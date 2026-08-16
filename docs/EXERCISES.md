@@ -60,7 +60,7 @@ Lite: `examples/selfhost/struct_lite.kenga`.
 ## E11. Decoder видит кадр
 
 `examples/ml/kenga_mm_gen.kenga` — стебель **kra / ze / si**.  
-`examples/ml/kenga_mm_words.kenga` — цвет одним словом: три полные подписи.
+`examples/ml/kenga_mm_words.kenga` — цвет одним словом + `kenga zhivet v yazyke`.
 
 Бонус: `scripts\bc-run.cmd examples\ml\kenga_birth.kenga` — birth без lite VM, потом `kenga-lite run examples\ml\kenga_born.kenga` → 24.
 

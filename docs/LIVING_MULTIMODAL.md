@@ -53,4 +53,4 @@ Fusion-smoke: `beep.wav` + `dot.ppm` (`examples/ml/fusion.kenga`).
 
 `examples/ml/kenga_mm_lm.kenga` — linear head, три готовые подписи.  
 `examples/ml/kenga_mm_gen.kenga` — по буквам, стебель.  
-`examples/ml/kenga_mm_words.kenga` — тот же decoder, цвет одним токеном, три полные подписи. Карточка: `docs/HUGGINGFACE.md`.
+`examples/ml/kenga_mm_words.kenga` — цвет одним токеном, три подписи, плюс `kenga zhivet v yazyke`. Карточка: `docs/HUGGINGFACE.md`.

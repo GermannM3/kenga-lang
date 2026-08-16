@@ -26,7 +26,7 @@
 | ✅ | C-lite: brace-match пропускает строки/комменты (чинит `kenga_lite.kenga` на lite) |
 | ✅ | Каталог **`kenga/`** — каноническая замена `src/` (`compiler/more`, `emit/c_seed`) |
 | ✅ | `docs/REPLACE_RUST.md` — карта модулей Rust → Kenga |
-| ✅ | **`more.kenga` step 10**: for/break/continue, `xs[i]=`, else if, struct, import, `run_file` |
+| ✅ | **`more.kenga`**: for/elif/struct/import/events + `run_file` fact_lite и **XOR `kenga_net`** |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
@@ -68,7 +68,7 @@
 | ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
 | ✅ | **`kenga_mm_lm.kenga`** / **`kenga_mm_talk.kenga`** — PPM+WAV → caption |
 | ✅ | **`kenga_mm_gen.kenga`** — decoder пишет стебель цвета (kra/ze/si) |
-| ✅ | **`kenga_mm_words.kenga`** / **`kenga_mm_words_talk.kenga`** — word-decoder пишет полную подпись |
+| ✅ | **`kenga_mm_words`** — 3 подписи + `kenga zhivet v yazyke` (12 токенов); `more.kenga` гоняет XOR |
 | ✅ | Карточка HF: `hf/kenga-seed/` + `scripts\hf-pack.cmd` |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |

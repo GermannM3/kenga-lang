@@ -1,6 +1,7 @@
 // Self-host compiler on Kenga (canonical). Replaces growing slice of src/compiler.rs + vm.rs.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 // Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, import,
+//          XOR net (`kenga_net.kenga`) and fact_lite via run_file.
 //          on/emit/pump/pending, types/ttl skip.
 
 fn OP_CONST() -> i64 { return 1; }
@@ -1328,6 +1329,8 @@ fn main() -> i64 {
     assert(run_lite("fn main() -> i64 { return ahead(41); } fn ahead(x: i64) -> i64 { return x + 1; }") == 42);
     assert(run_lite("on \"ping\"(x) { emit(\"pong\", x); } on \"pong\"(x) { println(x); } fn main() { emit(\"ping\", 7); assert(pump(8) == 2); assert(pending() == 0); 0 }") == 0);
     assert(run_file("examples/agent.kenga") == 0);
+    assert(run_file("examples/selfhost/fact_lite.kenga") == 0);
+    assert(run_file("examples/ml/kenga_net.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
