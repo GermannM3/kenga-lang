@@ -140,6 +140,7 @@ Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, з
 
 ## Дальше
 
+- Книга (PDF/EPUB): `book/kenga_kniga_yantaras_v1.pdf`
 - Справочник: `docs/LANGUAGE.md`
 - Self-host: `docs/SELFHOST.md`
 - Свобода от Rust: `docs/INDEPENDENCE.md`

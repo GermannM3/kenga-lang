@@ -45,6 +45,8 @@ kenga run --lite examples\selfhost\struct_lite.kenga
 
 Потом: `kenga chat minds/agent.km` → «смотри 5 1 6», «что будет завтра?»
 
+Книга (PDF и EPUB, как Z-система): **[book/](book/)** — `book/kenga_kniga_yantaras_v1.pdf`.
+
 Подробный питч: **[docs/FOR_FRIENDS.md](docs/FOR_FRIENDS.md)** · учить: **[docs/LEARN.md](docs/LEARN.md)** · справочник: **[docs/LANGUAGE.md](docs/LANGUAGE.md)** · упражнения: **[docs/EXERCISES.md](docs/EXERCISES.md)** · multimodal: **[docs/LIVING_MULTIMODAL.md](docs/LIVING_MULTIMODAL.md)** · своя LM: **[docs/KENGA_LM.md](docs/KENGA_LM.md)** · Hugging Face: **[docs/HUGGINGFACE.md](docs/HUGGINGFACE.md)** · chat/LM: **[docs/CHAT_AND_LM.md](docs/CHAT_AND_LM.md)** · Prophet без Rust: **[docs/PROPHET_LITE.md](docs/PROPHET_LITE.md)** · Tensor без Rust: **[docs/TENSOR_LITE.md](docs/TENSOR_LITE.md)** · план: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
 Иконки `.kenga` в Cursor/VS Code — из Marketplace или локально:
