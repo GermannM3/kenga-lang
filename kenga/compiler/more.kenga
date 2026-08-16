@@ -6,7 +6,8 @@
 //          t_from/t_get/t_matmul/t_shape/t_add/tensor/t_fill,
 //          t_sub/t_mul/t_reshape/t_transpose/t_scale/t_sum/t_dot,
 //          t_exp/t_log/t_softmax/t_mean/t_mse,
-//          memory_config/remember/foresee/consolidate/save_mind
+//          memory_config/remember/foresee/consolidate/save_mind,
+//          ag_clear/ag_param/ag_matmul/ag_mse/ag_backward/ag_step
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -75,6 +76,27 @@ fn OP_MEM_STATS() -> i64 { return 64; }
 fn OP_MEM_RECALL() -> i64 { return 65; }
 fn OP_SAVE_MIND() -> i64 { return 66; }
 fn OP_LOAD_MIND() -> i64 { return 67; }
+fn OP_AG_CLEAR() -> i64 { return 68; }
+fn OP_AG_PARAM() -> i64 { return 69; }
+fn OP_AG_CONST() -> i64 { return 70; }
+fn OP_AG_ADD() -> i64 { return 71; }
+fn OP_AG_SUB() -> i64 { return 72; }
+fn OP_AG_MUL() -> i64 { return 73; }
+fn OP_AG_MATMUL() -> i64 { return 74; }
+fn OP_AG_SCALE() -> i64 { return 75; }
+fn OP_AG_RELU() -> i64 { return 76; }
+fn OP_AG_NEG() -> i64 { return 77; }
+fn OP_AG_TRANSPOSE() -> i64 { return 78; }
+fn OP_AG_RESHAPE() -> i64 { return 79; }
+fn OP_AG_EXP() -> i64 { return 80; }
+fn OP_AG_SOFTMAX() -> i64 { return 81; }
+fn OP_AG_MSE() -> i64 { return 82; }
+fn OP_AG_SUM() -> i64 { return 83; }
+fn OP_AG_VALUE() -> i64 { return 84; }
+fn OP_AG_GRAD() -> i64 { return 85; }
+fn OP_AG_BACKWARD() -> i64 { return 86; }
+fn OP_AG_STEP() -> i64 { return 87; }
+fn OP_AG_LOG() -> i64 { return 88; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -442,6 +464,78 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         }
         if op == OP_LOAD_MIND() {
             let p = list_pop(stack); stack = push(p[0], load_mind(p[1]));
+        }
+        if op == OP_AG_CLEAR() {
+            ag_clear();
+            stack = push(stack, 0);
+        }
+        if op == OP_AG_PARAM() {
+            let p = list_pop(stack); stack = push(p[0], ag_param(p[1]));
+        }
+        if op == OP_AG_CONST() {
+            let p = list_pop(stack); stack = push(p[0], ag_const(p[1]));
+        }
+        if op == OP_AG_ADD() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_add(a[1], b[1]));
+        }
+        if op == OP_AG_SUB() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_sub(a[1], b[1]));
+        }
+        if op == OP_AG_MUL() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_mul(a[1], b[1]));
+        }
+        if op == OP_AG_MATMUL() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_matmul(a[1], b[1]));
+        }
+        if op == OP_AG_SCALE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_scale(a[1], b[1]));
+        }
+        if op == OP_AG_RELU() {
+            let p = list_pop(stack); stack = push(p[0], ag_relu(p[1]));
+        }
+        if op == OP_AG_NEG() {
+            let p = list_pop(stack); stack = push(p[0], ag_neg(p[1]));
+        }
+        if op == OP_AG_TRANSPOSE() {
+            let p = list_pop(stack); stack = push(p[0], ag_transpose(p[1]));
+        }
+        if op == OP_AG_RESHAPE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_reshape(a[1], b[1]));
+        }
+        if op == OP_AG_EXP() {
+            let p = list_pop(stack); stack = push(p[0], ag_exp(p[1]));
+        }
+        if op == OP_AG_SOFTMAX() {
+            let p = list_pop(stack); stack = push(p[0], ag_softmax(p[1]));
+        }
+        if op == OP_AG_MSE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_mse(a[1], b[1]));
+        }
+        if op == OP_AG_SUM() {
+            let p = list_pop(stack); stack = push(p[0], ag_sum(p[1]));
+        }
+        if op == OP_AG_VALUE() {
+            let p = list_pop(stack); stack = push(p[0], ag_value(p[1]));
+        }
+        if op == OP_AG_GRAD() {
+            let p = list_pop(stack); stack = push(p[0], ag_grad(p[1]));
+        }
+        if op == OP_AG_BACKWARD() {
+            let p = list_pop(stack); ag_backward(p[1]); stack = push(p[0], 0);
+        }
+        if op == OP_AG_STEP() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], ag_step(a[1], b[1]));
+        }
+        if op == OP_AG_LOG() {
+            let p = list_pop(stack); stack = push(p[0], ag_log(p[1]));
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
@@ -946,6 +1040,11 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                         code = push(code, OP_T_FILL());
                                                         i = j;
                                                     } else {
+                                                    if id[0] == "ag_clear" {
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_AG_CLEAR());
+                                                        i = j;
+                                                    } else {
                                                     let hop: i64 = 0;
                                                     if id[0] == "t_sub" { hop = OP_T_SUB(); }
                                                     if id[0] == "t_mul" { hop = OP_T_MUL(); }
@@ -956,6 +1055,14 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "surprise" { hop = OP_MEM_SURPRISE(); }
                                                     if id[0] == "foresee" { hop = OP_MEM_FORESEE(); }
                                                     if id[0] == "save_mind" { hop = OP_SAVE_MIND(); }
+                                                    if id[0] == "ag_add" { hop = OP_AG_ADD(); }
+                                                    if id[0] == "ag_sub" { hop = OP_AG_SUB(); }
+                                                    if id[0] == "ag_mul" { hop = OP_AG_MUL(); }
+                                                    if id[0] == "ag_matmul" { hop = OP_AG_MATMUL(); }
+                                                    if id[0] == "ag_mse" { hop = OP_AG_MSE(); }
+                                                    if id[0] == "ag_scale" { hop = OP_AG_SCALE(); }
+                                                    if id[0] == "ag_reshape" { hop = OP_AG_RESHAPE(); }
+                                                    if id[0] == "ag_step" { hop = OP_AG_STEP(); }
                                                     if hop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -976,6 +1083,18 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "consolidate" { uop = OP_MEM_CONSOLIDATE(); }
                                                     if id[0] == "mem_stats" { uop = OP_MEM_STATS(); }
                                                     if id[0] == "load_mind" { uop = OP_LOAD_MIND(); }
+                                                    if id[0] == "ag_param" { uop = OP_AG_PARAM(); }
+                                                    if id[0] == "ag_const" { uop = OP_AG_CONST(); }
+                                                    if id[0] == "ag_relu" { uop = OP_AG_RELU(); }
+                                                    if id[0] == "ag_neg" { uop = OP_AG_NEG(); }
+                                                    if id[0] == "ag_transpose" { uop = OP_AG_TRANSPOSE(); }
+                                                    if id[0] == "ag_exp" { uop = OP_AG_EXP(); }
+                                                    if id[0] == "ag_log" { uop = OP_AG_LOG(); }
+                                                    if id[0] == "ag_softmax" { uop = OP_AG_SOFTMAX(); }
+                                                    if id[0] == "ag_sum" { uop = OP_AG_SUM(); }
+                                                    if id[0] == "ag_value" { uop = OP_AG_VALUE(); }
+                                                    if id[0] == "ag_grad" { uop = OP_AG_GRAD(); }
+                                                    if id[0] == "ag_backward" { uop = OP_AG_BACKWARD(); }
                                                     if uop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1038,6 +1157,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     }
                                                     }
                                                     }
+                                                }
                                                 }
                                             }
                                         }
@@ -1791,6 +1911,8 @@ fn main() -> i64 {
     assert(run_file("examples/selfhost/tensor_more.kenga") == 0);
     assert(run_file("examples/selfhost/prophet_more.kenga") == 0);
     assert(run_file("examples/prophet.kenga") == 0);
+    assert(run_file("examples/selfhost/tape_more.kenga") == 0);
+    assert(run_file("examples/ml/autograd_tape.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
