@@ -46,6 +46,12 @@ fn OP_TO_STR() -> i64 { return 43; }
 fn OP_PRINT() -> i64 { return 44; }
 fn OP_SLEEP_MS() -> i64 { return 45; }
 fn OP_NOW_MS() -> i64 { return 46; }
+fn OP_T_FROM() -> i64 { return 47; }
+fn OP_T_GET() -> i64 { return 48; }
+fn OP_T_MATMUL() -> i64 { return 49; }
+fn OP_T_SHAPE() -> i64 { return 50; }
+fn OP_TENSOR() -> i64 { return 51; }
+fn OP_T_FILL() -> i64 { return 52; }
 fn OP_POP() -> i64 { return 20; }
 
 fn dirname_of(path: str) -> str {
@@ -246,6 +252,26 @@ fn emit3(code: list, a: i64, b: i64, c: i64) -> list {
     code = push(code, a);
     code = push(code, b);
     return push(code, c);
+}
+
+fn emit_n_args(s: str, j: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list, n: i64) -> list {
+    let k: i64 = 0;
+    while k < n {
+        if k > 0 {
+            j = skip(s, j);
+            assert(s[j] == ",");
+            j = j + 1;
+        }
+        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
+        code = ar[0];
+        j = ar[1];
+        vnames = ar[2];
+        k = k + 1;
+    }
+    j = skip(s, j);
+    assert(s[j] == ")");
+    j = j + 1;
+    return [code, j, vnames];
 }
 
 fn parse_ident(s: str, i: i64) -> list {
@@ -594,6 +620,36 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                             code = push(code, OP_NOW_MS());
                                             i = j;
                                         } else {
+                                        if id[0] == "t_from" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_T_FROM());
+                                            i = ar[1]; vnames = ar[2];
+                                        } else {
+                                        if id[0] == "t_get" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_T_GET());
+                                            i = ar[1]; vnames = ar[2];
+                                        } else {
+                                        if id[0] == "t_matmul" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_T_MATMUL());
+                                            i = ar[1]; vnames = ar[2];
+                                        } else {
+                                        if id[0] == "t_shape" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
+                                            code = push(ar[0], OP_T_SHAPE());
+                                            i = ar[1]; vnames = ar[2];
+                                        } else {
+                                        if id[0] == "tensor" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_TENSOR());
+                                            i = ar[1]; vnames = ar[2];
+                                        } else {
+                                        if id[0] == "t_fill" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_T_FILL());
+                                            i = ar[1]; vnames = ar[2];
+                                        } else {
                                 let argc: i64 = 0;
                                 j = skip(s, j);
                                 if s[j] != ")" {
@@ -613,6 +669,12 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 assert(fargc[fi] == argc);
                                 code = emit3(code, OP_CALL(), faddrs[fi], argc);
                                 i = j;
+                                        }
+                                        }
+                                        }
+                                        }
+                                        }
+                                        }
                                         }
                                         }
                                     }
@@ -1455,12 +1517,13 @@ fn write_runtime() -> str {
     s = s + "#include <unistd.h>\n";
     s = s + "#include <sys/time.h>\n";
     s = s + "#endif\n\n";
-    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46 };\n";
+    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52 };\n";
     s = s + "typedef struct { int tag; int64_t i; double f; } V;\n";
     s = s + "static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }\n";
     s = s + "static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }\n";
     s = s + "static V Vl(int64_t x) { V v; v.tag=2; v.i=x; v.f=0; return v; }\n";
     s = s + "static V Vs(int64_t x) { V v; v.tag=3; v.i=x; v.f=0; return v; }\n";
+    s = s + "static V Vt(int64_t x) { V v; v.tag=5; v.i=x; v.f=0; return v; }\n";
     s = s + "static double as_f(V v) { return v.tag==1 ? v.f : (double)v.i; }\n";
     s = s + "static int64_t as_i(V v) { return v.tag==1 ? (int64_t)llround(v.f) : v.i; }\n";
     s = s + "static int64_t as_list(V v) {\n";
@@ -1512,6 +1575,7 @@ fn write_runtime() -> str {
     s = s + "  if (v.tag==1) printf(\"%g\", v.f);\n";
     s = s + "  else if (v.tag==3) printf(\"%s\", as_str(v));\n";
     s = s + "  else if (v.tag==2) printf(\"[list:%lld]\", (long long)v.i);\n";
+    s = s + "  else if (v.tag==5) printf(\"[tensor:%lld]\", (long long)v.i);\n";
     s = s + "  else printf(\"%lld\", (long long)v.i);\n";
     s = s + "}\n";
     s = s + "static int64_t lnew(void) {\n";
@@ -1544,6 +1608,29 @@ fn write_runtime() -> str {
     s = s + "}\n";
     s = s + "static int64_t llen(int64_t id) {\n";
     s = s + "  return (int64_t)gL[id].n;\n";
+    s = s + "}\n\n";
+    s = s + "typedef struct { int rank; int shape[8]; int n; double *data; } TObj;\n";
+    s = s + "static TObj gT[64];\n";
+    s = s + "static int gTn = 0;\n";
+    s = s + "static int64_t talloc(const int *shape, int rank, int zero) {\n";
+    s = s + "  int n = 1, i;\n";
+    s = s + "  if (gTn >= 64) { fprintf(stderr, \"tensor heap full\\n\"); exit(1); }\n";
+    s = s + "  if (rank < 0 || rank > 8) { fprintf(stderr, \"bad tensor rank\\n\"); exit(1); }\n";
+    s = s + "  for (i = 0; i < rank; i++) {\n";
+    s = s + "    if (shape[i] < 0) { fprintf(stderr, \"negative tensor dim\\n\"); exit(1); }\n";
+    s = s + "    if (shape[i] > 0 && n > 4096 / shape[i]) { fprintf(stderr, \"tensor too large\\n\"); exit(1); }\n";
+    s = s + "    n *= shape[i];\n";
+    s = s + "  }\n";
+    s = s + "  gT[gTn].rank = rank; gT[gTn].n = n;\n";
+    s = s + "  for (i = 0; i < rank; i++) gT[gTn].shape[i] = shape[i];\n";
+    s = s + "  gT[gTn].data = n > 0 ? (double*)malloc((size_t)n * sizeof(double)) : NULL;\n";
+    s = s + "  if (n > 0 && !gT[gTn].data) { fprintf(stderr, \"oom\\n\"); exit(1); }\n";
+    s = s + "  if (n > 0 && zero) memset(gT[gTn].data, 0, (size_t)n * sizeof(double));\n";
+    s = s + "  return (int64_t)gTn++;\n";
+    s = s + "}\n";
+    s = s + "static TObj *tobj(V v) {\n";
+    s = s + "  if (v.tag != 5 || v.i < 0 || v.i >= gTn) { fprintf(stderr, \"expected tensor\\n\"); exit(1); }\n";
+    s = s + "  return &gT[v.i];\n";
     s = s + "}\n\n";
     s = s + "#define EVQ_CAP 256\n";
     s = s + "static char *ev_names[EVQ_CAP];\n";
@@ -1647,6 +1734,7 @@ fn write_runtime() -> str {
     s = s + "      if (v.tag==1) tn=\"f64\";\n";
     s = s + "      else if (v.tag==2) tn=\"list\";\n";
     s = s + "      else if (v.tag==3) tn=\"str\";\n";
+    s = s + "      else if (v.tag==5) tn=\"tensor\";\n";
     s = s + "      stack[sp++]=Vs(s_new(tn));\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_TO_STR) {\n";
@@ -1834,6 +1922,50 @@ fn write_runtime() -> str {
     s = s + "      pump_active = 1;\n";
     s = s + "      continue;\n";
     s = s + "    }\n";
+    s = s + "    else if (op == OP_T_FROM) {\n";
+    s = s + "      V data=stack[--sp]; V shape=stack[--sp]; int ishape[8]; int rank, n, i; int64_t h; TObj *t;\n";
+    s = s + "      if (shape.tag!=2 || data.tag!=2) { fprintf(stderr, \"t_from expects lists\\n\"); exit(1); }\n";
+    s = s + "      rank = (int)llen(shape.i); if (rank > 8) { fprintf(stderr, \"t_from rank\\n\"); exit(1); }\n";
+    s = s + "      for (i = 0; i < rank; i++) ishape[i] = (int)as_i(lget(shape.i, i));\n";
+    s = s + "      h = talloc(ishape, rank, 0); t = &gT[h]; n = t->n;\n";
+    s = s + "      if (llen(data.i) != (int64_t)n) { fprintf(stderr, \"t_from data length mismatch\\n\"); exit(1); }\n";
+    s = s + "      for (i = 0; i < n; i++) t->data[i] = as_f(lget(data.i, i));\n";
+    s = s + "      stack[sp++] = Vt(h);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_T_GET) {\n";
+    s = s + "      int64_t ix = as_i(stack[--sp]); TObj *t = tobj(stack[--sp]);\n";
+    s = s + "      if (ix < 0 || ix >= t->n) { fprintf(stderr, \"t_get out of range\\n\"); exit(1); }\n";
+    s = s + "      stack[sp++] = Vf(t->data[ix]);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_T_MATMUL) {\n";
+    s = s + "      TObj *tb = tobj(stack[--sp]); TObj *ta = tobj(stack[--sp]);\n";
+    s = s + "      int m, k, k2, n, i, j, p, shape[2]; int64_t h; TObj *o;\n";
+    s = s + "      if (ta->rank != 2 || tb->rank != 2) { fprintf(stderr, \"t_matmul expects rank-2\\n\"); exit(1); }\n";
+    s = s + "      m = ta->shape[0]; k = ta->shape[1]; k2 = tb->shape[0]; n = tb->shape[1];\n";
+    s = s + "      if (k != k2) { fprintf(stderr, \"t_matmul inner dim mismatch\\n\"); exit(1); }\n";
+    s = s + "      shape[0] = m; shape[1] = n; h = talloc(shape, 2, 1); o = &gT[h];\n";
+    s = s + "      for (i = 0; i < m; i++) for (j = 0; j < n; j++) {\n";
+    s = s + "        double acc = 0.0; for (p = 0; p < k; p++) acc += ta->data[i * k + p] * tb->data[p * n + j];\n";
+    s = s + "        o->data[i * n + j] = acc;\n";
+    s = s + "      }\n";
+    s = s + "      stack[sp++] = Vt(h);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_T_SHAPE) {\n";
+    s = s + "      TObj *t = tobj(stack[--sp]); int64_t lid = lnew(); int i;\n";
+    s = s + "      for (i = 0; i < t->rank; i++) lpush(lid, Vi((int64_t)t->shape[i]));\n";
+    s = s + "      stack[sp++] = Vl(lid);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_TENSOR) {\n";
+    s = s + "      int64_t cols = as_i(stack[--sp]); int64_t rows = as_i(stack[--sp]); int shape[2];\n";
+    s = s + "      if (rows < 0 || cols < 0) { fprintf(stderr, \"negative tensor dim\\n\"); exit(1); }\n";
+    s = s + "      shape[0] = (int)rows; shape[1] = (int)cols;\n";
+    s = s + "      stack[sp++] = Vt(talloc(shape, 2, 1));\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_T_FILL) {\n";
+    s = s + "      double x = as_f(stack[--sp]); V tv = stack[--sp]; TObj *t = tobj(tv); int i;\n";
+    s = s + "      for (i = 0; i < t->n; i++) t->data[i] = x;\n";
+    s = s + "      stack[sp++] = tv;\n";
+    s = s + "    }\n";
     s = s + "    else if (op == OP_HALT) { return 0; }\n";
     s = s + "    else { fprintf(stderr, \"bad op %lld\\n\", (long long)op); exit(1); }\n";
     s = s + "  }\n";
@@ -1942,6 +2074,11 @@ fn main() -> i64 {
     assert(write_file("bootstrap/generated/bc_from_now.c", write_c_driver(r24[0], r24[1], r24[2], r24[3])) == true);
     assert(code_has_seq(r24[0], [OP_NOW_MS()]) == 1);
 
+    let r25 = compile_src(resolve_imports("examples/selfhost/bc_tensor.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_tensor.c", write_c_driver(r25[0], r25[1], r25[2], r25[3])) == true);
+    assert(code_has_seq(r25[0], [OP_T_MATMUL()]) == 1);
+    assert(code_has_seq(r25[0], [OP_T_FROM()]) == 1);
+
     let raw: str = read_file("bootstrap/generated/_bc_path.txt");
     let one: str = trim_path(raw);
     if len(one) > 0 {
@@ -1950,7 +2087,7 @@ fn main() -> i64 {
         println("wrote bc_one_out.c for " + one);
     }
 
-    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net/birth/logic/typeof/print/now");
+    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net/birth/logic/typeof/print/now/tensor");
     println("bc_src_c ok");
     return 0;
 }

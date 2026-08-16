@@ -8,12 +8,13 @@
 #include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52 };
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
 static V Vl(int64_t x) { V v; v.tag=2; v.i=x; v.f=0; return v; }
 static V Vs(int64_t x) { V v; v.tag=3; v.i=x; v.f=0; return v; }
+static V Vt(int64_t x) { V v; v.tag=5; v.i=x; v.f=0; return v; }
 static double as_f(V v) { return v.tag==1 ? v.f : (double)v.i; }
 static int64_t as_i(V v) { return v.tag==1 ? (int64_t)llround(v.f) : v.i; }
 static int64_t as_list(V v) {
@@ -67,6 +68,7 @@ static void vprint(V v) {
   if (v.tag==1) printf("%g", v.f);
   else if (v.tag==3) printf("%s", as_str(v));
   else if (v.tag==2) printf("[list:%lld]", (long long)v.i);
+  else if (v.tag==5) printf("[tensor:%lld]", (long long)v.i);
   else printf("%lld", (long long)v.i);
 }
 static int64_t lnew(void) {
@@ -99,6 +101,30 @@ static void lset(int64_t id, int64_t i, V v) {
 }
 static int64_t llen(int64_t id) {
   return (int64_t)gL[id].n;
+}
+
+typedef struct { int rank; int shape[8]; int n; double *data; } TObj;
+static TObj gT[64];
+static int gTn = 0;
+static int64_t talloc(const int *shape, int rank, int zero) {
+  int n = 1, i;
+  if (gTn >= 64) { fprintf(stderr, "tensor heap full\n"); exit(1); }
+  if (rank < 0 || rank > 8) { fprintf(stderr, "bad tensor rank\n"); exit(1); }
+  for (i = 0; i < rank; i++) {
+    if (shape[i] < 0) { fprintf(stderr, "negative tensor dim\n"); exit(1); }
+    if (shape[i] > 0 && n > 4096 / shape[i]) { fprintf(stderr, "tensor too large\n"); exit(1); }
+    n *= shape[i];
+  }
+  gT[gTn].rank = rank; gT[gTn].n = n;
+  for (i = 0; i < rank; i++) gT[gTn].shape[i] = shape[i];
+  gT[gTn].data = n > 0 ? (double*)malloc((size_t)n * sizeof(double)) : NULL;
+  if (n > 0 && !gT[gTn].data) { fprintf(stderr, "oom\n"); exit(1); }
+  if (n > 0 && zero) memset(gT[gTn].data, 0, (size_t)n * sizeof(double));
+  return (int64_t)gTn++;
+}
+static TObj *tobj(V v) {
+  if (v.tag != 5 || v.i < 0 || v.i >= gTn) { fprintf(stderr, "expected tensor\n"); exit(1); }
+  return &gT[v.i];
 }
 
 #define EVQ_CAP 256
@@ -205,6 +231,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       if (v.tag==1) tn="f64";
       else if (v.tag==2) tn="list";
       else if (v.tag==3) tn="str";
+      else if (v.tag==5) tn="tensor";
       stack[sp++]=Vs(s_new(tn));
     }
     else if (op == OP_TO_STR) {
@@ -391,6 +418,50 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       pump_ret_ip = ip;
       pump_active = 1;
       continue;
+    }
+    else if (op == OP_T_FROM) {
+      V data=stack[--sp]; V shape=stack[--sp]; int ishape[8]; int rank, n, i; int64_t h; TObj *t;
+      if (shape.tag!=2 || data.tag!=2) { fprintf(stderr, "t_from expects lists\n"); exit(1); }
+      rank = (int)llen(shape.i); if (rank > 8) { fprintf(stderr, "t_from rank\n"); exit(1); }
+      for (i = 0; i < rank; i++) ishape[i] = (int)as_i(lget(shape.i, i));
+      h = talloc(ishape, rank, 0); t = &gT[h]; n = t->n;
+      if (llen(data.i) != (int64_t)n) { fprintf(stderr, "t_from data length mismatch\n"); exit(1); }
+      for (i = 0; i < n; i++) t->data[i] = as_f(lget(data.i, i));
+      stack[sp++] = Vt(h);
+    }
+    else if (op == OP_T_GET) {
+      int64_t ix = as_i(stack[--sp]); TObj *t = tobj(stack[--sp]);
+      if (ix < 0 || ix >= t->n) { fprintf(stderr, "t_get out of range\n"); exit(1); }
+      stack[sp++] = Vf(t->data[ix]);
+    }
+    else if (op == OP_T_MATMUL) {
+      TObj *tb = tobj(stack[--sp]); TObj *ta = tobj(stack[--sp]);
+      int m, k, k2, n, i, j, p, shape[2]; int64_t h; TObj *o;
+      if (ta->rank != 2 || tb->rank != 2) { fprintf(stderr, "t_matmul expects rank-2\n"); exit(1); }
+      m = ta->shape[0]; k = ta->shape[1]; k2 = tb->shape[0]; n = tb->shape[1];
+      if (k != k2) { fprintf(stderr, "t_matmul inner dim mismatch\n"); exit(1); }
+      shape[0] = m; shape[1] = n; h = talloc(shape, 2, 1); o = &gT[h];
+      for (i = 0; i < m; i++) for (j = 0; j < n; j++) {
+        double acc = 0.0; for (p = 0; p < k; p++) acc += ta->data[i * k + p] * tb->data[p * n + j];
+        o->data[i * n + j] = acc;
+      }
+      stack[sp++] = Vt(h);
+    }
+    else if (op == OP_T_SHAPE) {
+      TObj *t = tobj(stack[--sp]); int64_t lid = lnew(); int i;
+      for (i = 0; i < t->rank; i++) lpush(lid, Vi((int64_t)t->shape[i]));
+      stack[sp++] = Vl(lid);
+    }
+    else if (op == OP_TENSOR) {
+      int64_t cols = as_i(stack[--sp]); int64_t rows = as_i(stack[--sp]); int shape[2];
+      if (rows < 0 || cols < 0) { fprintf(stderr, "negative tensor dim\n"); exit(1); }
+      shape[0] = (int)rows; shape[1] = (int)cols;
+      stack[sp++] = Vt(talloc(shape, 2, 1));
+    }
+    else if (op == OP_T_FILL) {
+      double x = as_f(stack[--sp]); V tv = stack[--sp]; TObj *t = tobj(tv); int i;
+      for (i = 0; i < t->n; i++) t->data[i] = x;
+      stack[sp++] = tv;
     }
     else if (op == OP_HALT) { return 0; }
     else { fprintf(stderr, "bad op %lld\n", (long long)op); exit(1); }

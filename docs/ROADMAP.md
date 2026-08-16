@@ -54,6 +54,7 @@
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
 | ✅ | **`bc_src_c`**: `print` / `sleep_ms` / `now_ms` |
+| ✅ | **`bc_src_c`**: Tensor (`t_from` / `t_matmul` / `t_get` / `t_shape` / `tensor` / `t_fill`, ops 47–52) |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ✅ | Emit lite runtime: **`rt_types` / Prophet / tensor / tape / compiler / VM / selftest** — `kenga_lite.c` каркас |
 | ✅ | CI job `lite` без cargo; release **требует** `kenga-lite` (cargo `kenga` ещё legacy в архиве) |
