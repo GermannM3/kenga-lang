@@ -1,0 +1,20 @@
+fn main() -> i64 {
+    ag_clear();
+    let p = ag_softmax(ag_const(t_from([2], [0.0, 0.0])));
+    assert(round(t_get(ag_value(p), 0) * 10.0) == 5);
+    assert(round(t_get(ag_value(p), 1) * 10.0) == 5);
+
+    ag_clear();
+    let wid = ag_param(t_from([2], [-1.0, 2.0]));
+    ag_backward(ag_sum(ag_relu(wid)));
+    let g = ag_grad(wid);
+    assert(round(t_get(g, 0) * 10.0) == 0);
+    assert(round(t_get(g, 1) * 10.0) == 10);
+
+    ag_clear();
+    let r = ag_reshape(ag_const(t_from([2, 2], [1.0, 2.0, 3.0, 4.0])), [4]);
+    assert(round(t_get(ag_value(r), 3) * 10.0) == 40);
+
+    println("tape ops bc ok");
+    return 0;
+}
