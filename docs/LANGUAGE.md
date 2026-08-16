@@ -104,7 +104,7 @@ i64, f64, `round`, `assert`, строки, списки, `print`/`println`, `str
 **Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / `load_ppm` / `load_wav` / …),
 tape `ag_*`, `sweep`, `now_ms` wall clock, `sleep_ms`.
 
-Тот же диалект на VM **`more.kenga`**: birth→24, `print`/`sleep_ms`, `learn`/`predict`, `examples/prophet.kenga`, `mlp_autograd.kenga`, `examples/selfhost/vision_more.kenga`.
+Тот же диалект на VM **`more.kenga`**: birth→24, `print`/`sleep_ms`, `learn`/`predict`/`unroll`/`remember_next`, `examples/prophet.kenga`, `mlp_autograd.kenga`, `examples/selfhost/vision_more.kenga`.
 
 ```bash
 bash bootstrap/build.sh
@@ -122,8 +122,8 @@ kenga run --lite examples/selfhost/for_lite.kenga
 ## emit-c / build
 
 `lower_c` → C99: i64, f64, list, struct, for/if, events, `println`/`print`, `round`, `typeof`/`to_str`, `&&` `||` `!` `%`, `sleep_ms`, `now_ms`.  
-`lower_kv` → tagged KVal C, тот же диалект + str/ord.  
-`bc_src_c` → bytecode C VM: то же плюс birth/net/agent.  
+`lower_kv` → tagged KVal C, тот же диалект + str/ord + `now_ms`.  
+`bc_src_c` → bytecode C VM: то же плюс birth/net/agent + `now_ms`.  
 Нет в native C: Tensor, Memory, tape — это lite и `more`.
 
 ## Примеры по темам
@@ -145,7 +145,7 @@ kenga run --lite examples/selfhost/for_lite.kenga
 | Prophet | `examples/prophet.kenga` (и на `--lite`) |
 | Lite | `examples/selfhost/*_lite.kenga` |
 | more tensors / tape / vision | `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga` |
-| more print / learn | `examples/selfhost/print_more.kenga`, `learn_more.kenga` |
+| more print / learn / unroll | `examples/selfhost/print_more.kenga`, `learn_more.kenga`, `unroll_more.kenga` |
 | more Prophet | `examples/selfhost/prophet_more.kenga`, `examples/prophet.kenga` |
 
 Учить по шагам: `docs/LEARN.md` · упражнения: `docs/EXERCISES.md`.

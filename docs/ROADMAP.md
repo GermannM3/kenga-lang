@@ -35,6 +35,7 @@
 | ✅ | **`more.kenga`**: `t_set` / `save_tensor` / `load_tensor` + `mlp_autograd` on Kenga VM |
 | ✅ | **`more.kenga`**: `load_ppm` / `load_wav` / `t_patch_mean` / `t_linear_grad` |
 | ✅ | **`more.kenga`**: `print` / `sleep_ms` / `learn` / `predict` |
+| ✅ | **`more.kenga`**: `unroll` / `remember_next` |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
@@ -42,9 +43,10 @@
 | ✅ | **`kenga/emit/lower_c.kenga`** — agent / for / lists / **struct** / **elif** / **f64** / import → native C |
 | ✅ | **`lower_c`**: `now_ms` |
 | ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
+| ✅ | **`lower_kv`**: `now_ms` |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
-| ✅ | **`bc_src_c`**: `print` / `sleep_ms` |
+| ✅ | **`bc_src_c`**: `print` / `sleep_ms` / `now_ms` |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ✅ | Emit lite runtime: **`rt_types` / Prophet / tensor / tape / compiler / VM / selftest** — `kenga_lite.c` каркас |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |

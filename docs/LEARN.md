@@ -41,8 +41,8 @@ kenga run --lite examples/hello.kenga
 - `break` / `continue`
 - `&&` `||` `!` `%` `typeof` `to_str` (lite, `more`, lowerers, `bc_src_c`)
 - `print` без `\n`, `sleep_ms` (lite, `more`; `lower_c` / `lower_kv` / `bc_src_c`)
-- `learn` / `predict` на `more` VM (хост — lite builtins)
-- `now_ms` — часы, не заглушка; комментарии `//` и `/* … */`
+- `learn` / `predict` / `unroll` / `remember_next` на `more` VM (хост — lite builtins)
+- `now_ms` — часы, не заглушка (lite, `more`, `lower_c` / `lower_kv` / `bc_src_c`); комментарии `//` и `/* … */`
 
 ## 3. Списки и struct
 
@@ -88,7 +88,7 @@ kenga run --lite examples/ml/kenga_mm_lm.kenga
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
 
-`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `print_more.kenga`, `learn_more.kenga`, `examples/prophet.kenga`.
+`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `print_more.kenga`, `learn_more.kenga`, `unroll_more.kenga`, `examples/prophet.kenga`.
 
 `kenga_mm_lm` — картинка + звук → подпись (`kenga vidit … i slyshit ton`). Это сид большой модели, не CLIP.
 
@@ -117,8 +117,8 @@ scripts\freedom-smoke.cmd
 ```
 
 - `lower_c` — i64/struct/float/agent, `typeof`/`to_str`, `print`/`sleep_ms`/`now_ms` → `bootstrap/bin/lower_*.c`  
-- `lower_kv` — tagged KVal + тот же диалект → `bootstrap/generated/`  
-- `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, `print`/`sleep_ms`, birth/net/agent)  
+- `lower_kv` — tagged KVal + тот же диалект + `now_ms` → `bootstrap/generated/`  
+- `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, `print`/`sleep_ms`/`now_ms`, birth/net/agent)  
 - `rt_*` — Kenga пишет весь lite host (типы, Prophet, tensor, tape, compiler, VM, selftest). `kenga_lite.c` — `#include`.
 
 Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.
