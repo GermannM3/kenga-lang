@@ -104,7 +104,7 @@ i64, f64, `round`, `assert`, строки, списки, `print`/`println`, `str
 **Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / `load_ppm` / `load_wav` / …),
 tape `ag_*`, `sweep`, `now_ms` wall clock, `sleep_ms`.
 
-Тот же диалект на VM **`more.kenga`**: birth→24, `examples/prophet.kenga`, `mlp_autograd.kenga`, `examples/selfhost/vision_more.kenga`.
+Тот же диалект на VM **`more.kenga`**: birth→24, `print`/`sleep_ms`, `learn`/`predict`, `examples/prophet.kenga`, `mlp_autograd.kenga`, `examples/selfhost/vision_more.kenga`.
 
 ```bash
 bash bootstrap/build.sh
@@ -145,6 +145,7 @@ kenga run --lite examples/selfhost/for_lite.kenga
 | Prophet | `examples/prophet.kenga` (и на `--lite`) |
 | Lite | `examples/selfhost/*_lite.kenga` |
 | more tensors / tape / vision | `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga` |
+| more print / learn | `examples/selfhost/print_more.kenga`, `learn_more.kenga` |
 | more Prophet | `examples/selfhost/prophet_more.kenga`, `examples/prophet.kenga` |
 
 Учить по шагам: `docs/LEARN.md` · упражнения: `docs/EXERCISES.md`.

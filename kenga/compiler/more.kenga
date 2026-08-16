@@ -9,7 +9,8 @@
 //          memory_config/remember/foresee/consolidate/save_mind,
 //          ag_clear/ag_param/ag_matmul/ag_mse/ag_backward/ag_step,
 //          t_set/save_tensor/load_tensor/sweep/now_ms/memory,
-//          load_ppm/load_wav/t_patch_mean/t_linear_grad
+//          load_ppm/load_wav/t_patch_mean/t_linear_grad,
+//          print/sleep_ms/learn/predict
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -109,6 +110,10 @@ fn OP_LOAD_PPM() -> i64 { return 95; }
 fn OP_LOAD_WAV() -> i64 { return 96; }
 fn OP_T_PATCH_MEAN() -> i64 { return 97; }
 fn OP_T_LINEAR_GRAD() -> i64 { return 98; }
+fn OP_PRINT() -> i64 { return 99; }
+fn OP_SLEEP_MS() -> i64 { return 100; }
+fn OP_LEARN() -> i64 { return 101; }
+fn OP_PREDICT() -> i64 { return 102; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -583,6 +588,20 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         if op == OP_T_LINEAR_GRAD() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
             stack = push(a[0], t_linear_grad(a[1], b[1], c[1]));
+        }
+        if op == OP_PRINT() {
+            let p = list_pop(stack); stack = p[0]; print(p[1]);
+        }
+        if op == OP_SLEEP_MS() {
+            let p = list_pop(stack); stack = push(p[0], sleep_ms(p[1]));
+        }
+        if op == OP_LEARN() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], learn(a[1], b[1], c[1]));
+        }
+        if op == OP_PREDICT() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], predict(a[1], b[1]));
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
@@ -1116,6 +1135,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "ag_scale" { hop = OP_AG_SCALE(); }
                                                     if id[0] == "ag_reshape" { hop = OP_AG_RESHAPE(); }
                                                     if id[0] == "ag_step" { hop = OP_AG_STEP(); }
+                                                    if id[0] == "predict" { hop = OP_PREDICT(); }
                                                     if hop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1151,6 +1171,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "load_tensor" { uop = OP_LOAD_TENSOR(); }
                                                     if id[0] == "load_ppm" { uop = OP_LOAD_PPM(); }
                                                     if id[0] == "load_wav" { uop = OP_LOAD_WAV(); }
+                                                    if id[0] == "sleep_ms" { uop = OP_SLEEP_MS(); }
                                                     if uop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1165,6 +1186,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "t_set" { t3 = OP_T_SET(); }
                                                     if id[0] == "t_patch_mean" { t3 = OP_T_PATCH_MEAN(); }
                                                     if id[0] == "t_linear_grad" { t3 = OP_T_LINEAR_GRAD(); }
+                                                    if id[0] == "learn" { t3 = OP_LEARN(); }
                                                     if t3 != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1451,6 +1473,16 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
         i = skip(s, i); assert(s[i] == ")"); i = i + 1;
         code = push(code, OP_PRINTLN());
+        i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+        return [code, i, vnames, patches, lctx];
+    }
+    if starts_kw(s, i, "print") == 1 {
+        i = skip(s, i + 5);
+        assert(s[i] == "("); i = i + 1;
+        let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
+        code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+        i = skip(s, i); assert(s[i] == ")"); i = i + 1;
+        code = push(code, OP_PRINT());
         i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
         return [code, i, vnames, patches, lctx];
     }
@@ -1975,6 +2007,8 @@ fn main() -> i64 {
     assert(run_file("examples/selfhost/tensor_io_more.kenga") == 0);
     assert(run_file("examples/ml/mlp_autograd.kenga") == 0);
     assert(run_file("examples/selfhost/vision_more.kenga") == 0);
+    assert(run_file("examples/selfhost/print_more.kenga") == 0);
+    assert(run_file("examples/selfhost/learn_more.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }

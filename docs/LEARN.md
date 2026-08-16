@@ -40,7 +40,8 @@ kenga run --lite examples/hello.kenga
 - `for i in 0..n { … }` / `for x in xs { … }`
 - `break` / `continue`
 - `&&` `||` `!` `%` `typeof` `to_str` (lite, `more`, lowerers, `bc_src_c`)
-- `print` без `\n`, `sleep_ms` (lite; `lower_c` / `lower_kv` эмитят в C)
+- `print` без `\n`, `sleep_ms` (lite, `more`; `lower_c` / `lower_kv` эмитят в C)
+- `learn` / `predict` на `more` VM (хост — lite builtins)
 - `now_ms` — часы, не заглушка; комментарии `//` и `/* … */`
 
 ## 3. Списки и struct
@@ -87,7 +88,7 @@ kenga run --lite examples/ml/kenga_mm_lm.kenga
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
 
-`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `examples/prophet.kenga`.
+`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `print_more.kenga`, `learn_more.kenga`, `examples/prophet.kenga`.
 
 `kenga_mm_lm` — картинка + звук → подпись (`kenga vidit … i slyshit ton`). Это сид большой модели, не CLIP.
 
