@@ -39,8 +39,9 @@ kenga run --lite examples/hello.kenga
 - `while cond { … }`
 - `for i in 0..n { … }` / `for x in xs { … }`
 - `break` / `continue`
-- `&&` `||` `!` `%` `typeof` `to_str` (lite и `more`); `now_ms` — часы, не заглушка
-- комментарии `//` и `/* … */`
+- `&&` `||` `!` `%` `typeof` `to_str` (lite, `more`, lowerers, `bc_src_c`)
+- `print` без `\n`, `sleep_ms` (lite; `lower_c` / `lower_kv` эмитят в C)
+- `now_ms` — часы, не заглушка; комментарии `//` и `/* … */`
 
 ## 3. Списки и struct
 
@@ -83,7 +84,10 @@ kenga run --lite examples/ml/vision_ppm.kenga
 kenga run --lite examples/ml/fusion.kenga
 kenga run --lite examples/ml/living_multimodal.kenga
 kenga run --lite examples/ml/kenga_mm_lm.kenga
+bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
+
+`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `examples/prophet.kenga`.
 
 `kenga_mm_lm` — картинка + звук → подпись (`kenga vidit … i slyshit ton`). Это сид большой модели, не CLIP.
 
@@ -100,19 +104,20 @@ kenga run --lite examples\selfhost\for_lite.kenga
 kenga run --lite examples\agent.kenga
 ```
 
-Компилятор и VM на Kenga: `kenga/compiler/more.kenga` — birth→24, XOR, и сам гоняет `c_seed`/`expr_c` (пишет `.c`).  
+Компилятор и VM на Kenga: `kenga/compiler/more.kenga` — birth→24, XOR, `c_seed`/`expr_c`, Prophet, tape SGD, тензоры (включая `load_ppm`/`load_wav`). Сам гоняет `examples/prophet.kenga` и `mlp_autograd.kenga`.  
 Kenga сама пишет C99:
 
 ```bat
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\bc_src_c.kenga
 scripts\freedom-smoke.cmd
 ```
 
-- `lower_c` — i64/struct/float/agent → `bootstrap/bin/lower_*.c`  
-- `lower_kv` — tagged KVal (str/ord/hetero lists) + **lex_frag** → `bootstrap/generated/`  
-- `bc_src_c` — **парсит** `.kenga` → bytecode → native VM (`bc_from_fn`→42, lists→19, fact→120, for_lite, `else if`)
+- `lower_c` — i64/struct/float/agent, `typeof`/`to_str`, `print`/`sleep_ms` → `bootstrap/bin/lower_*.c`  
+- `lower_kv` — tagged KVal + тот же диалект → `bootstrap/generated/`  
+- `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, birth/net/agent)  
 - `rt_*` — Kenga пишет весь lite host (типы, Prophet, tensor, tape, compiler, VM, selftest). `kenga_lite.c` — `#include`.
 
 Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.

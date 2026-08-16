@@ -63,9 +63,9 @@ kenga run --lite examples\selfhost\struct_lite.kenga
 Обычные стеки для ML — Python-клей вокруг C++/CUDA.  
 **Kenga** — язык, где тензор, `ttl`, консолидация и агентный цикл часть семантики.
 
-Сейчас — **3.13**: `more` + `bc_src_c` + своя LM (birth→24, PPM+WAV→текст). Канон без cargo.  
+Сейчас — **3.13**: `more` (Prophet, tape, ppm/wav) + `bc_src_c` (`&&`/`typeof`) + своя LM (birth→24). Канон без cargo.  
 Карта: `docs/REPLACE_RUST.md`. Что в git: `docs/REPO.md`.  
-Расширение: [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga) (`Kenga-ai.kenga`).  
+Расширение: [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga) (`Kenga-ai.kenga`) — **3.13.0**, подсветка уже знает `ag_*` / `typeof` / `sleep_ms`. Язык в репо ушёл дальше хоста расширения; новый VSIX, когда тронем editor.  
 Rust ещё держит GPU / production-scale path. **Python не нужен.** Linux/macOS/Git Bash: `docs/UNIX.md`.
 
 <p align="center">

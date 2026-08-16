@@ -100,9 +100,11 @@ World-model: residual MLP `y = x + Δ`.
 ## Lite (без Rust)
 
 Поддерживает: `fn` `let` `while` **`for` / `break` / `continue`** `if`/`else`/`else if`,  
-i64, f64, `round`, `assert`, строки, списки, `println`, `struct`, type annotations (игнор),  
-**Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / …),
-`sweep` no-op, `now_ms` wall clock, `print` без \\n, `sleep_ms`.
+i64, f64, `round`, `assert`, строки, списки, `print`/`println`, `struct`, type annotations (игнор),  
+**Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / `load_ppm` / `load_wav` / …),
+tape `ag_*`, `sweep`, `now_ms` wall clock, `sleep_ms`.
+
+Тот же диалект на VM **`more.kenga`**: birth→24, `examples/prophet.kenga`, `mlp_autograd.kenga`, `examples/selfhost/vision_more.kenga`.
 
 ```bash
 bash bootstrap/build.sh
@@ -119,8 +121,10 @@ kenga run --lite examples/selfhost/for_lite.kenga
 
 ## emit-c / build
 
-Подмножество → C99: i64, f64, list, struct, управляющие конструкции, `println`, `round`.  
-Нет: Memory, Tensor, events.
+`lower_c` → C99: i64, f64, list, struct, for/if, events, `println`/`print`, `round`, `typeof`/`to_str`, `&&` `||` `!` `%`, `sleep_ms`.  
+`lower_kv` → tagged KVal C, тот же диалект + str/ord.  
+`bc_src_c` → bytecode C VM: то же плюс birth/net/agent.  
+Нет в native C: Tensor, Memory, tape — это lite и `more`.
 
 ## Примеры по темам
 
@@ -140,5 +144,7 @@ kenga run --lite examples/selfhost/for_lite.kenga
 | Fusion | `examples/ml/fusion.kenga` |
 | Prophet | `examples/prophet.kenga` (и на `--lite`) |
 | Lite | `examples/selfhost/*_lite.kenga` |
+| more tensors / tape / vision | `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga` |
+| more Prophet | `examples/selfhost/prophet_more.kenga`, `examples/prophet.kenga` |
 
 Учить по шагам: `docs/LEARN.md` · упражнения: `docs/EXERCISES.md`.

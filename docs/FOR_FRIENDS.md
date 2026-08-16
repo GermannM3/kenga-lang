@@ -55,7 +55,7 @@ World-model предсказывает динамику векторов сос�
 
 1. **Другая ось**, не «ещё один фреймворк на Python».
 2. Можно потрогать **surprise-gated memory** и unroll будущего без зоопарка зависимостей.
-3. Self-host путь открыт: Kenga-lite уже компилируется в bytecode, написанный на Kenga.
+3. Self-host путь открыт: `more.kenga` гоняет Prophet, tape SGD и `load_ppm` на своей VM; `lower_c`/`bc_src_c` пишут native C.
 
 ## Если сломалось
 

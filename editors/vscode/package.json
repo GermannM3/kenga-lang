@@ -1,7 +1,7 @@
 {
   "name": "kenga",
   "displayName": "Kenga Language",
-  "description": "Syntax highlighting and file icons for the Kenga programming language",
+  "description": "Kenga language: highlighting and icons for .kenga (living memory, tensors, self-host compiler)",
   "version": "3.13.0",
   "publisher": "Kenga-ai",
   "engines": {

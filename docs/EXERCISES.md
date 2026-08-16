@@ -39,7 +39,8 @@ Lite: `examples/selfhost/struct_lite.kenga`.
 
 ## E7. Картинка
 
-`load_ppm("examples/ml/assets/dot.ppm")` → `t_mean` → три числа около `0.5`.
+`load_ppm("examples/ml/assets/dot.ppm")` → `t_mean` → три числа около `0.5`.  
+Тот же путь на VM `more`: `examples/selfhost/vision_more.kenga`.
 
 ## E8. Fusion
 

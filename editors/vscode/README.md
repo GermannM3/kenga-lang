@@ -1,8 +1,7 @@
 # Kenga for VS Code / Cursor
 
-Версия **3.13.0**. Язык `.kenga` в проводнике получает свой значок (бирюзовая K), подсветка синтаксиса и базовый language config.
-
-Подсветка знает `read_file` / `write_file` / `save_tensor` / `load_tensor` / `ag_*` / `t_softmax` — то, чем живут birth и mm-LM.
+Версия **3.13.0** на Marketplace. Подсветка знает `read_file` / `write_file` / `save_tensor` / `ag_*` / `typeof` / `to_str` / `sleep_ms` / `print`.  
+Хост языка в репо дальше (self-host `more` / lowerers) — это не повод плодить VSIX, пока не трогаем grammar/иконки.
 
 ## Установка из этого репо
 

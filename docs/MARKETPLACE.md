@@ -1,7 +1,9 @@
 # Publishing the VS Code / Cursor extension
 
 Publisher id in `editors/vscode/package.json`: **`Kenga-ai`**.  
-На маркетплейсе **3.13.0**. Язык уже дальше (word-decoder, `rt_*` хост из Kenga) — следующий VSIX, когда накопится.
+На маркетплейсе **3.13.0** (подсветка + иконка `.kenga`).  
+Язык в git уже дальше: `more.kenga` гоняет Prophet/tape/ppm-wav, `lower_c`/`lower_kv` эмитят `typeof`/`print`/`sleep_ms`, `bc_src_c` — `&&`/`typeof`.  
+Грамматика расширения эти слова уже знает — **версию VSIX не поднимаем**, пока не меняется editor. Следующий `.vsix`, когда накопится в `editors/vscode`.
 
 ## Ручная заливка (без Azure / без vsce login)
 

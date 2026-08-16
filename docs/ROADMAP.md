@@ -89,4 +89,4 @@
 | ✅ | LEARN / LANGUAGE / UNIX / LIVING_MULTIMODAL / CHAT_AND_LM / INDEPENDENCE / REPLACE_RUST / HUGGINGFACE / … |
 | ✅ | Marketplace: ручной Upload `.vsix` (без Azure PAT) |
 
-Версия: **3.13.0**. Marketplace уже 3.13.0. Следующий VSIX — когда накопится в расширении.
+Версия расширения: **3.13.0** (Marketplace). Язык в `kenga/` дальше; следующий VSIX — когда накопится в `editors/vscode`.
