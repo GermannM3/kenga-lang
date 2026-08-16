@@ -580,6 +580,18 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_list(h));
       continue;
     }
+    if (op == OP_ARGC) {
+      vala_push(&stack, V_i64((int64_t)g_kargc));
+      continue;
+    }
+    if (op == OP_ARG) {
+      int64_t ai;
+      if (!stack.len) die("stack underflow arg");
+      ai = as_i64(stack.data[--stack.len], "arg: expected i64");
+      if (ai < 0 || ai >= (int64_t)g_kargc || !g_kargv) die("arg: out of range");
+      vala_push(&stack, V_str(intern_str(g_kargv[ai])));
+      continue;
+    }
     if (op == OP_ML_BOX) {
       if (ml_box_h < 0) {
         ValA tape = {0};

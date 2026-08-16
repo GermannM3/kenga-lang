@@ -111,8 +111,12 @@ enum {
   OP_SLEEP_MS,
   OP_FORESEE_N,
   OP_READ_BYTES,
-  OP_ML_BOX
+  OP_ML_BOX,
+  OP_ARGC,
+  OP_ARG
 };
+static int g_kargc = 0;
+static char **g_kargv = NULL;
 
 enum { TAG_I64 = 0, TAG_STR = 1, TAG_LIST = 2, TAG_STRUCT = 3, TAG_F64 = 4, TAG_MEMORY = 5,
        TAG_TENSOR = 6 };

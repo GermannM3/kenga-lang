@@ -8,7 +8,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 |---|---|---|
 | Living runtime | ✅ `kenga-lite` целиком из `rt_*.kenga` (типы, Prophet, tensor, tape, compiler, VM) | ❌ C99 glue / gcc |
 | Word-LM / tape / tensor / Prophet | ✅ | ✅ списки (`native_ml` / `ml_host`); CRT читает байты |
-| Компилятор на Kenga | ✅ **`more.kenga`**: birth→24, XOR, **`c_seed`/`expr_c`**, Prophet/tape/tensor на списках | ❌ CRT |
+| Компилятор на Kenga | ✅ **`more.kenga`**: `kenga-lite run file` → more VM; сьют без аргументов | ❌ CRT |
 | Emit на Kenga | ✅ **`lower_c`** + **`lower_kv`/`rt_kval`** | ❌ gcc/cl |
 | Native из `.kenga` | ✅ agent / net / **birth** (`bc_from_birth.c` → пишет `kenga_born.kenga`) | ❌ |
 | Каталог замены Rust | ✅ **`kenga/`** + `docs/REPLACE_RUST.md` | — |
@@ -22,7 +22,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM. Сетка: **`kenga_net.kenga`**. Birth: **`kenga_birth.kenga`** → native C пишет программу. Запуск одного файла: **`scripts\bc-run.cmd`**.  
 5. Emit lite runtime закрыт: `kenga_lite.c` только includes. Дальше — VM на Kenga без C.  
 6. Releases: `kenga-lite` обязателен в CI/zip; cargo `kenga` ещё legacy. `src/` → archive, когда zip = только lite.  
-7. `lite run` и more VM считают тензор / tape / Prophet на списках (`native_ml.kenga`, `ml_host.kenga`). C host = CRT: списки, арифметика, `read_file` / `read_bytes` / `write_file` / `print` / `now_ms`. ppm/wav парсятся на Kenga из байт. Без CRT процесс не стартует.
+7. Пользовательский `kenga-lite run file.kenga` компилирует файл на **more VM** (не lite C compiler). `kenga/emit/*` и `more.kenga` без аргументов остаются bootstrap. eval/selftest с `t_*` тоже списки. C host = CRT.
 
 Карта модулей: **`docs/REPLACE_RUST.md`**.
 

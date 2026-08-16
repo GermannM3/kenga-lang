@@ -2,14 +2,35 @@
 int main(int argc, char **argv) {
   if (argc == 1) return selftest();
   if (argc >= 3 && strcmp(argv[1], "run") == 0) {
-    char *src = load_with_imports(argv[2], 0);
-    int64_t r = run_lite(src);
+    char *src;
+    int64_t r;
+    const char *file = argv[2];
+    const char *more;
+    if (!is_host_kenga(file) && (more = find_more_path()) != NULL) {
+      static char *abuf[64];
+      int n = 0;
+      int i;
+      abuf[n++] = (char *)more;
+      abuf[n++] = (char *)file;
+      for (i = 3; i < argc && n < 63; i++) abuf[n++] = argv[i];
+      g_kargc = n;
+      g_kargv = abuf;
+      src = load_with_imports(more, 0);
+    } else {
+      g_kargc = argc - 2;
+      g_kargv = argv + 2;
+      src = load_with_imports(file, 0);
+    }
+    r = run_lite(src);
     free(src);
     if (r != 0) return (int)r;
     return 0;
   }
   if (argc >= 3 && strcmp(argv[1], "eval") == 0) {
-    int64_t r = run_lite(argv[2]);
+    int64_t r;
+    g_kargc = 0;
+    g_kargv = NULL;
+    r = run_lite(argv[2]);
     printf("%lld\n", (long long)r);
     return 0;
   }

@@ -585,6 +585,18 @@ fn main() -> i64 {
     s = s + "      vala_push(&stack, V_list(h));\n";
     s = s + "      continue;\n";
     s = s + "    }\n";
+    s = s + "    if (op == OP_ARGC) {\n";
+    s = s + "      vala_push(&stack, V_i64((int64_t)g_kargc));\n";
+    s = s + "      continue;\n";
+    s = s + "    }\n";
+    s = s + "    if (op == OP_ARG) {\n";
+    s = s + "      int64_t ai;\n";
+    s = s + "      if (!stack.len) die(\"stack underflow arg\");\n";
+    s = s + "      ai = as_i64(stack.data[--stack.len], \"arg: expected i64\");\n";
+    s = s + "      if (ai < 0 || ai >= (int64_t)g_kargc || !g_kargv) die(\"arg: out of range\");\n";
+    s = s + "      vala_push(&stack, V_str(intern_str(g_kargv[ai])));\n";
+    s = s + "      continue;\n";
+    s = s + "    }\n";
     s = s + "    if (op == OP_ML_BOX) {\n";
     s = s + "      if (ml_box_h < 0) {\n";
     s = s + "        ValA tape = {0};\n";

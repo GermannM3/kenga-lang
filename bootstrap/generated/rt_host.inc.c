@@ -42,6 +42,57 @@ static char *join_path(const char *dir, const char *rel) {
   return o;
 }
 
+static char *load_with_imports(const char *path, int depth);
+static const char *find_kenga_file(const char *fwd, const char *bwd) {
+  FILE *tf = fopen(fwd, "rb");
+  if (tf) { fclose(tf); return fwd; }
+  tf = fopen(bwd, "rb");
+  if (tf) { fclose(tf); return bwd; }
+  return NULL;
+}
+static const char *find_ml_host(void) {
+  return find_kenga_file("kenga/compiler/ml_host.kenga", "kenga\\compiler\\ml_host.kenga");
+}
+static const char *find_more_path(void) {
+  return find_kenga_file("kenga/compiler/more.kenga", "kenga\\compiler\\more.kenga");
+}
+static int is_host_kenga(const char *path) {
+  if (!path) return 0;
+  if (strstr(path, "kenga/emit/") || strstr(path, "kenga\\emit\\")) return 1;
+  if (strstr(path, "kenga/compiler/more.kenga") || strstr(path, "kenga\\compiler\\more.kenga")) return 1;
+  if (strstr(path, "kenga/compiler/native_ml.kenga") || strstr(path, "kenga\\compiler\\native_ml.kenga")) return 1;
+  if (strstr(path, "kenga/compiler/ml_host.kenga") || strstr(path, "kenga\\compiler\\ml_host.kenga")) return 1;
+  return 0;
+}
+static int src_mentions_ml(const char *s) {
+  if (!s) return 0;
+  return strstr(s, "t_from") || strstr(s, "t_matmul") || strstr(s, "t_get") ||
+         strstr(s, "ag_clear") || strstr(s, "ag_param") || strstr(s, "memory_config") ||
+         strstr(s, "load_ppm") || strstr(s, "load_wav") || strstr(s, "save_tensor") ||
+         strstr(s, "learn(") || strstr(s, "foresee") || strstr(s, "remember") ||
+         strstr(s, "t_mean") || strstr(s, "t_softmax") || strstr(s, "tensor(");
+}
+static char *inject_ml_src(const char *src) {
+  const char *hp;
+  char *host;
+  char *mix;
+  size_t hl;
+  size_t ol;
+  if (!src) return xstrdup("");
+  if (strstr(src, "fn nt_from(")) return xstrdup(src);
+  hp = find_ml_host();
+  if (!hp) return xstrdup(src);
+  host = load_with_imports(hp, 1);
+  hl = strlen(host);
+  ol = strlen(src);
+  mix = (char *)malloc(hl + ol + 2);
+  if (!mix) die("oom");
+  memcpy(mix, host, hl);
+  mix[hl] = '\n';
+  memcpy(mix + hl + 1, src, ol + 1);
+  free(host);
+  return mix;
+}
 static char *load_with_imports(const char *path, int depth) {
   if (depth > 32) die("import nest too deep");
   char *src = read_file(path);
@@ -86,27 +137,9 @@ static char *load_with_imports(const char *path, int depth) {
   free(dir);
   if (depth == 0 && strstr(path, "native_ml.kenga") == NULL &&
       strstr(path, "ml_host.kenga") == NULL && strstr(out, "fn nt_from(") == NULL) {
-    const char *hp = NULL;
-    FILE *tf;
-    tf = fopen("kenga/compiler/ml_host.kenga", "rb");
-    if (tf) { fclose(tf); hp = "kenga/compiler/ml_host.kenga"; }
-    if (!hp) {
-      tf = fopen("kenga\\compiler\\ml_host.kenga", "rb");
-      if (tf) { fclose(tf); hp = "kenga\\compiler\\ml_host.kenga"; }
-    }
-    if (hp) {
-      char *host = load_with_imports(hp, 1);
-      size_t hl = strlen(host);
-      size_t ol = strlen(out);
-      char *mix = (char *)malloc(hl + ol + 2);
-      if (!mix) die("oom");
-      memcpy(mix, host, hl);
-      mix[hl] = '\n';
-      memcpy(mix + hl + 1, out, ol + 1);
-      free(host);
-      free(out);
-      out = mix;
-    }
+    char *mix = inject_ml_src(out);
+    free(out);
+    out = mix;
   }
   return out;
 }

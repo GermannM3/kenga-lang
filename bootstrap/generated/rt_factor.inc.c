@@ -793,6 +793,23 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         j++;
         i64a_push(code, OP_SWEEP);
         i = j;
+      } else if (strcmp(id.name, "argc") == 0) {
+        free(id.name);
+        j++;
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in argc");
+        j++;
+        i64a_push(code, OP_ARGC);
+        i = j;
+      } else if (strcmp(id.name, "arg") == 0) {
+        free(id.name);
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in arg");
+        j++;
+        i64a_push(code, OP_ARG);
+        i = j;
       } else if (strcmp(id.name, "ml_box") == 0) {
         free(id.name);
         j++;
