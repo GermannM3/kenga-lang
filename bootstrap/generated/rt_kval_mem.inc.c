@@ -387,7 +387,18 @@ static KVal k_unroll(KVal mem, KVal x, KVal nsteps) {
   }
   return kval_list(out);
 }
-static KVal k_foresee_n(KVal mem, KVal x, KVal nsteps) { return k_unroll(mem, x, nsteps); }
+static KVal k_foresee_n(KVal mem, KVal x, KVal nsteps) {
+  double cur[KM_DIM_MAX]; int cn, steps, s;
+  int64_t out = klist_new();
+  cn = kval_list_to_pat(x, cur, KM_DIM_MAX);
+  steps = (int)kval_as_i64(nsteps); if (steps < 1) steps = 1; if (steps > 64) steps = 64;
+  for (s = 0; s < steps; s++) {
+    KVal nxt = k_foresee(mem, pat_to_kval_list(cur, cn));
+    klist_push_val(out, nxt);
+    cn = kval_list_to_pat(nxt, cur, KM_DIM_MAX);
+  }
+  return kval_list(out);
+}
 static KVal k_consolidate(KVal mem) {
   KmMind *m = km_get(mem); int i, n = 0;
   for (i = 0; i < m->nep; i++) {

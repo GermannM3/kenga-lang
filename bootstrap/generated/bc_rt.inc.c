@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86 };
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
@@ -729,6 +729,13 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       double cur[BM_D]; int cn = vlist_pat(x, cur, BM_D), i; int64_t out = lnew();
       if (steps < 1) steps = 1; if (steps > 64) steps = 64;
       for (i = 0; i < steps; i++) { V nxt = bm_predict_list(m, cur, cn); lpush(out, nxt); cn = vlist_pat(nxt, cur, BM_D); }
+      stack[sp++] = Vl(out);
+    }
+    else if (op == OP_FORESEE_N) {
+      int steps = (int)as_i(stack[--sp]); V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]);
+      double cur[BM_D]; int cn = vlist_pat(x, cur, BM_D), i; int64_t out = lnew();
+      if (steps < 1) steps = 1; if (steps > 64) steps = 64;
+      for (i = 0; i < steps; i++) { V nxt = bm_foresee_list(m, cur, cn); lpush(out, nxt); cn = vlist_pat(nxt, cur, BM_D); }
       stack[sp++] = Vl(out);
     }
     else if (op == OP_SURPRISE) {

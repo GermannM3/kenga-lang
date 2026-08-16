@@ -71,6 +71,7 @@ fn OP_SURPRISE() -> i64 { return 68; }
 fn OP_CONSOLIDATE() -> i64 { return 69; }
 fn OP_MEM_STATS() -> i64 { return 70; }
 fn OP_FORESEE() -> i64 { return 71; }
+fn OP_FORESEE_N() -> i64 { return 86; }
 fn OP_AG_ADD() -> i64 { return 72; }
 fn OP_AG_SUB() -> i64 { return 73; }
 fn OP_AG_MUL() -> i64 { return 74; }
@@ -780,7 +781,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                         } else {
                                         if id[0] == "foresee_n" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
-                                            code = push(ar[0], OP_UNROLL());
+                                            code = push(ar[0], OP_FORESEE_N());
                                             i = ar[1]; vnames = ar[2];
                                         } else {
                                         if id[0] == "ag_add" {
@@ -1754,7 +1755,7 @@ fn write_runtime() -> str {
     s = s + "#include <unistd.h>\n";
     s = s + "#include <sys/time.h>\n";
     s = s + "#endif\n\n";
-    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85 };\n";
+    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86 };\n";
     s = s + "typedef struct { int tag; int64_t i; double f; } V;\n";
     s = s + "static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }\n";
     s = s + "static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }\n";
@@ -2468,6 +2469,13 @@ fn write_runtime() -> str {
     s = s + "      for (i = 0; i < steps; i++) { V nxt = bm_predict_list(m, cur, cn); lpush(out, nxt); cn = vlist_pat(nxt, cur, BM_D); }\n";
     s = s + "      stack[sp++] = Vl(out);\n";
     s = s + "    }\n";
+    s = s + "    else if (op == OP_FORESEE_N) {\n";
+    s = s + "      int steps = (int)as_i(stack[--sp]); V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]);\n";
+    s = s + "      double cur[BM_D]; int cn = vlist_pat(x, cur, BM_D), i; int64_t out = lnew();\n";
+    s = s + "      if (steps < 1) steps = 1; if (steps > 64) steps = 64;\n";
+    s = s + "      for (i = 0; i < steps; i++) { V nxt = bm_foresee_list(m, cur, cn); lpush(out, nxt); cn = vlist_pat(nxt, cur, BM_D); }\n";
+    s = s + "      stack[sp++] = Vl(out);\n";
+    s = s + "    }\n";
     s = s + "    else if (op == OP_SURPRISE) {\n";
     s = s + "      V b=stack[--sp]; V a=stack[--sp]; double pa[BM_D], pb[BM_D]; int an = vlist_pat(a, pa, BM_D); int bn = vlist_pat(b, pb, BM_D);\n";
     s = s + "      stack[sp++] = Vf(bm_dist(pa, an, pb, bn));\n";
@@ -2770,6 +2778,7 @@ fn main() -> i64 {
     assert(code_has_seq(r26[0], [OP_FORESEE()]) == 1);
     assert(code_has_seq(r26[0], [OP_REMEMBER()]) == 1);
     assert(code_has_seq(r26[0], [OP_UNROLL()]) == 1);
+    assert(code_has_seq(r26[0], [OP_FORESEE_N()]) == 1);
     assert(code_has_seq(r26[0], [OP_SAVE_MIND()]) == 1);
     assert(code_has_seq(r26[0], [OP_LOAD_MIND()]) == 1);
 

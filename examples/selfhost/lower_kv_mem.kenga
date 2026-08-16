@@ -5,6 +5,9 @@ fn main() -> i64 {
     assert(len(p) == 3);
     let f = foresee(m, [1, 2, 3]);
     assert(len(f) == 3);
+    let fn = foresee_n(m, [1, 2, 3], 2);
+    assert(len(fn) == 2);
+    assert(round(fn[0][0] * 100.0) == round(f[0] * 100.0));
     assert(remember(m, [9, 0, 9], 80) == 1);
     assert(remember(m, [1, 1, 1], 0.01) == 0);
     remember_next(m, [1, 2, 3], [2, 3, 4], 55);

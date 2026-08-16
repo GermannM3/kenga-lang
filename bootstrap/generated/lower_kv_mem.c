@@ -52,6 +52,7 @@ int main(void) {
   KVal loss = kval_i64(0);
   KVal p = kval_i64(0);
   KVal f = kval_i64(0);
+  KVal fn = kval_i64(0);
   KVal traj = kval_i64(0);
   KVal folded = kval_i64(0);
   KVal st = kval_i64(0);
@@ -87,37 +88,46 @@ int main(void) {
     f = k_foresee(m, kval_list(_lk173));
   }
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(kval_len(f))) == kval_as_i64(kval_i64(3LL)))));
+  {
+  int64_t _lk236 = klist_new();
+  klist_push_val(_lk236, kval_i64(1LL));
+  klist_push_val(_lk236, kval_i64(2LL));
+  klist_push_val(_lk236, kval_i64(3LL));
+    fn = k_foresee_n(m, kval_list(_lk236), kval_i64(2LL));
+  }
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(kval_len(fn))) == kval_as_i64(kval_i64(2LL)))));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(kval_index(kval_index(fn, kval_as_i64(kval_i64(0LL))), kval_as_i64(kval_i64(0LL)))) * kval_as_f64(kval_f64(100.0))))))) == kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(kval_index(f, kval_as_i64(kval_i64(0LL)))) * kval_as_f64(kval_f64(100.0))))))))));
 {
-  int64_t _lk233 = klist_new();
-  klist_push_val(_lk233, kval_i64(9LL));
-  klist_push_val(_lk233, kval_i64(0LL));
-  klist_push_val(_lk233, kval_i64(9LL));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_remember(m, kval_list(_lk233), kval_i64(80LL))) == kval_as_i64(kval_i64(1LL)))));
+  int64_t _lk360 = klist_new();
+  klist_push_val(_lk360, kval_i64(9LL));
+  klist_push_val(_lk360, kval_i64(0LL));
+  klist_push_val(_lk360, kval_i64(9LL));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_remember(m, kval_list(_lk360), kval_i64(80LL))) == kval_as_i64(kval_i64(1LL)))));
 }
 {
-  int64_t _lk278 = klist_new();
-  klist_push_val(_lk278, kval_i64(1LL));
-  klist_push_val(_lk278, kval_i64(1LL));
-  klist_push_val(_lk278, kval_i64(1LL));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_remember(m, kval_list(_lk278), kval_f64(0.01))) == kval_as_i64(kval_i64(0LL)))));
+  int64_t _lk405 = klist_new();
+  klist_push_val(_lk405, kval_i64(1LL));
+  klist_push_val(_lk405, kval_i64(1LL));
+  klist_push_val(_lk405, kval_i64(1LL));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_remember(m, kval_list(_lk405), kval_f64(0.01))) == kval_as_i64(kval_i64(0LL)))));
 }
 {
-  int64_t _lk323 = klist_new();
-  klist_push_val(_lk323, kval_i64(1LL));
-  klist_push_val(_lk323, kval_i64(2LL));
-  klist_push_val(_lk323, kval_i64(3LL));
-  int64_t _lk334 = klist_new();
-  klist_push_val(_lk334, kval_i64(2LL));
-  klist_push_val(_lk334, kval_i64(3LL));
-  klist_push_val(_lk334, kval_i64(4LL));
-  (void)(k_remember_next(m, kval_list(_lk323), kval_list(_lk334), kval_i64(55LL)));
+  int64_t _lk450 = klist_new();
+  klist_push_val(_lk450, kval_i64(1LL));
+  klist_push_val(_lk450, kval_i64(2LL));
+  klist_push_val(_lk450, kval_i64(3LL));
+  int64_t _lk461 = klist_new();
+  klist_push_val(_lk461, kval_i64(2LL));
+  klist_push_val(_lk461, kval_i64(3LL));
+  klist_push_val(_lk461, kval_i64(4LL));
+  (void)(k_remember_next(m, kval_list(_lk450), kval_list(_lk461), kval_i64(55LL)));
 }
   {
-  int64_t _lk375 = klist_new();
-  klist_push_val(_lk375, kval_i64(1LL));
-  klist_push_val(_lk375, kval_i64(2LL));
-  klist_push_val(_lk375, kval_i64(3LL));
-    traj = k_unroll(m, kval_list(_lk375), kval_i64(2LL));
+  int64_t _lk502 = klist_new();
+  klist_push_val(_lk502, kval_i64(1LL));
+  klist_push_val(_lk502, kval_i64(2LL));
+  klist_push_val(_lk502, kval_i64(3LL));
+    traj = k_unroll(m, kval_list(_lk502), kval_i64(2LL));
   }
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(kval_len(traj))) == kval_as_i64(kval_i64(2LL)))));
   folded = k_consolidate(m);
@@ -125,30 +135,30 @@ int main(void) {
   st = k_mem_stats(m);
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_index(st, kval_as_i64(kval_i64(0LL)))) > kval_as_i64(kval_i64(0LL)))));
   {
-  int64_t _lk548 = klist_new();
-  klist_push_val(_lk548, kval_f64(1.0));
-  klist_push_val(_lk548, kval_f64(0.0));
-  int64_t _lk560 = klist_new();
-  klist_push_val(_lk560, kval_f64(0.0));
-  klist_push_val(_lk560, kval_f64(1.0));
-    err = k_surprise(kval_list(_lk548), kval_list(_lk560));
+  int64_t _lk675 = klist_new();
+  klist_push_val(_lk675, kval_f64(1.0));
+  klist_push_val(_lk675, kval_f64(0.0));
+  int64_t _lk687 = klist_new();
+  klist_push_val(_lk687, kval_f64(0.0));
+  klist_push_val(_lk687, kval_f64(1.0));
+    err = k_surprise(kval_list(_lk675), kval_list(_lk687));
   }
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(err) * kval_as_f64(kval_f64(10.0))))))) > kval_as_i64(kval_i64(0LL)))));
   {
-  int64_t _lk637 = klist_new();
-  klist_push_val(_lk637, kval_i64(1LL));
-  klist_push_val(_lk637, kval_i64(2LL));
-  klist_push_val(_lk637, kval_i64(3LL));
-    p_saved = k_predict(m, kval_list(_lk637));
+  int64_t _lk764 = klist_new();
+  klist_push_val(_lk764, kval_i64(1LL));
+  klist_push_val(_lk764, kval_i64(2LL));
+  klist_push_val(_lk764, kval_i64(3LL));
+    p_saved = k_predict(m, kval_list(_lk764));
   }
   k_assert(kval_as_i64(kval_i64(kval_as_i64(k_save_mind(m, kval_str("kv_mind.km"))) == kval_as_i64(kval_i64(1LL)))));
   m2 = k_load_mind(kval_str("kv_mind.km"));
   {
-  int64_t _lk757 = klist_new();
-  klist_push_val(_lk757, kval_i64(1LL));
-  klist_push_val(_lk757, kval_i64(2LL));
-  klist_push_val(_lk757, kval_i64(3LL));
-    p2 = k_predict(m2, kval_list(_lk757));
+  int64_t _lk884 = klist_new();
+  klist_push_val(_lk884, kval_i64(1LL));
+  klist_push_val(_lk884, kval_i64(2LL));
+  klist_push_val(_lk884, kval_i64(3LL));
+    p2 = k_predict(m2, kval_list(_lk884));
   }
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(kval_len(p2))) == kval_as_i64(kval_i64(3LL)))));
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(kval_index(p2, kval_as_i64(kval_i64(0LL)))) * kval_as_f64(kval_f64(100.0))))))) == kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(kval_index(p_saved, kval_as_i64(kval_i64(0LL)))) * kval_as_f64(kval_f64(100.0))))))))));
