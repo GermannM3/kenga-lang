@@ -1,5 +1,6 @@
 // KVal lowerer: Kenga i64/str/list/f64 subset → C99 with tagged KVal runtime.
 // Includes rt_kval.inc.c (from rt_kval.kenga). All value locals/params emit as KVal.
+//   && || % ! and block comments.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 
 fn is_space(ch: str) -> i64 {
@@ -31,6 +32,22 @@ fn skip(s: str, i: i64) -> i64 {
                         if s[i] == "\n" { break; }
                         i = i + 1;
                     }
+                    continue;
+                }
+                if s[i + 1] == "*" {
+                    i = i + 2;
+                    let closed: i64 = 0;
+                    while i + 1 < len(s) {
+                        if s[i] == "*" {
+                            if s[i + 1] == "/" {
+                                i = i + 2;
+                                closed = 1;
+                                break;
+                            }
+                        }
+                        i = i + 1;
+                    }
+                    assert(closed == 1);
                     continue;
                 }
             }
@@ -260,6 +277,10 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
         }
         return ["kval_i64(-kval_as_i64(" + r[0] + "))", r[1], 0, r[3]];
     }
+    if s[i] == "!" {
+        let r = lower_factor(s, i + 1, decls);
+        return ["kval_i64(!kval_as_i64(" + r[0] + "))", r[1], 0, r[3]];
+    }
     if s[i] == "\"" {
         let ps = parse_string(s, i);
         return ["kval_str(\"" + c_escape(ps[0]) + "\")", ps[1], 2, ""];
@@ -480,7 +501,16 @@ fn lower_term(s: str, i: i64, decls: list) -> list {
                     out = "kval_i64(kval_as_i64(" + out + ") / kval_as_i64(" + r[0] + "))";
                 }
                 i = r[1];
-            } else { break; }
+            } else {
+                if s[i] == "%" {
+                    r = lower_factor(s, i + 1, decls);
+                    r = lower_index(s, r[1], decls, r[0], r[2], r[3]);
+                    pre = merge_pre(pre, r[3]);
+                    kind = 0;
+                    out = "kval_i64(kval_as_i64(" + out + ") % kval_as_i64(" + r[0] + "))";
+                    i = r[1];
+                } else { break; }
+            }
         }
     }
     return [out, i, kind, pre];
@@ -532,7 +562,7 @@ fn lower_sum(s: str, i: i64, decls: list) -> list {
     return [out, i, kind, pre];
 }
 
-fn lower_cmp(s: str, i: i64, decls: list) -> list {
+fn lower_rel(s: str, i: i64, decls: list) -> list {
     let r = lower_sum(s, i, decls);
     let out: str = r[0]; i = r[1]; let kind: i64 = r[2]; let pre: str = r[3];
     i = skip(s, i);
@@ -577,6 +607,42 @@ fn lower_cmp(s: str, i: i64, decls: list) -> list {
         return ["kval_i64(kval_as_i64(" + out + ") > kval_as_i64(" + r[0] + "))", r[1], 0, pre];
     }
     return [out, i, kind, pre];
+}
+
+fn lower_and(s: str, i: i64, decls: list) -> list {
+    let r = lower_rel(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2]; let pre: str = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if starts_with(s, i, "&&") == 1 {
+            r = lower_rel(s, i + 2, decls);
+            pre = merge_pre(pre, r[3]);
+            out = "kval_i64(kval_as_i64(" + out + ") && kval_as_i64(" + r[0] + "))";
+            i = r[1];
+            kind = 0;
+        } else { break; }
+    }
+    return [out, i, kind, pre];
+}
+
+fn lower_or(s: str, i: i64, decls: list) -> list {
+    let r = lower_and(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2]; let pre: str = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if starts_with(s, i, "||") == 1 {
+            r = lower_and(s, i + 2, decls);
+            pre = merge_pre(pre, r[3]);
+            out = "kval_i64(kval_as_i64(" + out + ") || kval_as_i64(" + r[0] + "))";
+            i = r[1];
+            kind = 0;
+        } else { break; }
+    }
+    return [out, i, kind, pre];
+}
+
+fn lower_cmp(s: str, i: i64, decls: list) -> list {
+    return lower_or(s, i, decls);
 }
 
 fn wrap_if_pre(pre: str, inner: str) -> str {
@@ -1059,7 +1125,17 @@ fn main() -> i64 {
     let parsef = resolve_imports("examples/selfhost/parse_frag.kenga", 0);
     assert(write_file("bootstrap/generated/lower_parse_frag.c", lower_program(parsef)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag}.c");
+    let em_and = lower_cmp("1 && 0", 0, []);
+    assert(em_and[0] == "kval_i64(kval_as_i64(kval_i64(1LL)) && kval_as_i64(kval_i64(0LL)))");
+    let em_mod = lower_cmp("10 % 3", 0, []);
+    assert(em_mod[0] == "kval_i64(kval_as_i64(kval_i64(10LL)) % kval_as_i64(kval_i64(3LL)))");
+    let em_not = lower_cmp("!0", 0, []);
+    assert(em_not[0] == "kval_i64(!kval_as_i64(kval_i64(0LL)))");
+
+    let logic = resolve_imports("examples/selfhost/lower_kv_logic.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_kv_logic.c", lower_program(logic)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic}.c");
     println("lower_kv ok");
     return 0;
 }
