@@ -14,7 +14,7 @@ scripts\freedom-smoke.cmd
 | Путь | Роль | Вместо Rust |
 |---|---|---|
 | `compiler/lite.kenga` | i64 compiler+VM на Kenga | кусок `compiler.rs` + `vm.rs` |
-| `compiler/more.kenga` | birth→24, **tensor/softmax**, **Prophet**, **tape ag_matmul/ag_step** | шире `compiler.rs` + `vm.rs` |
+| `compiler/more.kenga` | birth→24, **tensor IO**, **Prophet**, **tape ag_step**, **mlp autograd** | шире `compiler.rs` + `vm.rs` |
 | `emit/c_seed.kenga` | Kenga пишет `.c` | зародыш `codegen.rs` |
 | `emit/expr_c.kenga` | expr → C99 + self-check | следующий шаг `codegen.rs` |
 | `emit/mini_codegen.kenga` | alias → `core_c` | — |

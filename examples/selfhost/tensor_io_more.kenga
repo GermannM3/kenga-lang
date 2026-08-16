@@ -1,0 +1,18 @@
+// Tensor persist + sweep/now_ms/memory on more.kenga VM.
+//   bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
+
+fn main() -> i64 {
+    let t = t_from([2], [1.0, 2.0]);
+    t_set(t, 0, 9.0);
+    assert(round(t_get(t, 0)) == 9);
+    assert(save_tensor(t, "minds/_more_t.kt") == 1);
+    let u = load_tensor("minds/_more_t.kt");
+    assert(round(t_get(u, 0)) == 9);
+    sweep();
+    let n = now_ms();
+    assert(n >= 0);
+    let m = memory();
+    assert(remember(m, [1, 2, 3], 90) == true);
+    println("tensor io more ok");
+    return 0;
+}

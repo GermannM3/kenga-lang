@@ -32,6 +32,7 @@
 | ✅ | **`more.kenga`**: tensor host builtins (`t_matmul` / `t_softmax` / `t_mean` / `t_mse`) |
 | ✅ | **`more.kenga`**: Prophet host builtins (`remember` / `foresee` / `save_mind`) |
 | ✅ | **`more.kenga`**: tape autograd (`ag_matmul` / `ag_backward` / `ag_step`) |
+| ✅ | **`more.kenga`**: `t_set` / `save_tensor` / `load_tensor` + `mlp_autograd` on Kenga VM |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |

@@ -7,7 +7,8 @@
 //          t_sub/t_mul/t_reshape/t_transpose/t_scale/t_sum/t_dot,
 //          t_exp/t_log/t_softmax/t_mean/t_mse,
 //          memory_config/remember/foresee/consolidate/save_mind,
-//          ag_clear/ag_param/ag_matmul/ag_mse/ag_backward/ag_step
+//          ag_clear/ag_param/ag_matmul/ag_mse/ag_backward/ag_step,
+//          t_set/save_tensor/load_tensor/sweep/now_ms/memory
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -97,6 +98,12 @@ fn OP_AG_GRAD() -> i64 { return 85; }
 fn OP_AG_BACKWARD() -> i64 { return 86; }
 fn OP_AG_STEP() -> i64 { return 87; }
 fn OP_AG_LOG() -> i64 { return 88; }
+fn OP_T_SET() -> i64 { return 89; }
+fn OP_SAVE_TENSOR() -> i64 { return 90; }
+fn OP_LOAD_TENSOR() -> i64 { return 91; }
+fn OP_SWEEP() -> i64 { return 92; }
+fn OP_NOW_MS() -> i64 { return 93; }
+fn OP_MEMORY() -> i64 { return 94; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -536,6 +543,27 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         }
         if op == OP_AG_LOG() {
             let p = list_pop(stack); stack = push(p[0], ag_log(p[1]));
+        }
+        if op == OP_T_SET() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], t_set(a[1], b[1], c[1]));
+        }
+        if op == OP_SAVE_TENSOR() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], save_tensor(a[1], b[1]));
+        }
+        if op == OP_LOAD_TENSOR() {
+            let p = list_pop(stack); stack = push(p[0], load_tensor(p[1]));
+        }
+        if op == OP_SWEEP() {
+            sweep();
+            stack = push(stack, 0);
+        }
+        if op == OP_NOW_MS() {
+            stack = push(stack, now_ms());
+        }
+        if op == OP_MEMORY() {
+            stack = push(stack, memory());
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
@@ -1040,9 +1068,14 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                         code = push(code, OP_T_FILL());
                                                         i = j;
                                                     } else {
-                                                    if id[0] == "ag_clear" {
+                                                    let zop: i64 = 0;
+                                                    if id[0] == "ag_clear" { zop = OP_AG_CLEAR(); }
+                                                    if id[0] == "sweep" { zop = OP_SWEEP(); }
+                                                    if id[0] == "now_ms" { zop = OP_NOW_MS(); }
+                                                    if id[0] == "memory" { zop = OP_MEMORY(); }
+                                                    if zop != 0 {
                                                         j = skip(s, j); assert(s[j] == ")"); j = j + 1;
-                                                        code = push(code, OP_AG_CLEAR());
+                                                        code = push(code, zop);
                                                         i = j;
                                                     } else {
                                                     let hop: i64 = 0;
@@ -1055,6 +1088,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "surprise" { hop = OP_MEM_SURPRISE(); }
                                                     if id[0] == "foresee" { hop = OP_MEM_FORESEE(); }
                                                     if id[0] == "save_mind" { hop = OP_SAVE_MIND(); }
+                                                    if id[0] == "save_tensor" { hop = OP_SAVE_TENSOR(); }
                                                     if id[0] == "ag_add" { hop = OP_AG_ADD(); }
                                                     if id[0] == "ag_sub" { hop = OP_AG_SUB(); }
                                                     if id[0] == "ag_mul" { hop = OP_AG_MUL(); }
@@ -1095,6 +1129,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "ag_value" { uop = OP_AG_VALUE(); }
                                                     if id[0] == "ag_grad" { uop = OP_AG_GRAD(); }
                                                     if id[0] == "ag_backward" { uop = OP_AG_BACKWARD(); }
+                                                    if id[0] == "load_tensor" { uop = OP_LOAD_TENSOR(); }
                                                     if uop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1106,6 +1141,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "memory_config" { t3 = OP_MEM_CONFIG(); }
                                                     if id[0] == "remember" { t3 = OP_MEM_REMEMBER(); }
                                                     if id[0] == "recall" { t3 = OP_MEM_RECALL(); }
+                                                    if id[0] == "t_set" { t3 = OP_T_SET(); }
                                                     if t3 != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1913,6 +1949,8 @@ fn main() -> i64 {
     assert(run_file("examples/prophet.kenga") == 0);
     assert(run_file("examples/selfhost/tape_more.kenga") == 0);
     assert(run_file("examples/ml/autograd_tape.kenga") == 0);
+    assert(run_file("examples/selfhost/tensor_io_more.kenga") == 0);
+    assert(run_file("examples/ml/mlp_autograd.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
