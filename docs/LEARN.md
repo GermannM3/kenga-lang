@@ -98,7 +98,7 @@ kenga run --lite examples\selfhost\for_lite.kenga
 kenga run --lite examples\agent.kenga
 ```
 
-Компилятор и VM на Kenga: `kenga/compiler/more.kenga` — гоняет fact, XOR и **birth** (сам пишет `kenga_born.kenga`).  
+Компилятор и VM на Kenga: `kenga/compiler/more.kenga` — fact, XOR, birth: пишет `kenga_born.kenga` и сам его запускает → 24.  
 Kenga сама пишет C99:
 
 ```bat

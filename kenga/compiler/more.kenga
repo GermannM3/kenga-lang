@@ -1366,6 +1366,7 @@ fn main() -> i64 {
     assert(run_file("examples/ml/kenga_net.kenga") == 0);
     assert(run_lite("fn main() { assert(write_file(\"minds/_more_io.txt\", \"hi\") == 1); ord(read_file(\"minds/_more_io.txt\")[0]) }") == 104);
     assert(run_file("examples/ml/kenga_birth.kenga") == 0);
+    assert(run_file("examples/ml/kenga_born.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
