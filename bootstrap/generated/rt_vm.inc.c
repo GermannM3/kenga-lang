@@ -502,7 +502,14 @@ static int64_t vm_exec(Program *prog) {
 #ifdef _WIN32
         Sleep((DWORD)n);
 #else
-        usleep((useconds_t)n * 1000);
+        {
+          unsigned long left = (unsigned long)n;
+          while (left > 0) {
+            unsigned long chunk = left > 999UL ? 999UL : left;
+            usleep((unsigned int)(chunk * 1000UL));
+            left = left - chunk;
+          }
+        }
 #endif
         vala_push(&stack, V_i64(0));
       }

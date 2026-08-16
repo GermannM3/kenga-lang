@@ -69,7 +69,7 @@
 | ✅ | Tape на lite (C99) |
 | ✅ | Patch encoder + linear grad helpers на lite |
 | ✅ | `save_tensor` / `load_tensor` / `write_file` / `read_file` |
-| ⬜ | GPU / production autograd |
+| ⬜ | GPU / production autograd (1660 свободна; lite всё ещё CPU f64) |
 
 ## 3. Multimodal
 

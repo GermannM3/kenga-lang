@@ -1700,7 +1700,14 @@ fn write_runtime() -> str {
     s = s + "#ifdef _WIN32\n";
     s = s + "        Sleep((DWORD)n);\n";
     s = s + "#else\n";
-    s = s + "        usleep((useconds_t)n * 1000);\n";
+    s = s + "        {\n";
+    s = s + "          unsigned long left = (unsigned long)n;\n";
+    s = s + "          while (left > 0) {\n";
+    s = s + "            unsigned long chunk = left > 999UL ? 999UL : left;\n";
+    s = s + "            usleep((unsigned int)(chunk * 1000UL));\n";
+    s = s + "            left = left - chunk;\n";
+    s = s + "          }\n";
+    s = s + "        }\n";
     s = s + "#endif\n";
     s = s + "      }\n";
     s = s + "      stack[sp++] = Vi(0);\n";
