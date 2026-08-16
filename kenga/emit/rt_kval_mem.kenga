@@ -43,7 +43,9 @@ fn main() -> i64 {
     s = s + "static size_t g_minds_cap = 0;\n\n";
     s = s + "static double km_xavier(int fan_in, int fan_out, int i) {\n";
     s = s + "  double sc = sqrt(6.0 / (double)(fan_in + fan_out));\n";
-    s = s + "  double u = (double)((i * 1103515245 + 12345) % 10000) / 10000.0;\n";
+    s = s + "  int64_t t = (int64_t)i * 1103515245LL + 12345LL;\n";
+    s = s + "  if (t < 0) t = -t;\n";
+    s = s + "  double u = (double)(t % 10000LL) / 10000.0;\n";
     s = s + "  return (u * 2.0 - 1.0) * sc;\n";
     s = s + "}\n\n";
     s = s + "static void km_wm_init(KmWorld *m, int dim, int hidden) {\n";

@@ -44,7 +44,9 @@ static size_t g_minds_cap = 0;
 
 static double km_xavier(int fan_in, int fan_out, int i) {
   double sc = sqrt(6.0 / (double)(fan_in + fan_out));
-  double u = (double)((i * 1103515245 + 12345) % 10000) / 10000.0;
+  int64_t t = (int64_t)i * 1103515245LL + 12345LL;
+  if (t < 0) t = -t;
+  double u = (double)(t % 10000LL) / 10000.0;
   return (u * 2.0 - 1.0) * sc;
 }
 

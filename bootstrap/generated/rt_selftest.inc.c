@@ -96,14 +96,10 @@ static int selftest(void) {
       /* void helper: trailing RET with empty stack → 0 */
       {"fn bump(x) { println(x); } fn main() { bump(1); 9 }", 9},
       /* Prophet Memory (no Rust) */
-      {"fn main() { let m = memory_config(10, 8, 4); 0 }",
-       0},
       {"fn main() { let m = memory_config(10, 8, 4); assert(remember(m, [9, 0, 9], "
        "80) == true); assert(remember(m, [1, 1, 1], 5) == false); let st = "
-       "mem_stats(m); assert(st[0] == 1); 0 }",
-       0},
-      {"fn main() { let m = memory_config(10, 8, 4); remember(m, [9, 0, 9], 80); "
-       "consolidate(m); let p = foresee(m, [9, 0, 0]); assert(len(p) == 3); 0 }",
+       "mem_stats(m); assert(st[0] == 1); consolidate(m); let p = foresee(m, [9, "
+       "0, 0]); assert(len(p) == 3); 0 }",
        0},
       {"fn main() { let m = memory_config(10, 8, 4); remember(m, [1, 2, 3], 90); "
        "consolidate(m); save_mind(m, \"minds/_lite_roundtrip.km\"); let m2 = "
@@ -155,10 +151,7 @@ static int selftest(void) {
   };
   size_t n = sizeof(cases) / sizeof(cases[0]);
   for (size_t i = 0; i < n; i++) {
-    int64_t got;
-    fprintf(stderr, "selftest %zu\n", i);
-    fflush(stderr);
-    got = run_lite(cases[i].src);
+    int64_t got = run_lite(cases[i].src);
     if (got != cases[i].want) {
       fprintf(stderr, "FAIL case %zu: got %lld want %lld\n", i, (long long)got,
               (long long)cases[i].want);
