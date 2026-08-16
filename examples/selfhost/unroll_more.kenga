@@ -1,0 +1,10 @@
+fn main() -> i64 {
+    let m = memory_config(5, 16, 8);
+    remember_next(m, [1, 2, 3], [2, 3, 4], 50);
+    learn(m, [1, 2, 3], [2, 3, 4]);
+    let t = unroll(m, [1, 2, 3], 2);
+    assert(len(t) == 2);
+    assert(len(t[0]) == 3);
+    println("unroll more ok");
+    return 0;
+}
