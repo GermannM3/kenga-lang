@@ -97,27 +97,32 @@ static void pl_wm_ensure(PlWorld *m, int dim) {
   if (dim > PL_DIM_MAX) dim = PL_DIM_MAX;
   if (dim <= m->dim) return;
   {
-    PlWorld old = *m;
-    int od = old.dim, oh = old.hidden, nh, r, c;
+    PlWorld *old = (PlWorld *)malloc(sizeof(PlWorld));
+    int od, oh, nh, r, c;
+    if (!old) die("oom prophet grow");
+    memcpy(old, m, sizeof(PlWorld));
+    od = old->dim;
+    oh = old->hidden;
     pl_wm_init(m, dim);
     nh = m->hidden;
     for (r = 0; r < oh && r < nh; r++) {
       for (c = 0; c < od; c++) {
-        m->w1[r * m->dim + c] = old.w1[r * od + c];
-        m->w1_lock[r * m->dim + c] = old.w1_lock[r * od + c];
+        m->w1[r * m->dim + c] = old->w1[r * od + c];
+        m->w1_lock[r * m->dim + c] = old->w1_lock[r * od + c];
       }
-      m->b1[r] = old.b1[r];
-      m->b1_lock[r] = old.b1_lock[r];
+      m->b1[r] = old->b1[r];
+      m->b1_lock[r] = old->b1_lock[r];
     }
     for (r = 0; r < od; r++) {
       for (c = 0; c < oh && c < nh; c++) {
-        m->w2[r * nh + c] = old.w2[r * oh + c];
-        m->w2_lock[r * nh + c] = old.w2_lock[r * oh + c];
+        m->w2[r * nh + c] = old->w2[r * oh + c];
+        m->w2_lock[r * nh + c] = old->w2_lock[r * oh + c];
       }
-      m->b2[r] = old.b2[r];
-      m->b2_lock[r] = old.b2_lock[r];
+      m->b2[r] = old->b2[r];
+      m->b2_lock[r] = old->b2_lock[r];
     }
-    m->steps = old.steps;
+    m->steps = old->steps;
+    free(old);
   }
 }
 
@@ -243,18 +248,18 @@ static ProphetMem *pl_get(int64_t h) {
 }
 
 static int64_t pl_mem_new(double thr, int ep_cap, int core_cap) {
-  ProphetMem m;
-  memset(&m, 0, sizeof(m));
-  m.threshold = thr;
-  m.ep_cap = ep_cap < 1 ? 1 : (ep_cap > PL_EP_MAX ? PL_EP_MAX : ep_cap);
-  m.core_cap = core_cap < 1 ? 1 : (core_cap > PL_CORE_MAX ? PL_CORE_MAX : core_cap);
-  m.lr = 0.08;
-  pl_wm_init(&m.model, 1);
+  ProphetMem *m;
   if (g_mems.len + 1 > g_mems.cap) {
     g_mems.cap = g_mems.cap ? g_mems.cap * 2 : 4;
     g_mems.data = (ProphetMem *)xrealloc(g_mems.data, g_mems.cap * sizeof(ProphetMem));
   }
-  g_mems.data[g_mems.len] = m;
+  m = &g_mems.data[g_mems.len];
+  memset(m, 0, sizeof(*m));
+  m->threshold = thr;
+  m->ep_cap = ep_cap < 1 ? 1 : (ep_cap > PL_EP_MAX ? PL_EP_MAX : ep_cap);
+  m->core_cap = core_cap < 1 ? 1 : (core_cap > PL_CORE_MAX ? PL_CORE_MAX : core_cap);
+  m->lr = 0.08;
+  pl_wm_init(&m->model, 1);
   return (int64_t)g_mems.len++;
 }
 
@@ -512,10 +517,13 @@ static int64_t pl_load_mind(const char *path) {
   char *raw;
   char *lines[4096];
   int nlines, li = 0;
-  ProphetMem m;
+  ProphetMem *pm;
   int d, h, i, core_n, ep_n;
   unsigned long long steps;
-  memset(&m, 0, sizeof(m));
+  pm = (ProphetMem *)malloc(sizeof(ProphetMem));
+  if (!pm) die("oom load_mind");
+  memset(pm, 0, sizeof(*pm));
+#define m (*pm)
   raw = pl_read_file(path, NULL);
   if (!raw) die("cannot read mind file");
   nlines = pl_split_lines(raw, lines, 4096);
@@ -638,7 +646,9 @@ static int64_t pl_load_mind(const char *path) {
     g_mems.cap = g_mems.cap ? g_mems.cap * 2 : 4;
     g_mems.data = (ProphetMem *)xrealloc(g_mems.data, g_mems.cap * sizeof(ProphetMem));
   }
-  g_mems.data[g_mems.len] = m;
+#undef m
+  g_mems.data[g_mems.len] = *pm;
+  free(pm);
   return (int64_t)g_mems.len++;
 }
 
@@ -700,11 +710,11 @@ static void pl_blend_core(const ProphetMem *mem, const double *obs, int on, doub
 }
 
 static void pl_predict(const ProphetMem *mem, const double *obs, int on, double *out, int *out_n) {
-  PlWorld tmp = mem->model;
   double hh[64];
-  pl_wm_ensure(&tmp, on > 0 ? on : 1);
-  pl_forward(&tmp, obs, on, hh, out);
-  *out_n = tmp.dim;
+  int need = on > 0 ? on : 1;
+  if (mem->model.dim < need) pl_wm_ensure((PlWorld *)&mem->model, need);
+  pl_forward(&mem->model, obs, on, hh, out);
+  *out_n = mem->model.dim;
 }
 
 static void pl_foresee(const ProphetMem *mem, const double *obs, int on, double *out, int *out_n) {
@@ -758,7 +768,8 @@ static int64_t pl_consolidate(ProphetMem *mem) {
   int folded = 0;
   int e;
   int nep = mem->nep;
-  PlEpisode eps[PL_EP_MAX];
+  PlEpisode *eps = (PlEpisode *)malloc(sizeof(PlEpisode) * (size_t)(nep > 0 ? nep : 1));
+  if (!eps) die("oom consolidate");
   memcpy(eps, mem->ep, sizeof(eps[0]) * (size_t)nep);
   mem->nep = 0;
   for (e = 0; e < nep; e++) {
@@ -809,6 +820,7 @@ static int64_t pl_consolidate(ProphetMem *mem) {
       mem->ncore--;
     }
   }
+  free(eps);
   return folded;
 }
 
