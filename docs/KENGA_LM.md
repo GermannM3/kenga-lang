@@ -8,6 +8,7 @@ Kenga уже выражает эту машину. Три файла:
 - `examples/ml/kenga_charlm.kenga` — тот же decoder, корпус = наши `.kenga`
 - `examples/ml/kenga_trigram.kenga` — char-триграмма на list/i64 (без Tensor), тот же корпус
 - `examples/ml/kenga_birth.kenga` — suffix LM пишет `kenga_born.kenga`, lite его запускает → **24**
+- `examples/ml/kenga_mm_lm.kenga` — PPM → подпись; сид для HF
 
 Скачанный GGUF из папки «kenga ai» сюда не кладём. Это чужой граф и чужие веса. Доказательство языка — сеть, написанная на Kenga и обученная на Kenga.
 
@@ -18,6 +19,8 @@ bootstrap\bin\kenga-lite.exe run examples\ml\kenga_char_talk.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
 scripts\bc-run.cmd examples\ml\kenga_trigram.kenga
 scripts\kenga-birth.cmd
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga
+scripts\hf-pack.cmd
 ```
 
 Word-LM на CPU lite: L=2, D=16, V=20. Дописывает `<s> kenga zhivet v yazyke .`  
@@ -51,5 +54,6 @@ Char-LM читает seed + selfhost, учит next-char, веса в `minds/ken
 5. **Триграмма на list/i64** — `kenga_trigram.kenga` ← вы здесь.
 6. Больше D/L, байтовый/BPE словарь, длинный контекст.
 7. GPU backend. Чужой GGUF — не доказательство.
+8. Большая мультимодальная: git (пример) + Hugging Face `Kenga-ai/kenga-mm`. Сид и упаковка: `docs/HUGGINGFACE.md`.
 
 Расти `fn D()` / `fn L()` / корпус в том же файле. Менять язык не нужно.

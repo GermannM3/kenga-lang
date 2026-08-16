@@ -37,3 +37,8 @@ npx ovsx publish -p <OPEN_VSX_TOKEN>
 ```
 
 https://open-vsx.org/
+
+## Hugging Face (модель, не расширение)
+
+Когда большая мультимодальная LM готова — git (пример) и HF. Сейчас сид и упаковка: `docs/HUGGINGFACE.md`.
+

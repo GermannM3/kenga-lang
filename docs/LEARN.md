@@ -114,7 +114,7 @@ scripts\freedom-smoke.cmd
 
 `docs/EXERCISES.md` · `examples/exercises/e01_sum.kenga`
 
-Своя модель пишет программу: `scripts\kenga-birth.cmd` → `kenga_born.kenga` → **24**. Шкала: `docs/KENGA_LM.md`.
+Своя модель пишет программу: `scripts\kenga-birth.cmd` → **24**. Vision→текст: `kenga_mm_lm.kenga`. Большую потом на HF: `docs/HUGGINGFACE.md`.
 
 ## Дальше
 

@@ -66,7 +66,10 @@
 | ✅ | **`kenga_char_talk.kenga`** — generate из сохранённых весов |
 | ✅ | **`kenga_trigram.kenga`** — char-триграмма на list/i64, корпус наш |
 | ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
+| ✅ | **`kenga_mm_lm.kenga`** — PPM → caption (сид мультимодального LM) |
+| ✅ | Карточка HF: `hf/kenga-seed/` + `scripts\hf-pack.cmd` |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
+| ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |
 | ⬜ | GPU backend (wgpu/CUDA) под 1660-class |
 | ⬜ | Pretrained encoders |
 

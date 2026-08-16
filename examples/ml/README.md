@@ -7,6 +7,7 @@
 | `kenga_char_talk.kenga` | generate из `minds/kenga_char_*` |
 | `kenga_trigram.kenga` | char-триграмма list/i64, без Tensor |
 | `kenga_birth.kenga` | suffix LM пишет `kenga_born.kenga` (запуск → 24) |
+| `kenga_mm_lm.kenga` | PPM → caption, сид для Hugging Face |
 | `kenga_dec.kenga` | общие блоки decoder (import) |
 | `kenga_lm.kenga` | decoder GPT-формы, закрытый словарь |
 | `tiny_lm.kenga` | tiny word-LM на tape (генерация фразы) |
