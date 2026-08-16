@@ -1,0 +1,28 @@
+// Dialect bits for lower_c: %, &&, ||, !, block comments.
+
+fn in_range(n: i64, lo: i64, hi: i64) -> i64 {
+    return n >= lo && n <= hi;
+}
+
+fn main() -> i64 {
+    let x = 1;
+    /* would set 9 if comments were live
+    x = 9;
+    */
+    assert(x == 1);
+    assert(1 + /* mid */ 2 == 3);
+    assert(10 % 3 == 1);
+    assert(1 && 1);
+    assert(!(1 && 0));
+    assert(0 || 1);
+    assert(!0);
+    assert(!(1 == 2));
+    assert(in_range(3, 1, 5));
+    assert(!in_range(9, 1, 5));
+    if 1 < 2 && 3 > 0 {
+        println("lower logic ok");
+    } else {
+        assert(0);
+    }
+    return 0;
+}
