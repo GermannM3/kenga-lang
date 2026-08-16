@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 #include "opcodes.inc.c"
 
 typedef struct { int64_t str_idx; int64_t addr; int64_t arity; } EvHandler;

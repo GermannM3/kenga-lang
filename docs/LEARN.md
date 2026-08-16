@@ -40,7 +40,7 @@ kenga run --lite examples/hello.kenga
 - `for i in 0..n { … }` / `for x in xs { … }`
 - `break` / `continue`
 - `&&` `||` `!` `%` `typeof` `to_str` (lite, `more`, lowerers, `bc_src_c`)
-- `print` без `\n`, `sleep_ms` (lite, `more`; `lower_c` / `lower_kv` эмитят в C)
+- `print` без `\n`, `sleep_ms` (lite, `more`; `lower_c` / `lower_kv` / `bc_src_c`)
 - `learn` / `predict` на `more` VM (хост — lite builtins)
 - `now_ms` — часы, не заглушка; комментарии `//` и `/* … */`
 
@@ -118,7 +118,7 @@ scripts\freedom-smoke.cmd
 
 - `lower_c` — i64/struct/float/agent, `typeof`/`to_str`, `print`/`sleep_ms` → `bootstrap/bin/lower_*.c`  
 - `lower_kv` — tagged KVal + тот же диалект → `bootstrap/generated/`  
-- `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, birth/net/agent)  
+- `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, `print`/`sleep_ms`, birth/net/agent)  
 - `rt_*` — Kenga пишет весь lite host (типы, Prophet, tensor, tape, compiler, VM, selftest). `kenga_lite.c` — `#include`.
 
 Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.
