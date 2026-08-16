@@ -1,0 +1,293 @@
+// Decoder-only transformer on Kenga tensors (same machine as GPT/Grok).
+// This file IS the architecture. Scale is D/L/H/V + data + GPU — not a different language.
+//
+// Today (lite CPU):  D=16 L=2 H=2 V=20  ~6k weights, closed vocab, seconds.
+// Half-Grok ballpark: D=4096 L=48 H=32 V=128k  + MoE + 1e12 tokens + GPU.
+// Same attn / residual / FFN / RMS / LM-head. Grow the numbers, not the syntax.
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_lm.kenga
+
+fn V() -> i64 { return 20; }
+fn D() -> i64 { return 16; }
+fn T() -> i64 { return 6; }
+fn L() -> i64 { return 2; }
+fn H() -> i64 { return 2; }
+fn FF() -> i64 { return 32; }
+
+fn tok(i: i64) -> str {
+    if i == 0 { return "<s>"; }
+    if i == 1 { return "kenga"; }
+    if i == 2 { return "zhivet"; }
+    if i == 3 { return "v"; }
+    if i == 4 { return "yazyke"; }
+    if i == 5 { return "pamyat"; }
+    if i == 6 { return "predskazyvaet"; }
+    if i == 7 { return "agent"; }
+    if i == 8 { return "uchitsya"; }
+    if i == 9 { return "bez"; }
+    if i == 10 { return "python"; }
+    if i == 11 { return "i"; }
+    if i == 12 { return "rust"; }
+    if i == 13 { return "vidit"; }
+    if i == 14 { return "slyshit"; }
+    if i == 15 { return "dumaet"; }
+    if i == 16 { return "deistvuet"; }
+    if i == 17 { return "."; }
+    if i == 18 { return "mir"; }
+    return "</s>";
+}
+
+fn zeros(n: i64) -> list {
+    let xs = [];
+    let i: i64 = 0;
+    while i < n {
+        xs = push(xs, 0.0);
+        i = i + 1;
+    }
+    return xs;
+}
+
+fn fill_w(rows: i64, cols: i64, seed: i64) -> Tensor {
+    let xs = [];
+    let s: i64 = seed;
+    let i: i64 = 0;
+    let n: i64 = rows * cols;
+    while i < n {
+        s = s * 1103515245 + 12345;
+        if s < 0 { s = 0 - s; }
+        let m: i64 = s - (s / 97) * 97;
+        xs = push(xs, (m + 0.0) / 97.0 * 0.3 - 0.15);
+        i = i + 1;
+    }
+    return t_from([rows, cols], xs);
+}
+
+fn row_of(e: Tensor, idx: i64, d: i64) -> list {
+    let xs = [];
+    let j: i64 = 0;
+    while j < d {
+        xs = push(xs, t_get(e, idx * d + j));
+        j = j + 1;
+    }
+    return xs;
+}
+
+fn embed_seq(e: Tensor, ids: list, d: i64) -> Tensor {
+    let tlen: i64 = len(ids);
+    let xs = [];
+    let i: i64 = 0;
+    while i < tlen {
+        let id: i64 = ids[i];
+        let j: i64 = 0;
+        while j < d {
+            xs = push(xs, t_get(e, id * d + j));
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return t_from([tlen, d], xs);
+}
+
+fn rms(x: Tensor, tlen: i64, d: i64) -> Tensor {
+    let out = t_from([tlen, d], zeros(tlen * d));
+    let t: i64 = 0;
+    while t < tlen {
+        let s = 0.0;
+        let j: i64 = 0;
+        while j < d {
+            let v = t_get(x, t * d + j);
+            s = s + v * v;
+            j = j + 1;
+        }
+        s = s / (d + 0.0) + 0.0001;
+        let inv = 1.0 / s;
+        j = 0;
+        while j < d {
+            t_set(out, t * d + j, t_get(x, t * d + j) * inv);
+            j = j + 1;
+        }
+        t = t + 1;
+    }
+    return out;
+}
+
+fn relu_mat(x: Tensor) -> Tensor {
+    let n = t_shape(x);
+    let rows: i64 = n[0];
+    let cols: i64 = n[1];
+    let i: i64 = 0;
+    while i < rows * cols {
+        let v = t_get(x, i);
+        if v < 0.0 { t_set(x, i, 0.0); }
+        i = i + 1;
+    }
+    return x;
+}
+
+fn attn(x: Tensor, wq: Tensor, wk: Tensor, wv: Tensor, wo: Tensor, tlen: i64, d: i64) -> Tensor {
+    let q = t_matmul(x, wq);
+    let k = t_matmul(x, wk);
+    let v = t_matmul(x, wv);
+    let scores = t_scale(t_matmul(q, t_transpose(k)), 0.25);
+    let i: i64 = 0;
+    while i < tlen {
+        let j: i64 = i + 1;
+        while j < tlen {
+            t_set(scores, i * tlen + j, 0.0 - 80.0);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    let a = t_from([tlen, tlen], zeros(tlen * tlen));
+    i = 0;
+    while i < tlen {
+        let row = [];
+        let j: i64 = 0;
+        while j < tlen {
+            row = push(row, t_get(scores, i * tlen + j));
+            j = j + 1;
+        }
+        let sm = t_softmax(t_from([tlen], row));
+        j = 0;
+        while j < tlen {
+            t_set(a, i * tlen + j, t_get(sm, j));
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return t_add(x, t_matmul(t_matmul(a, v), wo));
+}
+
+fn ffn(x: Tensor, w1: Tensor, w2: Tensor) -> Tensor {
+    return t_add(x, t_matmul(relu_mat(t_matmul(x, w1)), w2));
+}
+
+fn block(x: Tensor, wq: Tensor, wk: Tensor, wv: Tensor, wo: Tensor, wf1: Tensor, wf2: Tensor, tlen: i64, d: i64) -> Tensor {
+    let h = attn(rms(x, tlen, d), wq, wk, wv, wo, tlen, d);
+    return ffn(rms(h, tlen, d), wf1, wf2);
+}
+
+fn last_row(x: Tensor, tlen: i64, d: i64) -> Tensor {
+    return t_from([d, 1], row_of(x, tlen - 1, d));
+}
+
+fn forward(ids: list, e: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor) -> Tensor {
+    let tlen: i64 = len(ids);
+    let d: i64 = D();
+    let x = embed_seq(e, ids, d);
+    let li: i64 = 0;
+    while li < L() {
+        x = block(x, wq[li], wk[li], wv[li], wo[li], wf1[li], wf2[li], tlen, d);
+        li = li + 1;
+    }
+    return t_softmax(t_matmul(wlm, last_row(x, tlen, d)));
+}
+
+fn argmax(t: Tensor, n: i64) -> i64 {
+    let best: i64 = 0;
+    let bv = t_get(t, 0);
+    let i: i64 = 1;
+    while i < n {
+        let x = t_get(t, i);
+        if x > bv {
+            bv = x;
+            best = i;
+        }
+        i = i + 1;
+    }
+    return best;
+}
+
+fn train_last(e: Tensor, wlm: Tensor, ids: list, target: i64, lr: f64, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list) -> list {
+    let d: i64 = D();
+    let tlen: i64 = len(ids);
+    let vv: i64 = V();
+    let x = embed_seq(e, ids, d);
+    let li: i64 = 0;
+    while li < L() {
+        x = block(x, wq[li], wk[li], wv[li], wo[li], wf1[li], wf2[li], tlen, d);
+        li = li + 1;
+    }
+    let h = last_row(x, tlen, d);
+    let probs = t_softmax(t_matmul(wlm, h));
+    let last: i64 = 0;
+    if len(ids) > 0 { last = ids[len(ids) - 1]; }
+    let j: i64 = 0;
+    while j < vv {
+        let g = t_get(probs, j);
+        if j == target { g = g - 1.0; }
+        let k: i64 = 0;
+        while k < d {
+            let w = t_get(wlm, j * d + k);
+            t_set(wlm, j * d + k, w - lr * g * t_get(h, k));
+            let eh = t_get(e, last * d + k);
+            t_set(e, last * d + k, eh - lr * 0.25 * g * t_get(wlm, j * d + k));
+            k = k + 1;
+        }
+        j = j + 1;
+    }
+    return [e, wlm];
+}
+
+fn pad6(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) -> list {
+    return [a, b, c, d, e, f];
+}
+
+fn main() -> i64 {
+    println("=== kenga decoder (GPT-shaped, lite CPU) ===");
+    println("arch: decoder L=2 D=16 causal-attn FFN RMS residual — GPT blocks, CPU scale");
+    let d: i64 = D();
+    let ff: i64 = FF();
+    let e = fill_w(V(), d, 7);
+    let wq = [fill_w(d, d, 11), fill_w(d, d, 13)];
+    let wk = [fill_w(d, d, 17), fill_w(d, d, 19)];
+    let wv = [fill_w(d, d, 23), fill_w(d, d, 29)];
+    let wo = [fill_w(d, d, 31), fill_w(d, d, 37)];
+    let wf1 = [fill_w(d, ff, 41), fill_w(d, ff, 43)];
+    let wf2 = [fill_w(ff, d, 47), fill_w(ff, d, 53)];
+    let wlm = fill_w(V(), d, 59);
+
+    let xs = [
+        pad6(0, 1, 2, 3, 4, 17),
+        pad6(0, 1, 5, 6, 18, 17),
+        pad6(0, 7, 8, 9, 10, 17),
+        pad6(0, 7, 8, 9, 12, 17),
+        pad6(0, 1, 13, 11, 14, 17),
+        pad6(0, 1, 15, 11, 16, 17),
+        pad6(0, 5, 6, 11, 7, 17),
+        pad6(1, 2, 3, 4, 17, 19)
+    ];
+
+    let ep: i64 = 0;
+    while ep < 50 {
+        let si: i64 = 0;
+        while si < len(xs) {
+            let seq = xs[si];
+            let ctx = [seq[0], seq[1], seq[2], seq[3], seq[4]];
+            let packed = train_last(e, wlm, ctx, seq[5], 0.15, wq, wk, wv, wo, wf1, wf2);
+            e = packed[0];
+            wlm = packed[1];
+            si = si + 1;
+        }
+        ep = ep + 1;
+    }
+
+    let ctx = [0, 1, 2, 3, 4];
+    let out: str = tok(0) + " " + tok(1) + " " + tok(2) + " " + tok(3) + " " + tok(4);
+    let step: i64 = 0;
+    while step < 6 {
+        let probs = forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm);
+        let nxt = argmax(probs, V());
+        out = out + " " + tok(nxt);
+        ctx = [ctx[1], ctx[2], ctx[3], ctx[4], nxt];
+        if nxt == 17 { break; }
+        if nxt == 19 { break; }
+        step = step + 1;
+    }
+    println(out);
+    assert(len(out) > 8);
+    assert(save_tensor(e, "minds/kenga_lm_e.kt") == 1);
+    assert(save_tensor(wlm, "minds/kenga_lm_w.kt") == 1);
+    println("kenga lm ok (decoder + weights)");
+    return 0;
+}

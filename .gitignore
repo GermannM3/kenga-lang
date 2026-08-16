@@ -32,6 +32,7 @@ examples/*.c
 # === Generated minds / weights (demos stay: agent.km demo.km multi.km) ===
 minds/_*
 minds/word_lm_*.kt
+minds/kenga_lm_*.kt
 bootstrap/minds/
 
 # === Dev clutter ===

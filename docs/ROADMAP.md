@@ -61,7 +61,8 @@
 | ✅ | 2-layer word-LM + CE + weight files (`word_lm.kenga`) |
 | ⬜ | f32 / tiled matmul (efficiency под рост) |
 | ✅ | **`kenga_net.kenga`** — 2-2-1 MLP + SGD на list/f64 (XOR), lite и bytecode→C |
-| ⬜ | Larger generative LM (больше vocab/слоёв) |
+| ✅ | **`kenga_lm.kenga`** — decoder (causal attn / FFN / RMS / residual), next-token на lite |
+| ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | GPU backend (wgpu/CUDA) под 1660-class |
 | ⬜ | Pretrained encoders |
 
