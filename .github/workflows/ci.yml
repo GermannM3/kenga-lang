@@ -84,7 +84,8 @@ jobs:
           cc -O2 -std=c99 bootstrap/kenga_lite.c -lm -o bootstrap/bin/kenga-lite
 
       - name: Selftest
-        run: ./bootstrap/bin/kenga-lite
+        working-directory: bootstrap
+        run: ./bin/kenga-lite
 
       - name: Examples (no Rust)
         run: |
