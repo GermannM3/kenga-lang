@@ -30,6 +30,13 @@ static size_t skip(const char *s, size_t i, size_t n) {
       while (i < n && s[i] != '\n') i++;
       continue;
     }
+    if (s[i] == '/' && i + 1 < n && s[i + 1] == '*') {
+      i += 2;
+      while (i + 1 < n && !(s[i] == '*' && s[i + 1] == '/')) i++;
+      if (i + 1 >= n) die("unclosed block comment");
+      i += 2;
+      continue;
+    }
     break;
   }
   return i;

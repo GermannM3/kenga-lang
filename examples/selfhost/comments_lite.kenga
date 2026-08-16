@@ -1,0 +1,10 @@
+fn main() -> i64 {
+    let x = 1;
+    /* this would assign 9 if comments were live code
+    x = 9;
+    */
+    assert(x == 1);
+    assert(1 + /* mid */ 2 == 3);
+    println("comments ok");
+    return 0;
+}

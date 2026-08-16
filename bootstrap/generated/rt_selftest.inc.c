@@ -136,6 +136,8 @@ static int selftest(void) {
       {"fn main() { 1 < 2 && 3 > 1 }", 1},
       {"fn main() { 1 > 2 || 2 > 1 }", 1},
       {"fn main() { !(1 == 2) }", 1},
+      {"fn main() { /* c */ 1 + /* x */ 2 }", 3},
+      {"fn main() { let x = 1; /*\n x = 9; \n*/ x }", 1},
   };
   size_t n = sizeof(cases) / sizeof(cases[0]);
   for (size_t i = 0; i < n; i++) {

@@ -10,6 +10,7 @@
  *   nested/hetero lists, import "path", ord(s), s[i] char index
  *   str + str concat, forward fn calls, true/false
  *   for x in a..b / for v in xs / break / continue
+ *   comments: // line  and  slash-star block comments
  *   type annotations ignored: `let x: i64 =`, `fn f(a: i64) -> i64`, `ttl 5s`
  *   Tensor (no Rust): tensor / t_from / t_fill / t_get / t_set / t_shape /
  *     t_add / t_sub / t_mul / t_matmul / t_reshape / t_transpose /

@@ -32,6 +32,13 @@ fn main() -> i64 {
     s = s + "      while (i < n && s[i] != '\\n') i++;\n";
     s = s + "      continue;\n";
     s = s + "    }\n";
+    s = s + "    if (s[i] == '/' && i + 1 < n && s[i + 1] == '*') {\n";
+    s = s + "      i += 2;\n";
+    s = s + "      while (i + 1 < n && !(s[i] == '*' && s[i + 1] == '/')) i++;\n";
+    s = s + "      if (i + 1 >= n) die(\"unclosed block comment\");\n";
+    s = s + "      i += 2;\n";
+    s = s + "      continue;\n";
+    s = s + "    }\n";
     s = s + "    break;\n";
     s = s + "  }\n";
     s = s + "  return i;\n";

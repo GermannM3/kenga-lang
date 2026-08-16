@@ -452,6 +452,22 @@ fn skip(s: str, i: i64) -> i64 {
                     }
                     continue;
                 }
+                if s[i + 1] == "*" {
+                    i = i + 2;
+                    let closed: i64 = 0;
+                    while i + 1 < len(s) {
+                        if s[i] == "*" {
+                            if s[i + 1] == "/" {
+                                i = i + 2;
+                                closed = 1;
+                                break;
+                            }
+                        }
+                        i = i + 1;
+                    }
+                    assert(closed == 1);
+                    continue;
+                }
             }
         }
         break;
@@ -1458,6 +1474,8 @@ fn main() -> i64 {
     assert(run_lite("fn main() { !0 }") == 1);
     assert(run_lite("fn main() { !(1 == 2) }") == 1);
     assert(run_lite("fn main() { 1 < 2 && 3 > 1 }") == 1);
+    assert(run_lite("fn main() { /* c */ 1 + /* x */ 2 }") == 3);
+    assert(run_file("examples/selfhost/comments_lite.kenga") == 0);
     assert(run_file("examples/selfhost/logic_lite.kenga") == 0);
     assert(run_file("examples/ml/kenga_birth.kenga") == 0);
     assert(run_file("examples/ml/kenga_born.kenga") == 0);
