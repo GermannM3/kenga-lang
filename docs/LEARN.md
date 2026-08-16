@@ -111,7 +111,7 @@ scripts\freedom-smoke.cmd
 - `lower_c` — i64/struct/float/agent → `bootstrap/bin/lower_*.c`  
 - `lower_kv` — tagged KVal (str/ord/hetero lists) + **lex_frag** → `bootstrap/generated/`  
 - `bc_src_c` — **парсит** `.kenga` → bytecode → native VM (`bc_from_fn`→42, lists→19, fact→120, for_lite, `else if`)
-- `rt_cli` — Kenga пишет `main` lite-хоста (`bootstrap/generated/rt_cli.inc.c`)
+- `rt_cli` / `rt_mem` / `rt_host` — Kenga пишет `main`, die/xstrdup и загрузчик import
 
 Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.
 
@@ -125,11 +125,13 @@ scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
 scripts\kenga-mm.cmd
 ```
 
 Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).  
-`kenga_mm_gen` — decoder: зрение ставит первую букву, текст дописывает стебель (`kra` / `ze` / `si`). Полное слово на D=16 ещё плывёт.  
+`kenga_mm_gen` — по буквам, стебель `kra`/`ze`/`si`.  
+`kenga_mm_words` — тот же decoder, цвет одним токеном: полные `krasnyj` / `zelenyj` / `sinij`.  
 Шкала: `docs/KENGA_LM.md`. Куда потом большую: `docs/HUGGINGFACE.md`.
 
 ## 9. Упражнения

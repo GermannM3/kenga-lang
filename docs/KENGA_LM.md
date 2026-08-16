@@ -2,7 +2,7 @@
 
 Половина Grok — это не другой алгоритм. Это **тот же decoder** (внимание, residual, FFN, норма, LM-head) с другими числами: ширина, глубина, словарь, данные, GPU.
 
-Kenga уже выражает эту машину. Три файла:
+Kenga уже выражает эту машину. Файлы:
 
 - `examples/ml/kenga_lm.kenga` — decoder на закрытом словесном словаре
 - `examples/ml/kenga_charlm.kenga` — тот же decoder, корпус = наши `.kenga`
@@ -10,6 +10,7 @@ Kenga уже выражает эту машину. Три файла:
 - `examples/ml/kenga_birth.kenga` — suffix LM пишет `kenga_born.kenga`, lite его запускает → **24**
 - `examples/ml/kenga_mm_lm.kenga` — PPM+WAV → подпись (linear)
 - `examples/ml/kenga_mm_gen.kenga` — decoder пишет стебель цвета (kra/ze/si)
+- `examples/ml/kenga_mm_words.kenga` — тот же decoder, цвет = один токен, полная подпись
 
 Скачанный GGUF из папки «kenga ai» сюда не кладём. Это чужой граф и чужие веса. Доказательство языка — сеть, написанная на Kenga и обученная на Kenga.
 
@@ -22,6 +23,7 @@ scripts\bc-run.cmd examples\ml\kenga_trigram.kenga
 scripts\kenga-birth.cmd
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
 scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 scripts\hf-pack.cmd
 ```

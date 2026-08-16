@@ -11,6 +11,7 @@
 | `kenga_mm_lm.kenga` | PPM+WAV → caption, сид для Hugging Face |
 | `kenga_mm_talk.kenga` | caption из сохранённых весов |
 | `kenga_mm_gen.kenga` | decoder пишет стебель цвета (kra/ze/si) |
+| `kenga_mm_words.kenga` | word-decoder: полные krasnyj/zelenyj/sinij |
 | `kenga_mm_gen_talk.kenga` | generate из `minds/kenga_mm_{e,wlm,whead}` |
 | `kenga_dec.kenga` | общие блоки decoder (import) |
 | `kenga_lm.kenga` | decoder GPT-формы, закрытый словарь |
@@ -33,6 +34,7 @@ kenga run examples/ml/kenga_charlm.kenga
 kenga run examples/ml/kenga_trigram.kenga
 kenga run examples/ml/kenga_mm_lm.kenga
 kenga run examples/ml/kenga_mm_gen.kenga
+kenga run examples/ml/kenga_mm_words.kenga
 scripts/kenga-birth.cmd
 scripts/bc-run.cmd examples/ml/kenga_birth.kenga
 kenga run examples/ml/tiny_lm.kenga

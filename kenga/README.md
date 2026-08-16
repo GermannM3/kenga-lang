@@ -22,6 +22,8 @@ scripts\freedom-smoke.cmd
 | `emit/lower_c.kenga` | recursive → C99 (events/struct/f64) | кусок `codegen.rs` |
 | `emit/rt_kval.kenga` | tagged KVal + events + file IO runtime | зародыш runtime host |
 | `emit/rt_cli.kenga` | `main` kenga-lite → `generated/rt_cli.inc.c` | кусок `main.rs` / ручного host |
+| `emit/rt_mem.kenga` | die / xrealloc / xstrdup | кусок runtime host |
+| `emit/rt_host.kenga` | read_file + import flatten | кусок driver.rs |
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.

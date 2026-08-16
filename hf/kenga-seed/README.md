@@ -20,7 +20,7 @@ When the large model is ready, it lands here (same org, bigger weights) and on g
 
 | Piece | File |
 |---|---|
-| Vision+audio → text | `kenga_mm_lm.kenga` (linear) + `kenga_mm_gen.kenga` (decoder, stems kra/ze/si) |
+| Vision+audio → text | linear + char stem + `kenga_mm_words.kenga` (full color token) |
 | Text decoder | `examples/ml/kenga_charlm.kenga` / `kenga_dec.kenga` |
 | Birth (writes runnable Kenga) | lite or native C (`bc-run`) → `kenga_born.kenga` → **24** |
 | Living world-model | `examples/ml/living_multimodal.kenga` → `minds/multi.km` |

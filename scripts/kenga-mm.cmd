@@ -21,4 +21,8 @@ echo === decoder: next-char from the same scenes ===
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
 if errorlevel 1 exit /b 1
 
-echo OK: PPM+WAV → text (linear + decoder) from our weights
+echo === word decoder: full color token ===
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
+if errorlevel 1 exit /b 1
+
+echo OK: PPM+WAV → text (linear + char stem + word caption)

@@ -20,6 +20,7 @@ copy /y examples\ml\kenga_mm_lm.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_mm_talk.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_mm_gen.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_mm_gen_talk.kenga "%OUT%\examples\ml\" >nul
+copy /y examples\ml\kenga_mm_words.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_birth.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_born.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_dec.kenga "%OUT%\examples\ml\" >nul

@@ -59,7 +59,8 @@ Lite: `examples/selfhost/struct_lite.kenga`.
 
 ## E11. Decoder видит кадр
 
-`examples/ml/kenga_mm_gen.kenga` — после `"kenga vidit "` модель пишет стебель цвета: **kra / ze / si**. Зрение — первая буква, дальше текстовый decoder. Полные krasnyj/zelenyj/sinij на D=16 ещё смешиваются.
+`examples/ml/kenga_mm_gen.kenga` — стебель **kra / ze / si**.  
+`examples/ml/kenga_mm_words.kenga` — цвет одним словом: три полные подписи.
 
 Бонус: `scripts\bc-run.cmd examples\ml\kenga_birth.kenga` — birth без lite VM, потом `kenga-lite run examples\ml\kenga_born.kenga` → 24.
 

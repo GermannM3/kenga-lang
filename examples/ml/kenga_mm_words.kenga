@@ -1,0 +1,160 @@
+// Word-level decoder + visual fork. Color is one token, not a pile of letters.
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
+
+import "kenga_dec.kenga";
+
+fn fuse_col(img_path: str, wav_path: str) -> Tensor {
+    let img = t_mean(load_ppm(img_path));
+    let wav = load_wav(wav_path);
+    let am = t_mean(wav);
+    let energy = t_mean(t_mul(wav, wav));
+    return t_from([6, 1], [t_get(img, 0), t_get(img, 1), t_get(img, 2), am, energy, energy * 2.0]);
+}
+
+fn scene_col(i: i64) -> Tensor {
+    if i == 0 { return fuse_col("examples/ml/assets/frame0.ppm", "examples/ml/assets/tone0.wav"); }
+    if i == 1 { return fuse_col("examples/ml/assets/frame1.ppm", "examples/ml/assets/tone1.wav"); }
+    return fuse_col("examples/ml/assets/frame2.ppm", "examples/ml/assets/tone2.wav");
+}
+
+fn vocab_of() -> list {
+    return ["kenga", "vidit", "krasnyj", "zelenyj", "sinij", "kadr", "i", "slyshit", "ton"];
+}
+
+fn word_id(vocab: list, w: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(vocab) {
+        if vocab[i] == w { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn encode_words(ws: list, vocab: list) -> list {
+    let ids = [];
+    let i: i64 = 0;
+    while i < len(ws) {
+        ids = push(ids, word_id(vocab, ws[i]));
+        i = i + 1;
+    }
+    return ids;
+}
+
+fn caption_words(i: i64) -> list {
+    if i == 0 { return ["kenga", "vidit", "krasnyj", "kadr", "i", "slyshit", "ton"]; }
+    if i == 1 { return ["kenga", "vidit", "zelenyj", "kadr", "i", "slyshit", "ton"]; }
+    return ["kenga", "vidit", "sinij", "kadr", "i", "slyshit", "ton"];
+}
+
+fn color_of(i: i64) -> str {
+    if i == 0 { return "krasnyj"; }
+    if i == 1 { return "zelenyj"; }
+    return "sinij";
+}
+
+fn join_words(ids: list, vocab: list) -> str {
+    let out: str = "";
+    let i: i64 = 0;
+    while i < len(ids) {
+        if i > 0 { out = out + " "; }
+        out = out + vocab[ids[i]];
+        i = i + 1;
+    }
+    return out;
+}
+
+fn train_ids(e: Tensor, wlm: Tensor, ids: list, vv: i64, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list) -> list {
+    let ctxn: i64 = CTX();
+    let p: i64 = 1;
+    while p < len(ids) {
+        let packed = train_last(e, wlm, window(ids, p, ctxn), ids[p], 0.16, vv, wq, wk, wv, wo, wf1, wf2);
+        e = packed[0];
+        wlm = packed[1];
+        p = p + 1;
+    }
+    return [e, wlm];
+}
+
+fn generate_words(prompt: list, vocab: list, e: Tensor, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor, steps: i64) -> str {
+    let vv: i64 = len(vocab);
+    let ctxn: i64 = CTX();
+    let ctx = clip_ctx(encode_words(prompt, vocab), ctxn);
+    let out = encode_words(prompt, vocab);
+    if steps <= 0 { return join_words(out, vocab); }
+    let nxt = argmax(forward_vis(ctx, e, fuse, whead, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+    out = push(out, nxt);
+    ctx = clip_ctx(push(ctx, nxt), ctxn);
+    let step: i64 = 1;
+    while step < steps {
+        nxt = argmax(forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+        out = push(out, nxt);
+        ctx = clip_ctx(push(ctx, nxt), ctxn);
+        step = step + 1;
+    }
+    return join_words(out, vocab);
+}
+
+fn main() -> i64 {
+    println("=== kenga mm-words (decoder writes a color token) ===");
+    let vocab = vocab_of();
+    let vv: i64 = len(vocab);
+    let d: i64 = D();
+    let ff: i64 = FF();
+    let e = fill_w(vv, d, 7);
+    let att = frozen_attn(d, ff);
+    let wq = att[0];
+    let wk = att[1];
+    let wv = att[2];
+    let wo = att[3];
+    let wf1 = att[4];
+    let wf2 = att[5];
+    let wlm = fill_w(vv, d, 59);
+    let whead = fill_w(vv, 6, 71);
+    let f0 = scene_col(0);
+    let f1 = scene_col(1);
+    let f2 = scene_col(2);
+    let id0 = encode_words(caption_words(0), vocab);
+    let id1 = encode_words(caption_words(1), vocab);
+    let id2 = encode_words(caption_words(2), vocab);
+    let fork = encode_words(["kenga", "vidit"], vocab);
+
+    let ep: i64 = 0;
+    while ep < 12 {
+        let p = train_ids(e, wlm, id0, vv, wq, wk, wv, wo, wf1, wf2);
+        e = p[0];
+        wlm = p[1];
+        p = train_ids(e, wlm, id1, vv, wq, wk, wv, wo, wf1, wf2);
+        e = p[0];
+        wlm = p[1];
+        p = train_ids(e, wlm, id2, vv, wq, wk, wv, wo, wf1, wf2);
+        e = p[0];
+        wlm = p[1];
+        ep = ep + 1;
+    }
+
+    let br: i64 = 0;
+    while br < 80 {
+        whead = train_whead_only(whead, fork, word_id(vocab, "krasnyj"), 0.35, vv, f0, e, wq, wk, wv, wo, wf1, wf2, wlm);
+        whead = train_whead_only(whead, fork, word_id(vocab, "zelenyj"), 0.35, vv, f1, e, wq, wk, wv, wo, wf1, wf2, wlm);
+        whead = train_whead_only(whead, fork, word_id(vocab, "sinij"), 0.35, vv, f2, e, wq, wk, wv, wo, wf1, wf2, wlm);
+        br = br + 1;
+    }
+
+    let prompt = ["kenga", "vidit"];
+    let g0 = generate_words(prompt, vocab, e, f0, whead, wq, wk, wv, wo, wf1, wf2, wlm, 5);
+    let g1 = generate_words(prompt, vocab, e, f1, whead, wq, wk, wv, wo, wf1, wf2, wlm, 5);
+    let g2 = generate_words(prompt, vocab, e, f2, whead, wq, wk, wv, wo, wf1, wf2, wlm, 5);
+    println(g0);
+    println(g1);
+    println(g2);
+    assert(has_sub(g0, color_of(0)) == 1);
+    assert(has_sub(g1, color_of(1)) == 1);
+    assert(has_sub(g2, color_of(2)) == 1);
+    assert(write_file("examples/ml/kenga_mm_words_sample.txt", g0 + "\n" + g1 + "\n" + g2 + "\n") == 1);
+    assert(save_tensor(e, "minds/kenga_mm_we.kt") == 1);
+    assert(save_tensor(wlm, "minds/kenga_mm_wwlm.kt") == 1);
+    assert(save_tensor(whead, "minds/kenga_mm_wwhead.kt") == 1);
+    println("kenga mm-words ok");
+    return 0;
+}

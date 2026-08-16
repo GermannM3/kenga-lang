@@ -39,6 +39,14 @@ echo === kenga/emit/rt_cli.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_cli.kenga
 if errorlevel 1 exit /b 1
 
+echo === kenga/emit/rt_mem.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_mem.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_host.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_host.kenga
+if errorlevel 1 exit /b 1
+
 echo === kenga/emit/lower_kv.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 if errorlevel 1 exit /b 1

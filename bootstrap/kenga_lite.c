@@ -222,24 +222,7 @@ static StrA *g_strtab; /* active during compile */
 static StructType *g_stypes;
 static size_t g_nstypes, g_stypes_cap;
 
-static void die(const char *msg) {
-  fprintf(stderr, "kenga-lite: %s\n", msg);
-  exit(1);
-}
-
-static void *xrealloc(void *p, size_t n) {
-  void *q = realloc(p, n);
-  if (!q) die("oom");
-  return q;
-}
-
-static char *xstrdup(const char *s) {
-  size_t n = strlen(s) + 1;
-  char *d = (char *)malloc(n);
-  if (!d) die("oom");
-  memcpy(d, s, n);
-  return d;
-}
+#include "generated/rt_mem.inc.c"
 
 static Value V_i64(int64_t x) {
   Value v;
@@ -3307,95 +3290,7 @@ static int64_t run_lite(const char *src) {
   return r;
 }
 
-static char *read_file(const char *path) {
-  FILE *f = fopen(path, "rb");
-  if (!f) {
-    fprintf(stderr, "kenga-lite: cannot open %s\n", path);
-    exit(1);
-  }
-  fseek(f, 0, SEEK_END);
-  long sz = ftell(f);
-  fseek(f, 0, SEEK_SET);
-  if (sz < 0) die("ftell");
-  char *buf = (char *)malloc((size_t)sz + 1);
-  if (!buf) die("oom");
-  if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) die("fread");
-  buf[sz] = 0;
-  fclose(f);
-  return buf;
-}
-
-static char *dirname_dup(const char *path) {
-  size_t n = strlen(path);
-  size_t slash = n;
-  for (size_t i = 0; i < n; i++) {
-    if (path[i] == '/' || path[i] == '\\') slash = i;
-  }
-  if (slash == n) return xstrdup(".");
-  char *d = (char *)malloc(slash + 1);
-  if (!d) die("oom");
-  memcpy(d, path, slash);
-  d[slash] = 0;
-  return d;
-}
-
-static char *join_path(const char *dir, const char *rel) {
-  size_t nd = strlen(dir), nr = strlen(rel);
-  char *o = (char *)malloc(nd + nr + 2);
-  if (!o) die("oom");
-  memcpy(o, dir, nd);
-  o[nd] = '/';
-  memcpy(o + nd + 1, rel, nr + 1);
-  return o;
-}
-
-/* Resolve import "..." and prepend dependency sources (recursive). */
-static char *load_with_imports(const char *path, int depth) {
-  if (depth > 32) die("import nest too deep");
-  char *src = read_file(path);
-  char *dir = dirname_dup(path);
-  size_t n = strlen(src);
-  size_t i = 0;
-  char *acc = xstrdup("");
-  size_t acc_len = 0;
-
-  while (1) {
-    i = skip(src, i, n);
-    if (!starts_kw(src, i, n, "import")) break;
-    i = skip(src, i + 6, n);
-    if (i >= n || src[i] != '"') die("expected string after import");
-    size_t ii = i;
-    char *spec = parse_string(src, &ii, n);
-    i = skip(src, ii, n);
-    if (i < n && src[i] == ';') i++;
-    char *dep_path = join_path(dir, spec);
-    free(spec);
-    char *dep = load_with_imports(dep_path, depth + 1);
-    free(dep_path);
-    size_t dep_len = strlen(dep);
-    char *nacc = (char *)malloc(acc_len + dep_len + 2);
-    if (!nacc) die("oom");
-    memcpy(nacc, acc, acc_len);
-    memcpy(nacc + acc_len, dep, dep_len);
-    nacc[acc_len + dep_len] = '\n';
-    nacc[acc_len + dep_len + 1] = 0;
-    free(acc);
-    free(dep);
-    acc = nacc;
-    acc_len += dep_len + 1;
-  }
-
-  size_t rest = n - i;
-  char *out = (char *)malloc(acc_len + rest + 1);
-  if (!out) die("oom");
-  memcpy(out, acc, acc_len);
-  memcpy(out + acc_len, src + i, rest);
-  out[acc_len + rest] = 0;
-  free(acc);
-  free(src);
-  free(dir);
-  return out;
-}
+#include "generated/rt_host.inc.c"
 
 static int selftest(void) {
   struct {

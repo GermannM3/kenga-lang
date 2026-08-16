@@ -33,4 +33,4 @@ bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 
 `more` уже гоняет `for_lite` / `elif_lite` / `struct_lite` / `float_lite` / `lists_lite` / **`agent.kenga`** через свой bytecode VM.  
 `bc_src_c` пишет тот же диалект в native C (`bc_from_agent`, `bc_from_import`, **`bc_from_net`**, **`bc_from_birth`**).  
-`rt_cli.kenga` пишет `main` хоста в `bootstrap/generated/rt_cli.inc.c`.
+`rt_cli` / `rt_mem` / `rt_host` пишут `main`, die/xstrdup и import-loader.
