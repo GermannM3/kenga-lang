@@ -24,6 +24,8 @@ scripts\freedom-smoke.cmd
 | `emit/rt_cli.kenga` | `main` kenga-lite → `generated/rt_cli.inc.c` | кусок `main.rs` / ручного host |
 | `emit/rt_mem.kenga` | die / xrealloc / xstrdup | кусок runtime host |
 | `emit/rt_host.kenga` | read_file + import flatten | кусок driver.rs |
+| `emit/rt_val.kenga` | V_i64 / V_f64 / to_f64 | кусок vm.rs |
+| `emit/rt_lex.kenga` | intern / skip / starts_kw | кусок lexer.rs |
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.

@@ -22,7 +22,11 @@ bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
 if errorlevel 1 exit /b 1
 
 echo === word decoder: full color token ===
-bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
+if not exist minds\kenga_mm_we.kt (
+  bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
+  if errorlevel 1 exit /b 1
+)
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words_talk.kenga
 if errorlevel 1 exit /b 1
 
 echo OK: PPM+WAV → text (linear + char stem + word caption)

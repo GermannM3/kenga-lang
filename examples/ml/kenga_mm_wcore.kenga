@@ -1,0 +1,81 @@
+// Shared word-level caption helpers. No main().
+import "kenga_dec.kenga";
+
+fn fuse_col(img_path: str, wav_path: str) -> Tensor {
+    let img = t_mean(load_ppm(img_path));
+    let wav = load_wav(wav_path);
+    let am = t_mean(wav);
+    let energy = t_mean(t_mul(wav, wav));
+    return t_from([6, 1], [t_get(img, 0), t_get(img, 1), t_get(img, 2), am, energy, energy * 2.0]);
+}
+
+fn scene_col(i: i64) -> Tensor {
+    if i == 0 { return fuse_col("examples/ml/assets/frame0.ppm", "examples/ml/assets/tone0.wav"); }
+    if i == 1 { return fuse_col("examples/ml/assets/frame1.ppm", "examples/ml/assets/tone1.wav"); }
+    return fuse_col("examples/ml/assets/frame2.ppm", "examples/ml/assets/tone2.wav");
+}
+
+fn vocab_of() -> list {
+    return ["kenga", "vidit", "krasnyj", "zelenyj", "sinij", "kadr", "i", "slyshit", "ton"];
+}
+
+fn word_id(vocab: list, w: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(vocab) {
+        if vocab[i] == w { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn encode_words(ws: list, vocab: list) -> list {
+    let ids = [];
+    let i: i64 = 0;
+    while i < len(ws) {
+        ids = push(ids, word_id(vocab, ws[i]));
+        i = i + 1;
+    }
+    return ids;
+}
+
+fn caption_words(i: i64) -> list {
+    if i == 0 { return ["kenga", "vidit", "krasnyj", "kadr", "i", "slyshit", "ton"]; }
+    if i == 1 { return ["kenga", "vidit", "zelenyj", "kadr", "i", "slyshit", "ton"]; }
+    return ["kenga", "vidit", "sinij", "kadr", "i", "slyshit", "ton"];
+}
+
+fn color_of(i: i64) -> str {
+    if i == 0 { return "krasnyj"; }
+    if i == 1 { return "zelenyj"; }
+    return "sinij";
+}
+
+fn join_words(ids: list, vocab: list) -> str {
+    let out: str = "";
+    let i: i64 = 0;
+    while i < len(ids) {
+        if i > 0 { out = out + " "; }
+        out = out + vocab[ids[i]];
+        i = i + 1;
+    }
+    return out;
+}
+
+fn generate_words(prompt: list, vocab: list, e: Tensor, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor, steps: i64) -> str {
+    let vv: i64 = len(vocab);
+    let ctxn: i64 = CTX();
+    let ctx = clip_ctx(encode_words(prompt, vocab), ctxn);
+    let out = encode_words(prompt, vocab);
+    if steps <= 0 { return join_words(out, vocab); }
+    let nxt = argmax(forward_vis(ctx, e, fuse, whead, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+    out = push(out, nxt);
+    ctx = clip_ctx(push(ctx, nxt), ctxn);
+    let step: i64 = 1;
+    while step < steps {
+        nxt = argmax(forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+        out = push(out, nxt);
+        ctx = clip_ctx(push(ctx, nxt), ctxn);
+        step = step + 1;
+    }
+    return join_words(out, vocab);
+}

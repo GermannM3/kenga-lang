@@ -24,6 +24,7 @@ scripts\kenga-birth.cmd
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words_talk.kenga
 scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 scripts\hf-pack.cmd
 ```

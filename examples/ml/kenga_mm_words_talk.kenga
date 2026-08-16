@@ -1,0 +1,26 @@
+// Load word-decoder weights, caption three scenes. No training.
+// Run after kenga_mm_words.kenga:
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words_talk.kenga
+
+import "kenga_mm_wcore.kenga";
+
+fn main() -> i64 {
+    println("=== kenga mm-words-talk (full captions from saved weights) ===");
+    let vocab = vocab_of();
+    let e = load_tensor("minds/kenga_mm_we.kt");
+    let wlm = load_tensor("minds/kenga_mm_wwlm.kt");
+    let whead = load_tensor("minds/kenga_mm_wwhead.kt");
+    let att = frozen_attn(D(), FF());
+    let prompt = ["kenga", "vidit"];
+    let g0 = generate_words(prompt, vocab, e, scene_col(0), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 5);
+    let g1 = generate_words(prompt, vocab, e, scene_col(1), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 5);
+    let g2 = generate_words(prompt, vocab, e, scene_col(2), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 5);
+    println(g0);
+    println(g1);
+    println(g2);
+    assert(has_sub(g0, color_of(0)) == 1);
+    assert(has_sub(g1, color_of(1)) == 1);
+    assert(has_sub(g2, color_of(2)) == 1);
+    println("kenga mm-words-talk ok");
+    return 0;
+}

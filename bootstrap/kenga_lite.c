@@ -223,52 +223,7 @@ static StructType *g_stypes;
 static size_t g_nstypes, g_stypes_cap;
 
 #include "generated/rt_mem.inc.c"
-
-static Value V_i64(int64_t x) {
-  Value v;
-  v.tag = TAG_I64;
-  v.payload = x;
-  return v;
-}
-static Value V_str(int64_t h) {
-  Value v;
-  v.tag = TAG_STR;
-  v.payload = h;
-  return v;
-}
-static Value V_list(int64_t h) {
-  Value v;
-  v.tag = TAG_LIST;
-  v.payload = h;
-  return v;
-}
-static Value V_struct(int64_t h) {
-  Value v;
-  v.tag = TAG_STRUCT;
-  v.payload = h;
-  return v;
-}
-static Value V_f64(double x) {
-  Value v;
-  v.tag = TAG_F64;
-  memcpy(&v.payload, &x, sizeof(double));
-  return v;
-}
-static double f64_bits(Value v) {
-  double d;
-  memcpy(&d, &v.payload, sizeof(double));
-  return d;
-}
-static int is_num(Value v) { return v.tag == TAG_I64 || v.tag == TAG_F64; }
-static double to_f64(Value v, const char *ctx) {
-  if (v.tag == TAG_F64) return f64_bits(v);
-  if (v.tag == TAG_I64) return (double)v.payload;
-  die(ctx);
-  return 0.0;
-}
-static int64_t k_round_d(double x) {
-  return (int64_t)(x >= 0.0 ? x + 0.5 : x - 0.5);
-}
+#include "generated/rt_val.inc.c"
 
 static void i64a_push(I64A *a, int64_t v) {
   if (a->len + 1 > a->cap) {
@@ -402,50 +357,7 @@ static void program_free(Program *p) {
   p->nfns = 0;
 }
 
-static int intern_str(const char *s) {
-  if (!g_strtab) die("no strtab");
-  for (size_t i = 0; i < g_strtab->len; i++) {
-    if (strcmp(g_strtab->data[i], s) == 0) return (int)i;
-  }
-  stra_push(g_strtab, xstrdup(s));
-  return (int)g_strtab->len - 1;
-}
-
-static int starts_with(const char *s, size_t i, size_t n, const char *w) {
-  size_t wl = strlen(w);
-  if (i + wl > n) return 0;
-  return memcmp(s + i, w, wl) == 0;
-}
-
-static int is_ident_start(char c) {
-  return isalpha((unsigned char)c) || c == '_';
-}
-static int is_ident(char c) {
-  return isalnum((unsigned char)c) || c == '_';
-}
-
-static size_t skip(const char *s, size_t i, size_t n) {
-  while (i < n) {
-    if (isspace((unsigned char)s[i])) {
-      i++;
-      continue;
-    }
-    if (s[i] == '/' && i + 1 < n && s[i + 1] == '/') {
-      i += 2;
-      while (i < n && s[i] != '\n') i++;
-      continue;
-    }
-    break;
-  }
-  return i;
-}
-
-static int starts_kw(const char *s, size_t i, size_t n, const char *w) {
-  size_t wl = strlen(w);
-  if (!starts_with(s, i, n, w)) return 0;
-  if (i + wl < n && is_ident(s[i + wl])) return 0;
-  return 1;
-}
+#include "generated/rt_lex.inc.c"
 
 static void emit2(I64A *code, int64_t a, int64_t b);
 static void emit3(I64A *code, int64_t a, int64_t b, int64_t c);

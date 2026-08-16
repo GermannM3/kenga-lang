@@ -36,7 +36,7 @@
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
-| 🟡 | Emit lite runtime: **`rt_cli` / `rt_mem` / `rt_host`**; компилятор в `kenga_lite.c` ещё руками |
+| 🟡 | Emit lite runtime: **`rt_cli` / `rt_mem` / `rt_host` / `rt_val` / `rt_lex`**; компилятор ещё руками |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 
@@ -68,7 +68,7 @@
 | ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
 | ✅ | **`kenga_mm_lm.kenga`** / **`kenga_mm_talk.kenga`** — PPM+WAV → caption |
 | ✅ | **`kenga_mm_gen.kenga`** — decoder пишет стебель цвета (kra/ze/si) |
-| ✅ | **`kenga_mm_words.kenga`** — word-decoder пишет полную подпись |
+| ✅ | **`kenga_mm_words.kenga`** / **`kenga_mm_words_talk.kenga`** — word-decoder пишет полную подпись |
 | ✅ | Карточка HF: `hf/kenga-seed/` + `scripts\hf-pack.cmd` |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |
