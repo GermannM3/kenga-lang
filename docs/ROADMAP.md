@@ -62,6 +62,7 @@
 | ⬜ | f32 / tiled matmul (efficiency под рост) |
 | ✅ | **`kenga_net.kenga`** — 2-2-1 MLP + SGD на list/f64 (XOR), lite и bytecode→C |
 | ✅ | **`kenga_lm.kenga`** — decoder (causal attn / FFN / RMS / residual), next-token на lite |
+| ✅ | **`kenga_charlm.kenga`** — тот же decoder, корпус = наш `.kenga` (не GGUF) |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | GPU backend (wgpu/CUDA) под 1660-class |
 | ⬜ | Pretrained encoders |

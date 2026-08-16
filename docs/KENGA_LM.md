@@ -2,18 +2,24 @@
 
 Половина Grok — это не другой алгоритм. Это **тот же decoder** (внимание, residual, FFN, норма, LM-head) с другими числами: ширина, глубина, словарь, данные, GPU.
 
-Kenga уже выражает эту машину. Файл: `examples/ml/kenga_lm.kenga`.
+Kenga уже выражает эту машину. Два файла:
+
+- `examples/ml/kenga_lm.kenga` — decoder на закрытом словесном словаре
+- `examples/ml/kenga_charlm.kenga` — тот же decoder, корпус = наш `.kenga` (`kenga_seed.kenga` через `read_file`)
+
+Скачанный GGUF из папки «kenga ai» сюда не кладём. Это чужой граф и чужие веса. Доказательство языка — сеть, написанная на Kenga и обученная на Kenga.
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_lm.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
 ```
 
-На CPU lite сейчас: L=2, D=16, V=20, закрытый словарь, ~6k весов, секунды.  
-После обучения дописывает фразу: `<s> kenga zhivet v yazyke .`
+Word-LM на CPU lite: L=2, D=16, V=20, ~6k весов. Дописывает `<s> kenga zhivet v yazyke .`  
+Char-LM читает `examples/ml/kenga_seed.kenga`, строит charset, учит next-char, пишет с `"fn add"` что-то вроде `fn add(y);` плюс скобки языка. Не Grok и не скачанный GGUF — сеть из этого файла, корпус из нашего `.kenga`.
 
 ## Что это доказывает
 
-Язык может описать и прогнать **архитектуру большого LM**, не Python и не PyTorch. Веса пишутся в `minds/kenga_lm_*.kt`.
+Язык может описать и прогнать **архитектуру большого LM**, не Python и не PyTorch. Веса: `minds/kenga_lm_*.kt`, `minds/kenga_char_*.kt`.
 
 Что ещё не доказано (и честно не будет за вечер):
 
@@ -33,8 +39,9 @@ bootstrap\bin\kenga-lite.exe run examples\ml\kenga_lm.kenga
 
 1. XOR-MLP на list/f64 — `kenga_net.kenga` (алгоритм в языке, без tensor host).
 2. 2-layer word-LM + CE — `word_lm.kenga`.
-3. **Decoder GPT-формы** — `kenga_lm.kenga` ← вы здесь.
-4. Больше D/L, байтовый/BPE словарь, длинный контекст.
-5. GPU backend + (позже) GGUF/safetensors.
+3. **Decoder GPT-формы** — `kenga_lm.kenga`.
+4. **Char-LM на нашем исходнике** — `kenga_charlm.kenga` ← вы здесь.
+5. Больше D/L, байтовый/BPE словарь, длинный контекст.
+6. GPU backend. Чужой GGUF — не доказательство.
 
 Расти `fn D()` / `fn L()` / корпус в том же файле. Менять язык не нужно.

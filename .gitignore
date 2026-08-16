@@ -33,6 +33,7 @@ examples/*.c
 minds/_*
 minds/word_lm_*.kt
 minds/kenga_lm_*.kt
+minds/kenga_char_*.kt
 bootstrap/minds/
 
 # === Dev clutter ===

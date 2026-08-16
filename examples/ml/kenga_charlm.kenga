@@ -1,0 +1,306 @@
+// Char-level decoder trained on our .kenga (not GGUF, not Python).
+// Corpus: examples/ml/kenga_seed.kenga via read_file.
+// Same blocks as kenga_lm.kenga: causal attn, residual, FFN, RMS, LM-head.
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
+
+fn D() -> i64 { return 16; }
+fn L() -> i64 { return 1; }
+fn FF() -> i64 { return 24; }
+fn CTX() -> i64 { return 5; }
+
+fn zeros(n: i64) -> list {
+    let xs = [];
+    let i: i64 = 0;
+    while i < n {
+        xs = push(xs, 0.0);
+        i = i + 1;
+    }
+    return xs;
+}
+
+fn fill_w(rows: i64, cols: i64, seed: i64) -> Tensor {
+    let xs = [];
+    let s: i64 = seed;
+    let i: i64 = 0;
+    let n: i64 = rows * cols;
+    while i < n {
+        s = s * 1103515245 + 12345;
+        if s < 0 { s = 0 - s; }
+        let m: i64 = s - (s / 97) * 97;
+        xs = push(xs, (m + 0.0) / 97.0 * 0.3 - 0.15);
+        i = i + 1;
+    }
+    return t_from([rows, cols], xs);
+}
+
+fn ch_id(alpha: str, ch: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(alpha) {
+        if alpha[i] == ch { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn build_alpha(src: str) -> str {
+    let a: str = "";
+    let i: i64 = 0;
+    while i < len(src) {
+        if ch_id(a, src[i]) < 0 { a = a + src[i]; }
+        i = i + 1;
+    }
+    return a;
+}
+
+fn encode(src: str, alpha: str) -> list {
+    let ids = [];
+    let i: i64 = 0;
+    while i < len(src) {
+        let id = ch_id(alpha, src[i]);
+        if id >= 0 { ids = push(ids, id); }
+        i = i + 1;
+    }
+    return ids;
+}
+
+fn row_of(e: Tensor, idx: i64, d: i64) -> list {
+    let xs = [];
+    let j: i64 = 0;
+    while j < d {
+        xs = push(xs, t_get(e, idx * d + j));
+        j = j + 1;
+    }
+    return xs;
+}
+
+fn embed_seq(e: Tensor, ids: list, d: i64) -> Tensor {
+    let tlen: i64 = len(ids);
+    let xs = [];
+    let i: i64 = 0;
+    while i < tlen {
+        let id: i64 = ids[i];
+        let j: i64 = 0;
+        while j < d {
+            xs = push(xs, t_get(e, id * d + j));
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return t_from([tlen, d], xs);
+}
+
+fn rms(x: Tensor, tlen: i64, d: i64) -> Tensor {
+    let out = t_from([tlen, d], zeros(tlen * d));
+    let t: i64 = 0;
+    while t < tlen {
+        let s = 0.0;
+        let j: i64 = 0;
+        while j < d {
+            let v = t_get(x, t * d + j);
+            s = s + v * v;
+            j = j + 1;
+        }
+        s = s / (d + 0.0) + 0.0001;
+        let inv = 1.0 / s;
+        j = 0;
+        while j < d {
+            t_set(out, t * d + j, t_get(x, t * d + j) * inv);
+            j = j + 1;
+        }
+        t = t + 1;
+    }
+    return out;
+}
+
+fn relu_mat(x: Tensor) -> Tensor {
+    let n = t_shape(x);
+    let rows: i64 = n[0];
+    let cols: i64 = n[1];
+    let i: i64 = 0;
+    while i < rows * cols {
+        let v = t_get(x, i);
+        if v < 0.0 { t_set(x, i, 0.0); }
+        i = i + 1;
+    }
+    return x;
+}
+
+fn attn(x: Tensor, wq: Tensor, wk: Tensor, wv: Tensor, wo: Tensor, tlen: i64, d: i64) -> Tensor {
+    let q = t_matmul(x, wq);
+    let k = t_matmul(x, wk);
+    let v = t_matmul(x, wv);
+    let scores = t_scale(t_matmul(q, t_transpose(k)), 0.25);
+    let i: i64 = 0;
+    while i < tlen {
+        let j: i64 = i + 1;
+        while j < tlen {
+            t_set(scores, i * tlen + j, 0.0 - 80.0);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    let a = t_from([tlen, tlen], zeros(tlen * tlen));
+    i = 0;
+    while i < tlen {
+        let row = [];
+        let j: i64 = 0;
+        while j < tlen {
+            row = push(row, t_get(scores, i * tlen + j));
+            j = j + 1;
+        }
+        let sm = t_softmax(t_from([tlen], row));
+        j = 0;
+        while j < tlen {
+            t_set(a, i * tlen + j, t_get(sm, j));
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return t_add(x, t_matmul(t_matmul(a, v), wo));
+}
+
+fn ffn(x: Tensor, w1: Tensor, w2: Tensor) -> Tensor {
+    return t_add(x, t_matmul(relu_mat(t_matmul(x, w1)), w2));
+}
+
+fn block(x: Tensor, wq: Tensor, wk: Tensor, wv: Tensor, wo: Tensor, wf1: Tensor, wf2: Tensor, tlen: i64, d: i64) -> Tensor {
+    let h = attn(rms(x, tlen, d), wq, wk, wv, wo, tlen, d);
+    return ffn(rms(h, tlen, d), wf1, wf2);
+}
+
+fn last_row(x: Tensor, tlen: i64, d: i64) -> Tensor {
+    return t_from([d, 1], row_of(x, tlen - 1, d));
+}
+
+fn forward(ids: list, e: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor) -> Tensor {
+    let tlen: i64 = len(ids);
+    let d: i64 = D();
+    let x = embed_seq(e, ids, d);
+    let li: i64 = 0;
+    while li < L() {
+        x = block(x, wq[li], wk[li], wv[li], wo[li], wf1[li], wf2[li], tlen, d);
+        li = li + 1;
+    }
+    return t_softmax(t_matmul(wlm, last_row(x, tlen, d)));
+}
+
+fn argmax(t: Tensor, n: i64) -> i64 {
+    let best: i64 = 0;
+    let bv = t_get(t, 0);
+    let i: i64 = 1;
+    while i < n {
+        let x = t_get(t, i);
+        if x > bv {
+            bv = x;
+            best = i;
+        }
+        i = i + 1;
+    }
+    return best;
+}
+
+fn train_last(e: Tensor, wlm: Tensor, ids: list, target: i64, lr: f64, vv: i64, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list) -> list {
+    let d: i64 = D();
+    let tlen: i64 = len(ids);
+    let x = embed_seq(e, ids, d);
+    let li: i64 = 0;
+    while li < L() {
+        x = block(x, wq[li], wk[li], wv[li], wo[li], wf1[li], wf2[li], tlen, d);
+        li = li + 1;
+    }
+    let h = last_row(x, tlen, d);
+    let probs = t_softmax(t_matmul(wlm, h));
+    let last: i64 = 0;
+    if len(ids) > 0 { last = ids[len(ids) - 1]; }
+    let j: i64 = 0;
+    while j < vv {
+        let g = t_get(probs, j);
+        if j == target { g = g - 1.0; }
+        let k: i64 = 0;
+        while k < d {
+            let w = t_get(wlm, j * d + k);
+            t_set(wlm, j * d + k, w - lr * g * t_get(h, k));
+            let eh = t_get(e, last * d + k);
+            t_set(e, last * d + k, eh - lr * 0.25 * g * t_get(wlm, j * d + k));
+            k = k + 1;
+        }
+        j = j + 1;
+    }
+    return [e, wlm];
+}
+
+fn window(ids: list, end: i64, ctx: i64) -> list {
+    let out = [];
+    let i: i64 = end - ctx;
+    if i < 0 { i = 0; }
+    while i < end {
+        out = push(out, ids[i]);
+        i = i + 1;
+    }
+    return out;
+}
+
+fn main() -> i64 {
+    println("=== kenga char-LM (decoder on our .kenga) ===");
+    let src: str = read_file("examples/ml/kenga_seed.kenga");
+    let alpha: str = build_alpha(src);
+    let ids = encode(src, alpha);
+    let vv: i64 = len(alpha);
+    let d: i64 = D();
+    let ff: i64 = FF();
+    println("chars");
+    println(len(src));
+    println("vocab");
+    println(vv);
+
+    let e = fill_w(vv, d, 7);
+    let wq = [fill_w(d, d, 11)];
+    let wk = [fill_w(d, d, 17)];
+    let wv = [fill_w(d, d, 23)];
+    let wo = [fill_w(d, d, 31)];
+    let wf1 = [fill_w(d, ff, 41)];
+    let wf2 = [fill_w(ff, d, 47)];
+    let wlm = fill_w(vv, d, 59);
+
+    let ctxn: i64 = CTX();
+    let ep: i64 = 0;
+    while ep < 60 {
+        let p: i64 = ctxn;
+        while p < len(ids) {
+            let packed = train_last(e, wlm, window(ids, p, ctxn), ids[p], 0.12, vv, wq, wk, wv, wo, wf1, wf2);
+            e = packed[0];
+            wlm = packed[1];
+            p = p + 1;
+        }
+        ep = ep + 1;
+    }
+
+    let prompt: str = "fn add";
+    let ctx = encode(prompt, alpha);
+    let out: str = prompt;
+    let step: i64 = 0;
+    while step < 48 {
+        if len(ctx) > ctxn {
+            let cut = [];
+            let i: i64 = len(ctx) - ctxn;
+            while i < len(ctx) {
+                cut = push(cut, ctx[i]);
+                i = i + 1;
+            }
+            ctx = cut;
+        }
+        let nxt = argmax(forward(ctx, e, wq, wk, wv, wo, wf1, wf2, wlm), vv);
+        out = out + alpha[nxt];
+        ctx = push(ctx, nxt);
+        step = step + 1;
+    }
+    println(out);
+    assert(len(out) > 20);
+    assert(ch_id(out, "(") >= 0);
+    assert(ch_id(out, ")") >= 0);
+    assert(save_tensor(e, "minds/kenga_char_e.kt") == 1);
+    assert(save_tensor(wlm, "minds/kenga_char_w.kt") == 1);
+    println("kenga char-lm ok");
+    return 0;
+}

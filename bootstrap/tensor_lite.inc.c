@@ -66,7 +66,7 @@ static int64_t tl_alloc(const int *shape, int rank, int zero) {
     if (zero) memset(t.data, 0, (size_t)n * sizeof(double));
   }
   if (g_tensors.len + 1 > g_tensors.cap) {
-    g_tensors.cap = g_tensors.cap ? g_tensors.cap * 2 : 8;
+    g_tensors.cap = g_tensors.cap ? g_tensors.cap * 2 : 4096;
     g_tensors.data = (Tensor *)xrealloc(g_tensors.data, g_tensors.cap * sizeof(Tensor));
   }
   g_tensors.data[g_tensors.len] = t;
@@ -118,15 +118,21 @@ static Value tl_shape_to_list(const Tensor *t, ListHeap *lists) {
 
 static int64_t tl_ew(int64_t ha, int64_t hb, double (*op)(double, double)) {
   Tensor *a = tl_get(ha), *b = tl_get(hb);
-  int i;
+  int i, n, rank, shape[TL_RANK_MAX];
+  double *ad, *bd;
   int64_t h;
   Tensor *o;
   if (a->rank != b->rank || a->n != b->n) die("tensor shape mismatch");
   for (i = 0; i < a->rank; i++)
     if (a->shape[i] != b->shape[i]) die("tensor shape mismatch");
-  h = tl_alloc(a->shape, a->rank, 0);
+  rank = a->rank;
+  n = a->n;
+  for (i = 0; i < rank; i++) shape[i] = a->shape[i];
+  ad = a->data;
+  bd = b->data;
+  h = tl_alloc(shape, rank, 0);
   o = tl_get(h);
-  for (i = 0; i < a->n; i++) o->data[i] = op(a->data[i], b->data[i]);
+  for (i = 0; i < n; i++) o->data[i] = op(ad[i], bd[i]);
   return h;
 }
 
@@ -138,6 +144,7 @@ static int64_t tl_matmul(int64_t ha, int64_t hb) {
   Tensor *a = tl_get(ha), *b = tl_get(hb);
   int m, k, k2, n, i, j, t;
   int shape[2];
+  double *ad, *bd;
   int64_t h;
   Tensor *o;
   if (a->rank != 2 || b->rank != 2) die("t_matmul expects rank-2");
@@ -146,6 +153,8 @@ static int64_t tl_matmul(int64_t ha, int64_t hb) {
   k2 = b->shape[0];
   n = b->shape[1];
   if (k != k2) die("t_matmul inner dim mismatch");
+  ad = a->data;
+  bd = b->data;
   shape[0] = m;
   shape[1] = n;
   h = tl_zeros(shape, 2);
@@ -153,7 +162,7 @@ static int64_t tl_matmul(int64_t ha, int64_t hb) {
   for (i = 0; i < m; i++)
     for (j = 0; j < n; j++) {
       double s = 0.0;
-      for (t = 0; t < k; t++) s += a->data[i * k + t] * b->data[t * n + j];
+      for (t = 0; t < k; t++) s += ad[i * k + t] * bd[t * n + j];
       o->data[i * n + j] = s;
     }
   return h;
@@ -162,11 +171,13 @@ static int64_t tl_matmul(int64_t ha, int64_t hb) {
 static int64_t tl_transpose(int64_t ha) {
   Tensor *a = tl_get(ha);
   int r, c, shape[2];
+  double *ad;
   int64_t h;
   Tensor *o;
   if (a->rank != 2) die("t_transpose expects rank-2");
   r = a->shape[0];
   c = a->shape[1];
+  ad = a->data;
   shape[0] = c;
   shape[1] = r;
   h = tl_zeros(shape, 2);
@@ -174,7 +185,7 @@ static int64_t tl_transpose(int64_t ha) {
   {
     int i, j;
     for (i = 0; i < r; i++)
-      for (j = 0; j < c; j++) o->data[j * r + i] = a->data[i * c + j];
+      for (j = 0; j < c; j++) o->data[j * r + i] = ad[i * c + j];
   }
   return h;
 }
@@ -495,6 +506,7 @@ static int64_t tl_mean_tensor(int64_t ha, double *out_f64, int *is_f64) {
   if (a->rank == 3) {
     int h = a->shape[0], w = a->shape[1], c = a->shape[2];
     double n = (double)(h * w);
+    double *ad = a->data;
     int shape[1];
     int64_t oh;
     Tensor *o;
@@ -504,17 +516,18 @@ static int64_t tl_mean_tensor(int64_t ha, double *out_f64, int *is_f64) {
     o = tl_get(oh);
     for (y = 0; y < h; y++)
       for (x = 0; x < w; x++)
-        for (ch = 0; ch < c; ch++) o->data[ch] += a->data[(y * w + x) * c + ch];
+        for (ch = 0; ch < c; ch++) o->data[ch] += ad[(y * w + x) * c + ch];
     for (ch = 0; ch < c; ch++) o->data[ch] /= n > 0.0 ? n : 1.0;
     return oh;
   }
   if (a->rank == 2) {
     double s = 0.0;
-    int i, shape[1] = {1};
+    double *ad = a->data;
+    int i, an = a->n, shape[1] = {1};
     int64_t oh;
-    for (i = 0; i < a->n; i++) s += a->data[i];
+    for (i = 0; i < an; i++) s += ad[i];
     oh = tl_zeros(shape, 1);
-    tl_get(oh)->data[0] = s / (a->n > 0 ? (double)a->n : 1.0);
+    tl_get(oh)->data[0] = s / (an > 0 ? (double)an : 1.0);
     return oh;
   }
   {
@@ -587,19 +600,22 @@ static int64_t tl_patch_mean(int64_t ha, int gh, int gw) {
   oshape[0] = gh;
   oshape[1] = gw;
   oshape[2] = c;
-  oh = tl_zeros(oshape, 3);
-  o = tl_get(oh);
-  for (gy = 0; gy < gh; gy++) {
-    for (gx = 0; gx < gw; gx++) {
-      for (ch = 0; ch < c; ch++) {
-        double s = 0.0, n = 0.0;
-        for (y = gy * ph; y < (gy + 1) * ph; y++) {
-          for (x = gx * pw; x < (gx + 1) * pw; x++) {
-            s += a->data[(y * w + x) * c + ch];
-            n += 1.0;
+  {
+    double *ad = a->data;
+    oh = tl_zeros(oshape, 3);
+    o = tl_get(oh);
+    for (gy = 0; gy < gh; gy++) {
+      for (gx = 0; gx < gw; gx++) {
+        for (ch = 0; ch < c; ch++) {
+          double s = 0.0, n = 0.0;
+          for (y = gy * ph; y < (gy + 1) * ph; y++) {
+            for (x = gx * pw; x < (gx + 1) * pw; x++) {
+              s += ad[(y * w + x) * c + ch];
+              n += 1.0;
+            }
           }
+          o->data[(gy * gw + gx) * c + ch] = s / (n > 0.0 ? n : 1.0);
         }
-        o->data[(gy * gw + gx) * c + ch] = s / (n > 0.0 ? n : 1.0);
       }
     }
   }

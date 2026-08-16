@@ -13,11 +13,13 @@
 | **2-layer word-LM + CE** | ✅ `examples/ml/word_lm.kenga` → `minds/word_lm_*.kt` |
 | **Своя MLP (XOR)** | ✅ `examples/ml/kenga_net.kenga` — list/f64, без tensor host |
 | **Decoder GPT-формы** | ✅ `examples/ml/kenga_lm.kenga` — attn + FFN + RMS, next-token |
+| **Char-LM на нашем `.kenga`** | ✅ `examples/ml/kenga_charlm.kenga` — `read_file` seed, не чужой GGUF |
 | Половина Grok / GPU | ⬜ те же блоки × D/L/V + корпус + GPU; см. `docs/KENGA_LM.md` |
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\word_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\tiny_lm.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
 kenga chat --lite minds\multi.km
 ```
 

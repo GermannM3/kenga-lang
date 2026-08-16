@@ -114,7 +114,7 @@ scripts\freedom-smoke.cmd
 
 `docs/EXERCISES.md` · `examples/exercises/e01_sum.kenga`
 
-Своя языковая модель (decoder, не XOR): `examples/ml/kenga_lm.kenga` — зачем и какая шкала: `docs/KENGA_LM.md`.
+Своя языковая модель (decoder, не XOR и не скачанный GGUF): `examples/ml/kenga_charlm.kenga` учится на нашем `.kenga`. Шкала: `docs/KENGA_LM.md`.
 
 ## Дальше
 
