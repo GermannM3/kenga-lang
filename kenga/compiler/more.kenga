@@ -2047,6 +2047,7 @@ fn main() -> i64 {
     assert(run_file("examples/selfhost/learn_more.kenga") == 0);
     assert(run_file("examples/selfhost/unroll_more.kenga") == 0);
     assert(run_file("examples/selfhost/foresee_n_more.kenga") == 0);
+    assert(run_file("examples/ml/living_multimodal.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }

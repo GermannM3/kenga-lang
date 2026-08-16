@@ -11,6 +11,8 @@ Kenga умеет **видеть + слышать + жить**: PPM/WAV → ве�
 kenga run examples/ml/living_multimodal.kenga
 kenga run --lite examples/ml/living_multimodal.kenga
 kenga chat --lite minds/multi.km
+# тот же файл на VM more:
+bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
 
 Ожидаемо:
