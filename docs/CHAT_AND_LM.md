@@ -38,7 +38,7 @@ kenga chat --lite minds\multi.km
 
 | Есть без Rust | Ещё нужно |
 |---|---|
-| Living runtime: компилятор/VM/selftest пишет `rt_*.kenga` | Типы + prophet/tensor ещё C; Releases ещё `src/` |
+| Living runtime целиком из `rt_*.kenga` | C glue + Releases ещё `src/` |
 | Word-LM / tape / tensor / Prophet / events | Self-host VM без C glue |
 | `emit_c_seed.kenga` пишет `.c` через `write_file` | Archive `src/` когда Releases = lite-only |
 | Лестница `examples/selfhost/` | GPU + большой корпус |

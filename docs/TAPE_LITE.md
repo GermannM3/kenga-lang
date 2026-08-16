@@ -1,6 +1,6 @@
 # Tape autograd на kenga-lite (без Rust)
 
-С **3.6** reverse-mode tape живёт в `bootstrap/tape_lite.inc.c`.
+С **3.6** reverse-mode tape пишет `kenga/emit/rt_tape.kenga` → `bootstrap/generated/rt_tape.inc.c`.
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\autograd_tape.kenga

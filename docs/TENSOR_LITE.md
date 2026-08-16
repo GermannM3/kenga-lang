@@ -1,6 +1,6 @@
 # Tensor на kenga-lite (без Rust)
 
-С **3.3** плотные f64-тензоры живут в `bootstrap/tensor_lite.inc.c`.
+С **3.3** плотные f64-тензоры пишет `kenga/emit/rt_tensor.kenga` → `bootstrap/generated/rt_tensor.inc.c`.
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\tensor_core.kenga
