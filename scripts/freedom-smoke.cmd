@@ -55,6 +55,18 @@ echo === kenga/emit/rt_lex.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_lex.kenga
 if errorlevel 1 exit /b 1
 
+echo === kenga/emit/rt_arena.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_arena.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_parse.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_parse.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_loop.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_loop.kenga
+if errorlevel 1 exit /b 1
+
 echo === kenga/emit/lower_kv.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 if errorlevel 1 exit /b 1
