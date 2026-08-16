@@ -103,8 +103,10 @@ fn main() -> i64 {
     s = s + "      /* Prophet Memory (no Rust) */\n";
     s = s + "      {\"fn main() { let m = memory_config(10, 8, 4); assert(remember(m, [9, 0, 9], \"\n";
     s = s + "       \"80) == true); assert(remember(m, [1, 1, 1], 5) == false); let st = \"\n";
-    s = s + "       \"mem_stats(m); assert(st[0] == 1); consolidate(m); let p = foresee(m, [9, \"\n";
-    s = s + "       \"0, 0]); assert(len(p) == 3); 0 }\",\n";
+    s = s + "       \"mem_stats(m); assert(st[0] == 1); 0 }\",\n";
+    s = s + "       0},\n";
+    s = s + "      {\"fn main() { let m = memory_config(10, 8, 4); remember(m, [9, 0, 9], 80); \"\n";
+    s = s + "       \"consolidate(m); let p = foresee(m, [9, 0, 0]); assert(len(p) == 3); 0 }\",\n";
     s = s + "       0},\n";
     s = s + "      {\"fn main() { let m = memory_config(10, 8, 4); remember(m, [1, 2, 3], 90); \"\n";
     s = s + "       \"consolidate(m); save_mind(m, \\\"minds/_lite_roundtrip.km\\\"); let m2 = \"\n";

@@ -86,6 +86,7 @@ jobs:
       - name: Selftest
         run: |
           mkdir -p minds
+          ulimit -s unlimited
           ./bootstrap/bin/kenga-lite
 
       - name: Examples (no Rust)

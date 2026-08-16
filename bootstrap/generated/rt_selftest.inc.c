@@ -98,8 +98,10 @@ static int selftest(void) {
       /* Prophet Memory (no Rust) */
       {"fn main() { let m = memory_config(10, 8, 4); assert(remember(m, [9, 0, 9], "
        "80) == true); assert(remember(m, [1, 1, 1], 5) == false); let st = "
-       "mem_stats(m); assert(st[0] == 1); consolidate(m); let p = foresee(m, [9, "
-       "0, 0]); assert(len(p) == 3); 0 }",
+       "mem_stats(m); assert(st[0] == 1); 0 }",
+       0},
+      {"fn main() { let m = memory_config(10, 8, 4); remember(m, [9, 0, 9], 80); "
+       "consolidate(m); let p = foresee(m, [9, 0, 0]); assert(len(p) == 3); 0 }",
        0},
       {"fn main() { let m = memory_config(10, 8, 4); remember(m, [1, 2, 3], 90); "
        "consolidate(m); save_mind(m, \"minds/_lite_roundtrip.km\"); let m2 = "
