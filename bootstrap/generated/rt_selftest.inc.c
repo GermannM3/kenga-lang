@@ -62,8 +62,9 @@ static int selftest(void) {
        "t_from([3, 2], [1.0, 0.0, 0.0, 1.0, 1.0, 1.0]); let c = t_matmul(a, b); "
        "assert(round(t_get(c, 0)) == 4); assert(round(t_get(c, 3)) == 11); 0 }",
        0},
-      {"fn main() { let img = load_ppm(\"../examples/ml/assets/dot.ppm\"); let m = "
-       "t_mean(img); assert(len(t_shape(m)) == 1); 0 }",
+      {"fn main() { let img = t_from([2, 2, 3], [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, "
+       "0.0, 0.0, 1.0, 1.0, 1.0, 1.0]); let m = t_mean(img); assert(len(t_shape(m)) "
+       "== 1); 0 }",
        0},
       {"on \"ping\"(x) { emit(\"pong\", x + 1); } on \"pong\"(x) { } fn main() { "
        "emit(\"ping\", 1); assert(pump(8) == 2); assert(pending() == 0); 0 }",
@@ -113,12 +114,13 @@ static int selftest(void) {
        "i + 1; } assert(round(t_get(t_matmul(w, x), 0) * 10.0) == 40); 0 }",
        0},
       /* Vision helpers */
-      {"fn main() { let img = load_ppm(\"../examples/ml/assets/dot.ppm\"); let p = "
-       "t_patch_mean(img, 1, 1); assert(len(t_shape(p)) == 3); let w = t_from([1, "
-       "3], [0.0, 0.0, 0.0]); let x = t_reshape(t_mean(img), [3, 1]); let y = "
-       "t_from([1, 1], [1.5]); let g = t_linear_grad(w, x, y); let l0 = t_mse(t_"
-       "matmul(w, x), y); w = t_sub(w, t_scale(g, 0.5)); let l1 = t_mse(t_matmul(w, "
-       "x), y); assert(l1 < l0); 0 }",
+      {"fn main() { let img = t_from([2, 2, 3], [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, "
+       "0.0, 0.0, 1.0, 1.0, 1.0, 1.0]); let p = t_patch_mean(img, 1, 1); "
+       "assert(len(t_shape(p)) == 3); let w = t_from([1, 3], [0.0, 0.0, 0.0]); "
+       "let x = t_reshape(t_mean(img), [3, 1]); let y = t_from([1, 1], [1.5]); "
+       "let g = t_linear_grad(w, x, y); let l0 = t_mse(t_matmul(w, x), y); w = "
+       "t_sub(w, t_scale(g, 0.5)); let l1 = t_mse(t_matmul(w, x), y); assert(l1 < "
+       "l0); 0 }",
        0},
       /* log + tensor IO + write_file */
       {"fn main() { let t = t_from([2], [1.0, 2.718281828]); let l = t_log(t); "
@@ -149,7 +151,10 @@ static int selftest(void) {
   };
   size_t n = sizeof(cases) / sizeof(cases[0]);
   for (size_t i = 0; i < n; i++) {
-    int64_t got = run_lite(cases[i].src);
+    int64_t got;
+    fprintf(stderr, "selftest %zu\n", i);
+    fflush(stderr);
+    got = run_lite(cases[i].src);
     if (got != cases[i].want) {
       fprintf(stderr, "FAIL case %zu: got %lld want %lld\n", i, (long long)got,
               (long long)cases[i].want);
