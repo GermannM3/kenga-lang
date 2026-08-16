@@ -48,3 +48,7 @@ Fusion-smoke: `beep.wav` + `dot.ppm` (`examples/ml/fusion.kenga`).
 3. GPU backend за тем же `t_matmul`, когда модель перестанет комфортно жить на naive f64
 
 Честный критерий «слабому железу ок»: demo заканчивается за секунды, mind < 100KB, chat стартует без OOM.
+
+## Текст из кадра и звука
+
+`examples/ml/kenga_mm_lm.kenga` — тот же PPM+WAV, но выход не world-model, а подпись. Сид большой мультимодальной LM; карточка и упаковка: `docs/HUGGINGFACE.md`.

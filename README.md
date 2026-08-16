@@ -45,7 +45,7 @@ kenga run --lite examples\selfhost\struct_lite.kenga
 
 Потом: `kenga chat minds/agent.km` → «смотри 5 1 6», «что будет завтра?»
 
-Подробный питч: **[docs/FOR_FRIENDS.md](docs/FOR_FRIENDS.md)** · учить: **[docs/LEARN.md](docs/LEARN.md)** · справочник: **[docs/LANGUAGE.md](docs/LANGUAGE.md)** · упражнения: **[docs/EXERCISES.md](docs/EXERCISES.md)** · multimodal: **[docs/LIVING_MULTIMODAL.md](docs/LIVING_MULTIMODAL.md)** · chat/LM: **[docs/CHAT_AND_LM.md](docs/CHAT_AND_LM.md)** · Prophet без Rust: **[docs/PROPHET_LITE.md](docs/PROPHET_LITE.md)** · Tensor без Rust: **[docs/TENSOR_LITE.md](docs/TENSOR_LITE.md)** · план: **[docs/ROADMAP.md](docs/ROADMAP.md)**
+Подробный питч: **[docs/FOR_FRIENDS.md](docs/FOR_FRIENDS.md)** · учить: **[docs/LEARN.md](docs/LEARN.md)** · справочник: **[docs/LANGUAGE.md](docs/LANGUAGE.md)** · упражнения: **[docs/EXERCISES.md](docs/EXERCISES.md)** · multimodal: **[docs/LIVING_MULTIMODAL.md](docs/LIVING_MULTIMODAL.md)** · своя LM: **[docs/KENGA_LM.md](docs/KENGA_LM.md)** · Hugging Face: **[docs/HUGGINGFACE.md](docs/HUGGINGFACE.md)** · chat/LM: **[docs/CHAT_AND_LM.md](docs/CHAT_AND_LM.md)** · Prophet без Rust: **[docs/PROPHET_LITE.md](docs/PROPHET_LITE.md)** · Tensor без Rust: **[docs/TENSOR_LITE.md](docs/TENSOR_LITE.md)** · план: **[docs/ROADMAP.md](docs/ROADMAP.md)**
 
 Иконки `.kenga` в Cursor/VS Code — из Marketplace или локально:
 
@@ -78,6 +78,8 @@ Rust ещё держит GPU / production-scale path. **Python не нужен.*
 | Residual MLP + тензорный SGD | Не замена PyTorch |
 | Lite без Rust (`bootstrap/` + **`kenga/`** compiler/emit) | GPU; legacy `src/` пока в Releases |
 | PPM/WAV → tensor bridges | Не pretrained CLIP/Whisper |
+| Своя LM: birth → **24**, PPM+WAV → caption | Не Grok и не чужой GGUF |
+| Сид под HF: `hf/kenga-seed/` | Большая модель ещё не залита |
 | Kenga→C99 (`lower_c`: agent/struct/float) | — |
 
 ---
@@ -157,6 +159,8 @@ kenga chat minds/agent.km
 kenga run --lite examples/hello.kenga
 kenga run --lite examples/native_lists.kenga
 kenga run --lite examples/ml/living_multimodal.kenga
+kenga run --lite examples/ml/kenga_mm_lm.kenga
+scripts\kenga-birth.cmd
 kenga chat --lite minds/multi.km
 kenga run --lite examples/ml/tensor_core.kenga
 kenga run --lite examples/ml/fusion.kenga
@@ -209,6 +213,9 @@ fn main() {
 | `kenga demo` тур для друзей | ✅ |
 | emit-c / build (i64/f64/list/str) | ✅ |
 | Tape-autograd (`ag_*`) | ✅ |
+| Decoder / char-LM / trigram на нашем `.kenga` | ✅ |
+| Birth: модель пишет программу → run → 24 | ✅ |
+| PPM+WAV → caption (`kenga_mm_lm.kenga`) | ✅ |
 | Self-host Kenga-lite → bytecode VM | ✅ |
 | **`lower_c`**: Kenga → native C (agent/for/lists/struct/elif/float) | ✅ |
 | **`lower_kv` + `rt_kval`**: tagged KVal (str/ord/lex_frag/agent) | ✅ |
@@ -236,10 +243,11 @@ kenga-lang/
 ├── bootstrap/        # Rust-free C99 kenga-lite host
 ├── src/              # legacy Rust (Releases), новый код сюда не кладём
 ├── examples/         # demos + ml/ + selfhost/
+├── hf/kenga-seed/    # карточка сида под Hugging Face
 ├── editors/vscode/   # подсветка + иконка .kenga
-├── minds/            # сохранённые world-model
+├── minds/            # сохранённые world-model и веса .kt
 ├── stdlib/
-├── docs/             # LEARN, FOR_FRIENDS, SELFHOST, INDEPENDENCE
+├── docs/             # LEARN, KENGA_LM, HUGGINGFACE, …
 └── .github/          # CI + releases
 ```
 

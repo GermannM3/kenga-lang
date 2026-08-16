@@ -20,7 +20,7 @@ When the large model is ready, it lands here (same org, bigger weights) and on g
 
 | Piece | File |
 |---|---|
-| Vision → text | `examples/ml/kenga_mm_lm.kenga` — PPM mean RGB → linear → caption |
+| Vision+audio → text | `examples/ml/kenga_mm_lm.kenga` — PPM RGB + WAV energy → caption |
 | Text decoder | `examples/ml/kenga_charlm.kenga` / `kenga_dec.kenga` |
 | Birth (writes runnable Kenga) | `examples/ml/kenga_birth.kenga` → `kenga_born.kenga` → **24** |
 | Living world-model | `examples/ml/living_multimodal.kenga` → `minds/multi.km` |
@@ -28,9 +28,9 @@ When the large model is ready, it lands here (same org, bigger weights) and on g
 Captions on the three demo frames:
 
 ```
-kenga vidit krasnyj kadr
-kenga vidit zelenyj kadr
-kenga vidit sinij kadr
+kenga vidit krasnyj kadr i slyshit ton
+kenga vidit zelenyj kadr i slyshit ton
+kenga vidit sinij kadr i slyshit ton
 ```
 
 ## What it is not

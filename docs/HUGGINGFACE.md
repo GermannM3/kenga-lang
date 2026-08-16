@@ -4,7 +4,7 @@
 
 ## Сейчас
 
-Сиды и формат карточки: `hf/kenga-seed/`. Собрать папку под заливку:
+Сид уже multimodal: картинка + звук → подпись (`kenga_mm_lm.kenga`). Карточка: `hf/kenga-seed/`. Собрать папку под заливку:
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga

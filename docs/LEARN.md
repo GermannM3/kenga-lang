@@ -79,7 +79,11 @@ kenga run --lite examples/ml/tensor_core.kenga
 kenga run --lite examples/ml/train_sgd.kenga
 kenga run --lite examples/ml/vision_ppm.kenga
 kenga run --lite examples/ml/fusion.kenga
+kenga run --lite examples/ml/living_multimodal.kenga
+kenga run --lite examples/ml/kenga_mm_lm.kenga
 ```
+
+`kenga_mm_lm` — картинка + звук → подпись (`kenga vidit … i slyshit ton`). Это сид большой модели, не CLIP.
 
 ## 7. Без Rust (lite + свой codegen)
 
@@ -110,11 +114,22 @@ scripts\freedom-smoke.cmd
 
 Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.
 
-## 8. Упражнения
+## 8. Своя языковая модель
+
+Не скачанный GGUF. Сеть и корпус на Kenga.
+
+```bat
+scripts\kenga-birth.cmd
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga
+```
+
+Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, lite запускает — на экране **24**.  
+Шкала: `docs/KENGA_LM.md`. Куда потом большую: `docs/HUGGINGFACE.md`.
+
+## 9. Упражнения
 
 `docs/EXERCISES.md` · `examples/exercises/e01_sum.kenga`
-
-Своя модель пишет программу: `scripts\kenga-birth.cmd` → **24**. Vision→текст: `kenga_mm_lm.kenga`. Большую потом на HF: `docs/HUGGINGFACE.md`.
 
 ## Дальше
 
@@ -123,3 +138,5 @@ scripts\freedom-smoke.cmd
 - Свобода от Rust: `docs/INDEPENDENCE.md`
 - План: `docs/ROADMAP.md`
 - Питч: `docs/FOR_FRIENDS.md`
+- Своя LM: `docs/KENGA_LM.md`
+- Hugging Face: `docs/HUGGINGFACE.md`

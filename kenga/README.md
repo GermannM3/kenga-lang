@@ -24,3 +24,5 @@ scripts\freedom-smoke.cmd
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.
+
+Свои сети живут в `examples/ml/` (birth, char-LM, PPM+WAV→текст). Учебник: `docs/LEARN.md` §8. HF: `docs/HUGGINGFACE.md`.

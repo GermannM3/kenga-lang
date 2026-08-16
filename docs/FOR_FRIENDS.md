@@ -16,6 +16,8 @@ cd kenga-lang
 bootstrap\build.cmd
 kenga run --lite examples\agent.kenga
 kenga run --lite examples\selfhost\struct_lite.kenga
+scripts\kenga-birth.cmd
+kenga run --lite examples\ml\kenga_mm_lm.kenga
 scripts\freedom-smoke.cmd
 ```
 
@@ -39,7 +41,7 @@ kenga chat --lite minds/agent.km
 
 | Да | Нет |
 |---|---|
-| Свой язык + VM | Не LLM-чат из коробки |
+| Свой язык + VM + birth→24 + PPM+WAV→текст | Не LLM-чат из коробки и не чужой GGUF |
 | Living memory + MLP world-model | Не замена PyTorch/JAX |
 | Агентный event loop | Не production CUDA stack |
 | Self-host ladder + **Kenga→C** (`lower_c`) | Полный self-host (без C host) ещё не закрыт |
@@ -81,5 +83,7 @@ Reload Window — у `.kenga` появится свой значок (K) и по
 - Self-host / Rust-free: `docs/SELFHOST.md`  
 - Roadmap: `docs/ROADMAP.md`  
 - Exercises: `docs/EXERCISES.md`  
+- Своя LM: `docs/KENGA_LM.md`  
+- Hugging Face: `docs/HUGGINGFACE.md`  
 - Bootstrap: `docs/BOOTSTRAP.md`  
 - Editor: `editors/vscode/`

@@ -47,4 +47,14 @@ Lite: `examples/selfhost/struct_lite.kenga`.
 
 ---
 
-Когда все зелёные — ты уже не «по наитию», а по треку. Дальше: `docs/ROADMAP.md` · `docs/INDEPENDENCE.md`.
+## E9. Birth
+
+Запусти `scripts\kenga-birth.cmd`. Ожидай: модель пишет `examples/ml/kenga_born.kenga`, запуск печатает **24**.
+
+Прочитай `kenga_birth.kenga` — это suffix-LM, не GGUF.
+
+## E10. Видишь и слышишь
+
+`examples/ml/kenga_mm_lm.kenga` — три подписи про цвет кадра и тон. Прогони, сверь три строки.
+
+Дальше: `docs/KENGA_LM.md` · `docs/HUGGINGFACE.md` · `docs/ROADMAP.md`.

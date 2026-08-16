@@ -8,7 +8,7 @@ Kenga уже выражает эту машину. Три файла:
 - `examples/ml/kenga_charlm.kenga` — тот же decoder, корпус = наши `.kenga`
 - `examples/ml/kenga_trigram.kenga` — char-триграмма на list/i64 (без Tensor), тот же корпус
 - `examples/ml/kenga_birth.kenga` — suffix LM пишет `kenga_born.kenga`, lite его запускает → **24**
-- `examples/ml/kenga_mm_lm.kenga` — PPM → подпись; сид для HF
+- `examples/ml/kenga_mm_lm.kenga` — PPM+WAV → подпись; сид для HF
 
 Скачанный GGUF из папки «kenga ai» сюда не кладём. Это чужой граф и чужие веса. Доказательство языка — сеть, написанная на Kenga и обученная на Kenga.
 

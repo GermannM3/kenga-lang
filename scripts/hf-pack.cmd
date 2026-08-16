@@ -25,6 +25,9 @@ copy /y examples\ml\living_multimodal.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\assets\frame0.ppm "%OUT%\examples\ml\assets\" >nul
 copy /y examples\ml\assets\frame1.ppm "%OUT%\examples\ml\assets\" >nul
 copy /y examples\ml\assets\frame2.ppm "%OUT%\examples\ml\assets\" >nul
+copy /y examples\ml\assets\tone0.wav "%OUT%\examples\ml\assets\" >nul
+copy /y examples\ml\assets\tone1.wav "%OUT%\examples\ml\assets\" >nul
+copy /y examples\ml\assets\tone2.wav "%OUT%\examples\ml\assets\" >nul
 
 if exist minds\kenga_mm_w.kt copy /y minds\kenga_mm_w.kt "%OUT%\minds\" >nul
 if exist minds\kenga_mm_b.kt copy /y minds\kenga_mm_b.kt "%OUT%\minds\" >nul
