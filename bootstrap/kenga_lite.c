@@ -232,30 +232,12 @@ static size_t g_nstypes, g_stypes_cap;
 #include "events_lite.inc.c"
 #include "chat_lite.inc.c"
 
-static void program_free(Program *p) {
-  size_t i;
-  i64a_free(&p->code);
-  stra_free(&p->strs);
-  for (i = 0; i < p->nstypes; i++) {
-    free(p->stypes[i].name);
-    stra_free(&p->stypes[i].fields);
-  }
-  free(p->stypes);
-  p->stypes = NULL;
-  p->nstypes = 0;
-  for (i = 0; i < p->nbinds; i++) free(p->binds[i].event);
-  free(p->binds);
-  p->binds = NULL;
-  p->nbinds = 0;
-  for (i = 0; i < p->nfns; i++) free(p->fns[i].name);
-  free(p->fns);
-  p->fns = NULL;
-  p->nfns = 0;
-}
+#include "generated/rt_prog.inc.c"
 
 #include "generated/rt_lex.inc.c"
 #include "generated/rt_parse.inc.c"
 #include "generated/rt_loop.inc.c"
+#include "generated/rt_scan.inc.c"
 
 static int g_tmpn = 0;
 
@@ -1144,28 +1126,6 @@ static size_t emit_block(const char *s, size_t i, size_t n, I64A *code, StrA *vn
   }
 }
 
-static size_t skip_type_annot(const char *s, size_t i, size_t n) {
-  i = skip(s, i, n);
-  if (i >= n || s[i] != ':') return i;
-  i = skip(s, i + 1, n);
-  if (i >= n || !is_ident_start(s[i])) die("expected type after :");
-  Ident ty = parse_ident(s, i, n);
-  free(ty.name);
-  i = skip(s, ty.i, n);
-  /* optional: ttl 5s / ttl 100ms */
-  if (starts_kw(s, i, n, "ttl")) {
-    i = skip(s, i + 3, n);
-    if (i >= n || !isdigit((unsigned char)s[i])) die("expected duration after ttl");
-    while (i < n && isdigit((unsigned char)s[i])) i++;
-    if (i + 1 < n && s[i] == 'm' && s[i + 1] == 's') {
-      i += 2;
-    } else if (i < n && (s[i] == 's' || s[i] == 'm' || s[i] == 'h' || s[i] == 'd')) {
-      i++;
-    }
-  }
-  return i;
-}
-
 static size_t emit_stmt(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
                         StrA *fnames, I64A *faddrs, I64A *fargc) {
   i = skip(s, i, n);
@@ -1403,53 +1363,6 @@ static size_t emit_stmt(const char *s, size_t i, size_t n, I64A *code, StrA *vna
     i++;
     i64a_push(code, OP_POP); /* statement form; bare expr is implicit return */
   }
-  return i;
-}
-
-static char *slice_dup(const char *s, size_t a, size_t b) {
-  size_t len = b - a;
-  char *o = (char *)malloc(len + 1);
-  if (!o) die("oom");
-  memcpy(o, s + a, len);
-  o[len] = 0;
-  return o;
-}
-
-/* Advance from opening `{` at *i to just past matching `}`, skipping strings/comments. */
-static size_t match_brace_block(const char *s, size_t i, size_t n) {
-  int depth;
-  if (i >= n || s[i] != '{') die("expected {");
-  depth = 0;
-  while (i < n) {
-    char c = s[i];
-    if (c == '/' && i + 1 < n && s[i + 1] == '/') {
-      i += 2;
-      while (i < n && s[i] != '\n') i++;
-      continue;
-    }
-    if (c == '"') {
-      i++;
-      while (i < n && s[i] != '"') {
-        if (s[i] == '\\' && i + 1 < n) i += 2;
-        else i++;
-      }
-      if (i < n) i++;
-      continue;
-    }
-    if (c == '{') {
-      depth++;
-      i++;
-      continue;
-    }
-    if (c == '}') {
-      depth--;
-      i++;
-      if (depth == 0) return i;
-      continue;
-    }
-    i++;
-  }
-  die("unclosed brace block");
   return i;
 }
 

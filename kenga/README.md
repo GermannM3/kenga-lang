@@ -29,6 +29,8 @@ scripts\freedom-smoke.cmd
 | `emit/rt_arena.kenga` | i64a/vala/stra/list/struct heaps | кусок runtime host |
 | `emit/rt_parse.kenga` | ident / number / string / emit2 | кусок lexer.rs + compiler.rs |
 | `emit/rt_loop.kenga` | break/continue + CALL patches | кусок compiler.rs |
+| `emit/rt_prog.kenga` | program_free | кусок runtime host |
+| `emit/rt_scan.kenga` | type annot / slice / braces | кусок parser.rs |
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.

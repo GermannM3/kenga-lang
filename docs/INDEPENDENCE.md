@@ -6,7 +6,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 
 | Слой | Без Rust? | Без C? |
 |---|---|---|
-| Living runtime | ✅ `kenga-lite` (`main`/`die`/Value/arena/lex/parse/loop/import из `rt_*.kenga`) | ❌ C99 host |
+| Living runtime | ✅ `kenga-lite` (`rt_*` пишет host: Value/arena/lex/parse/loop/scan/import) | ❌ C99 host |
 | Word-LM / tape / tensor / Prophet | ✅ | ❌ |
 | Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** (for / elif / struct / import / events) | ❌ |
 | Emit на Kenga | ✅ **`lower_c`** + **`lower_kv`/`rt_kval`** | ❌ gcc/cl |
@@ -43,6 +43,8 @@ bootstrap\bin\kenga-lite.exe run kenga\emit\rt_lex.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_arena.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_parse.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_loop.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_prog.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_scan.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 ```
 
