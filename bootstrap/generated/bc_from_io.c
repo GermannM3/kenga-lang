@@ -10,14 +10,14 @@ typedef struct { int64_t str_idx; int64_t addr; int64_t arity; } EvHandler;
 static const EvHandler g_handlers[] = { {0,0,0} };
 static const int g_nhandlers = 0;
 
-static const char *g_strs[] = { "" };
+static const char *g_strs[] = { "bootstrap/generated/_bc_io_probe.txt", "hi" };
 
 static const double g_f64s[] = { 0.0 };
 
 #include "bc_rt.inc.c"
 
 int main(void) {
-  static const int64_t code[] = { 11, 2, 1, 0, 3, 0, 1, 1, 3, 1, 1, 6, 3, 2, 2, 1, 2, 2, 8, 12, 37, 2, 0, 2, 1, 4, 3, 0, 2, 1, 1, 1, 4, 3, 1, 11, 14, 2, 0, 17, 1, 0, 16, 13 };
+  static const int64_t code[] = { 11, 2, 35, 0, 35, 1, 37, 1, 1, 10, 18, 35, 0, 36, 3, 0, 2, 0, 1, 0, 24, 27, 1, 104, 10, 18, 2, 0, 23, 1, 2, 10, 18, 2, 0, 17, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }
