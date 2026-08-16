@@ -28,10 +28,9 @@ static KVal k_sleep_ms(int64_t n) {
 
 
 int main(void) {
-  k_assert(kval_as_i64(kval_i64(kval_eq(kval_str("i64"), kval_str("i64")))));
-  k_assert(kval_as_i64(kval_i64(kval_eq(kval_str("str"), kval_str("str")))));
-  k_assert(kval_as_i64(kval_i64(kval_eq(kval_str(kstr_concat(kval_as_str(kval_str("n=")), kval_as_str(kval_str(k_i64_to_str(kval_as_i64(kval_i64(42LL))))))), kval_str("n=42")))));
-  kenga_println_val(kval_str("lower kv typeof ok"));
+  kenga_print_val(kval_str("x")); fflush(stdout);
+  (void)(k_sleep_ms(kval_as_i64(kval_i64(0LL))));
+  kenga_println_val(kval_str("y"));
   return (int)kval_as_i64(kval_i64(0LL));
   return 0;
 }
