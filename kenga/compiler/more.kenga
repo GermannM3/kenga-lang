@@ -1,7 +1,7 @@
 // Self-host compiler on Kenga (canonical). Replaces growing slice of src/compiler.rs + vm.rs.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 // Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, import,
-//          XOR net, fact_lite, birth (read_file/write_file) via run_file.
+//          XOR, birth→24, c_seed/expr_c (Kenga writes .c) via run_file.
 //          on/emit/pump/pending, types/ttl skip.
 
 fn OP_CONST() -> i64 { return 1; }
@@ -487,6 +487,21 @@ fn parse_string(s: str, i: i64) -> list {
     i = i + 1;
     let out: str = "";
     while i < len(s) {
+        if s[i] == "\\" {
+            i = i + 1;
+            assert(i < len(s));
+            if s[i] == "n" {
+                out = out + "\n";
+            } else {
+                if s[i] == "t" {
+                    out = out + "\t";
+                } else {
+                    out = out + s[i];
+                }
+            }
+            i = i + 1;
+            continue;
+        }
         if s[i] == "\"" { return [out, i + 1]; }
         out = out + s[i];
         i = i + 1;
@@ -1365,8 +1380,11 @@ fn main() -> i64 {
     assert(run_file("examples/selfhost/fact_lite.kenga") == 0);
     assert(run_file("examples/ml/kenga_net.kenga") == 0);
     assert(run_lite("fn main() { assert(write_file(\"minds/_more_io.txt\", \"hi\") == 1); ord(read_file(\"minds/_more_io.txt\")[0]) }") == 104);
+    assert(run_lite("fn main() { let s = \"a\\nb\"; len(s) }") == 3);
     assert(run_file("examples/ml/kenga_birth.kenga") == 0);
     assert(run_file("examples/ml/kenga_born.kenga") == 0);
+    assert(run_file("kenga/emit/c_seed.kenga") == 0);
+    assert(run_file("kenga/emit/expr_c.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }

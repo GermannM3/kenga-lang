@@ -26,7 +26,7 @@
 | ✅ | C-lite: brace-match пропускает строки/комменты (чинит `kenga_lite.kenga` на lite) |
 | ✅ | Каталог **`kenga/`** — каноническая замена `src/` (`compiler/more`, `emit/c_seed`) |
 | ✅ | `docs/REPLACE_RUST.md` — карта модулей Rust → Kenga |
-| ✅ | **`more.kenga`**: birth пишет `kenga_born.kenga` и **сам его выполняет** → 24 |
+| ✅ | **`more.kenga`**: birth→24 + **`c_seed`/`expr_c`** (Kenga пишет `.c`, `\"`/`\\n` в парсере) |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
