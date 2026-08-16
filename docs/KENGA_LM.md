@@ -7,6 +7,7 @@ Kenga уже выражает эту машину. Три файла:
 - `examples/ml/kenga_lm.kenga` — decoder на закрытом словесном словаре
 - `examples/ml/kenga_charlm.kenga` — тот же decoder, корпус = наши `.kenga`
 - `examples/ml/kenga_trigram.kenga` — char-триграмма на list/i64 (без Tensor), тот же корпус
+- `examples/ml/kenga_birth.kenga` — suffix LM пишет `kenga_born.kenga`, lite его запускает → **24**
 
 Скачанный GGUF из папки «kenga ai» сюда не кладём. Это чужой граф и чужие веса. Доказательство языка — сеть, написанная на Kenga и обученная на Kenga.
 
@@ -16,11 +17,12 @@ bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_char_talk.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
 scripts\bc-run.cmd examples\ml\kenga_trigram.kenga
+scripts\kenga-birth.cmd
 ```
 
 Word-LM на CPU lite: L=2, D=16, V=20. Дописывает `<s> kenga zhivet v yazyke .`  
 Char-LM читает seed + selfhost, учит next-char, веса в `minds/kenga_char_*`. Talk грузит их без повторного обучения.  
-Триграмма (sparse counts) ест seed + selfhost + кусок `kenga/compiler/lite.kenga` и пишет `fn add(a: i64 {` / `fn OP_LOAD() -> i64 {`. Синтаксис нашего языка, не GGUF.
+Триграмма пишет обрывки синтаксиса. Ощутимый результат: `scripts\kenga-birth.cmd` — модель дописывает seed с `"fn add"`, кладёт `examples/ml/kenga_born.kenga`, lite выполняет и печатает **24** (`fact(add(2,3)-1)`). Не GGUF.
 
 ## Что это доказывает
 

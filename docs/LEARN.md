@@ -114,7 +114,7 @@ scripts\freedom-smoke.cmd
 
 `docs/EXERCISES.md` · `examples/exercises/e01_sum.kenga`
 
-Своя языковая модель (не скачанный GGUF): `examples/ml/kenga_trigram.kenga` пишет `fn add(a: i64` с нашего корпуса; decoder — `kenga_charlm.kenga`. Шкала: `docs/KENGA_LM.md`.
+Своя модель пишет программу: `scripts\kenga-birth.cmd` → `kenga_born.kenga` → **24**. Шкала: `docs/KENGA_LM.md`.
 
 ## Дальше
 

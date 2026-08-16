@@ -15,6 +15,7 @@
 | **Decoder GPT-формы** | ✅ `examples/ml/kenga_lm.kenga` — attn + FFN + RMS, next-token |
 | **Char-LM на нашем `.kenga`** | ✅ `examples/ml/kenga_charlm.kenga` + `kenga_char_talk.kenga` |
 | **Триграмма на нашем `.kenga`** | ✅ `examples/ml/kenga_trigram.kenga` — list/i64, `fn add(a: i64` |
+| **Birth → run** | ✅ `scripts\kenga-birth.cmd` → `kenga_born.kenga` → **24** |
 | Половина Grok / GPU | ⬜ те же блоки × D/L/V + корпус + GPU; см. `docs/KENGA_LM.md` |
 
 ```bat
@@ -22,6 +23,7 @@ bootstrap\bin\kenga-lite.exe run examples\ml\word_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\tiny_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
+scripts\kenga-birth.cmd
 kenga chat --lite minds\multi.km
 ```
 

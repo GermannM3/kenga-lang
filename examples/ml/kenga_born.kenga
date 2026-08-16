@@ -1,0 +1,25 @@
+fn add(a: i64, b: i64) -> i64 {
+  return a + b;
+}
+fn sub(a: i64, b: i64) -> i64 {
+  return a - b;
+}
+fn fact(n: i64) -> i64 {
+  let p = 1;
+  let i = 1;
+  while i <= n {
+    p = p * i;
+    i = i + 1;
+  }
+  return p;
+}
+fn main() -> i64 {
+  let x = add(2, 3);
+  let y = sub(x, 1);
+  if y > 0 {
+    println(fact(y));
+  } else {
+    println(0);
+  }
+  return 0;
+}

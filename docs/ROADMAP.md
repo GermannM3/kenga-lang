@@ -65,6 +65,7 @@
 | ✅ | **`kenga_charlm.kenga`** — тот же decoder, корпус = наши `.kenga` (не GGUF) |
 | ✅ | **`kenga_char_talk.kenga`** — generate из сохранённых весов |
 | ✅ | **`kenga_trigram.kenga`** — char-триграмма на list/i64, корпус наш |
+| ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | GPU backend (wgpu/CUDA) под 1660-class |
 | ⬜ | Pretrained encoders |
