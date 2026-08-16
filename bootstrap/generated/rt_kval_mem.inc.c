@@ -6,7 +6,7 @@
 
 #define KM_DIM_MAX 64
 #define KM_HID_MAX 64
-#define KM_EP_MAX 16
+#define KM_EP_MAX 64
 
 typedef struct {
   int dim, hidden;
@@ -27,6 +27,7 @@ typedef struct {
   int dim;
   int target_dim;
   int has_target;
+  double surprise;
 } KmEpisode;
 
 typedef struct {
@@ -36,6 +37,7 @@ typedef struct {
   KmEpisode ep[KM_EP_MAX];
   int nep;
   int ep_head;
+  int ep_cap;
 } KmMind;
 
 static KmMind *g_minds = NULL;
@@ -205,20 +207,21 @@ static double km_dist(const double *a, int an, const double *b, int bn) {
   return sqrt(sum / (double)n);
 }
 
-static void km_ep_push(KmMind *m, const double *x, int xn, const double *y, int yn) {
+static int km_ep_push(KmMind *m, const double *x, int xn, const double *y, int yn) {
   KmEpisode *e;
   int i, slot;
   if (xn < 0) xn = 0;
   if (yn < 0) yn = 0;
   if (xn > KM_DIM_MAX) xn = KM_DIM_MAX;
   if (yn > KM_DIM_MAX) yn = KM_DIM_MAX;
-  if (m->nep < KM_EP_MAX) {
+  if (m->ep_cap < 1) m->ep_cap = KM_EP_MAX;
+  if (m->nep < m->ep_cap) {
     slot = m->nep;
     m->nep++;
   } else {
     slot = m->ep_head;
     m->ep_head++;
-    if (m->ep_head >= KM_EP_MAX) m->ep_head = 0;
+    if (m->ep_head >= m->ep_cap) m->ep_head = 0;
   }
   e = &m->ep[slot];
   memset(e, 0, sizeof(*e));
@@ -227,6 +230,7 @@ static void km_ep_push(KmMind *m, const double *x, int xn, const double *y, int 
   e->has_target = yn > 0 ? 1 : 0;
   e->target_dim = yn;
   for (i = 0; i < yn; i++) e->target[i] = y[i];
+  return slot;
 }
 
 /* blend nearby episode patterns -- inverse-distance weights, top-3 */
@@ -272,14 +276,17 @@ static void km_blend_ep(const KmMind *m, const double *obs, int on, double *out,
   *out_n = dim;
 }
 
-static KVal k_memory_config(int64_t dim, int64_t threshold, int64_t hidden) {
+static KVal k_memory_config(double threshold, int64_t ep_cap, int64_t hidden) {
   KmMind m;
-  int d = (int)dim;
   int h = (int)hidden;
+  int cap = (int)ep_cap;
   memset(&m, 0, sizeof(m));
-  m.threshold = (double)threshold;
+  m.threshold = threshold;
   m.lr = 0.08;
-  km_wm_init(&m.model, d, h);
+  if (h < 1) h = 8; if (h > KM_HID_MAX) h = KM_HID_MAX;
+  if (cap < 1) cap = 1; if (cap > KM_EP_MAX) cap = KM_EP_MAX;
+  m.ep_cap = cap;
+  km_wm_init(&m.model, 1, h);
   if (g_minds_len + 1 > g_minds_cap) {
     size_t ncap = g_minds_cap ? g_minds_cap * 2 : 4;
     KmMind *nd = (KmMind *)realloc(g_minds, ncap * sizeof(KmMind));
@@ -347,4 +354,62 @@ static KVal k_foresee(KVal mem, KVal x) {
   }
   return pat_to_kval_list(out, dim);
 }
+
+static KVal k_surprise(KVal a, KVal b) {
+  double pa[KM_DIM_MAX], pb[KM_DIM_MAX];
+  int an = kval_list_to_pat(a, pa, KM_DIM_MAX);
+  int bn = kval_list_to_pat(b, pb, KM_DIM_MAX);
+  return kval_f64(km_dist(pa, an, pb, bn));
+}
+static KVal k_remember(KVal mem, KVal pat, KVal sur) {
+  KmMind *m = km_get(mem); double xp[KM_DIM_MAX]; int xn; double s = kval_as_f64(sur);
+  if (s < m->threshold) return kval_i64(0);
+  xn = kval_list_to_pat(pat, xp, KM_DIM_MAX);
+  m->ep[km_ep_push(m, xp, xn, NULL, 0)].surprise = s;
+  return kval_i64(1);
+}
+static KVal k_remember_next(KVal mem, KVal a, KVal b, KVal sur) {
+  KmMind *m = km_get(mem); double xp[KM_DIM_MAX], yp[KM_DIM_MAX]; int xn, yn; double s = kval_as_f64(sur);
+  if (s < m->threshold) return kval_i64(0);
+  xn = kval_list_to_pat(a, xp, KM_DIM_MAX); yn = kval_list_to_pat(b, yp, KM_DIM_MAX);
+  m->ep[km_ep_push(m, xp, xn, yp, yn)].surprise = s;
+  return kval_i64(1);
+}
+static KVal k_unroll(KVal mem, KVal x, KVal nsteps) {
+  KmMind *m = km_get(mem); double cur[KM_DIM_MAX]; int cn, steps, s, i;
+  int64_t out = klist_new();
+  cn = kval_list_to_pat(x, cur, KM_DIM_MAX);
+  steps = (int)kval_as_i64(nsteps); if (steps < 1) steps = 1; if (steps > 64) steps = 64;
+  for (s = 0; s < steps; s++) {
+    KVal nxt = k_predict(mem, pat_to_kval_list(cur, cn));
+    klist_push_val(out, nxt);
+    cn = kval_list_to_pat(nxt, cur, KM_DIM_MAX);
+  }
+  return kval_list(out);
+}
+static KVal k_foresee_n(KVal mem, KVal x, KVal nsteps) { return k_unroll(mem, x, nsteps); }
+static KVal k_consolidate(KVal mem) {
+  KmMind *m = km_get(mem); int i, n = 0;
+  for (i = 0; i < m->nep; i++) {
+    if (!m->ep[i].has_target) continue;
+    km_train_step(&m->model, m->ep[i].pattern, m->ep[i].dim, m->ep[i].target, m->ep[i].target_dim, m->lr);
+    n++;
+  }
+  return kval_i64((int64_t)n);
+}
+static KVal k_mem_stats(KVal mem) {
+  KmMind *m = km_get(mem); int64_t id = klist_new();
+  klist_push_val(id, kval_i64((int64_t)m->nep));
+  klist_push_val(id, kval_i64((int64_t)m->model.steps));
+  klist_push_val(id, kval_f64(m->threshold));
+  return kval_list(id);
+}
+static KVal k_save_mind(KVal mem, KVal path) {
+  KmMind *m = km_get(mem); FILE *f = fopen(kval_as_str(path), "wb");
+  if (!f) return kval_i64(0);
+  fprintf(f, "KENGA_MIND 1\n%d %d %.17g\n", m->nep, (int)m->model.steps, m->threshold);
+  fclose(f); return kval_i64(1);
+}
+static KVal k_sweep(void) { return kval_i64(0); }
+static KVal k_memory(void) { return k_memory_config(0.12, 16, 8); }
 #endif /* KENGA_RT_KVAL_MEM_INC */

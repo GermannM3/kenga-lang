@@ -500,7 +500,7 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 j = skip(s, ac[1]); assert(s[j] == ")"); j = j + 1;
                 let pre: str = merge_pre(ar[3], ab[3]);
                 pre = merge_pre(pre, ac[3]);
-                return ["k_memory_config(kval_as_i64(" + ar[0] + "), kval_as_i64(" + ab[0] + "), kval_as_i64(" + ac[0] + "))", j, 0, pre];
+                return ["k_memory_config(kval_as_f64(" + ar[0] + "), kval_as_i64(" + ab[0] + "), kval_as_i64(" + ac[0] + "))", j, 0, pre];
             }
             if id[0] == "learn" {
                 let ar = lower_cmp(s, j, decls);
@@ -528,6 +528,82 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 j = skip(s, ax[1]); assert(s[j] == ")"); j = j + 1;
                 let pre: str = merge_pre(ar[3], ax[3]);
                 return ["k_foresee(" + ar[0] + ", " + ax[0] + ")", j, 1, pre];
+            }
+            if id[0] == "surprise" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ax = lower_cmp(s, j, decls);
+                j = skip(s, ax[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ax[3]);
+                return ["k_surprise(" + ar[0] + ", " + ax[0] + ")", j, 3, pre];
+            }
+            if id[0] == "remember" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ax = lower_cmp(s, j, decls);
+                j = skip(s, ax[1]); assert(s[j] == ","); j = j + 1;
+                let asu = lower_cmp(s, j, decls);
+                j = skip(s, asu[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(merge_pre(ar[3], ax[3]), asu[3]);
+                return ["k_remember(" + ar[0] + ", " + ax[0] + ", " + asu[0] + ")", j, 0, pre];
+            }
+            if id[0] == "remember_next" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ax = lower_cmp(s, j, decls);
+                j = skip(s, ax[1]); assert(s[j] == ","); j = j + 1;
+                let ay = lower_cmp(s, j, decls);
+                j = skip(s, ay[1]); assert(s[j] == ","); j = j + 1;
+                let asu = lower_cmp(s, j, decls);
+                j = skip(s, asu[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(merge_pre(merge_pre(ar[3], ax[3]), ay[3]), asu[3]);
+                return ["k_remember_next(" + ar[0] + ", " + ax[0] + ", " + ay[0] + ", " + asu[0] + ")", j, 0, pre];
+            }
+            if id[0] == "unroll" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ax = lower_cmp(s, j, decls);
+                j = skip(s, ax[1]); assert(s[j] == ","); j = j + 1;
+                let an = lower_cmp(s, j, decls);
+                j = skip(s, an[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(merge_pre(ar[3], ax[3]), an[3]);
+                return ["k_unroll(" + ar[0] + ", " + ax[0] + ", " + an[0] + ")", j, 1, pre];
+            }
+            if id[0] == "foresee_n" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ax = lower_cmp(s, j, decls);
+                j = skip(s, ax[1]); assert(s[j] == ","); j = j + 1;
+                let an = lower_cmp(s, j, decls);
+                j = skip(s, an[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(merge_pre(ar[3], ax[3]), an[3]);
+                return ["k_foresee_n(" + ar[0] + ", " + ax[0] + ", " + an[0] + ")", j, 1, pre];
+            }
+            if id[0] == "consolidate" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_consolidate(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "mem_stats" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_mem_stats(" + ar[0] + ")", j, 1, ar[3]];
+            }
+            if id[0] == "save_mind" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ap = lower_cmp(s, j, decls);
+                j = skip(s, ap[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ap[3]);
+                return ["k_save_mind(" + ar[0] + ", " + ap[0] + ")", j, 0, pre];
+            }
+            if id[0] == "sweep" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["k_sweep()", j, 0, ""];
+            }
+            if id[0] == "memory" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["k_memory()", j, 0, ""];
             }
             if id[0] == "tensor" {
                 let ar = lower_cmp(s, j, decls);

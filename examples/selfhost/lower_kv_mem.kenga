@@ -1,10 +1,22 @@
 fn main() -> i64 {
-    let m = memory_config(5, 16, 8);
+    let m = memory_config(0.12, 16, 8);
     let loss = learn(m, [1, 2, 3], [2, 3, 4]);
     let p = predict(m, [1, 2, 3]);
     assert(len(p) == 3);
     let f = foresee(m, [1, 2, 3]);
     assert(len(f) == 3);
+    assert(remember(m, [9, 0, 9], 80) == 1);
+    assert(remember(m, [1, 1, 1], 0.01) == 0);
+    remember_next(m, [1, 2, 3], [2, 3, 4], 55);
+    let traj = unroll(m, [1, 2, 3], 2);
+    assert(len(traj) == 2);
+    let folded = consolidate(m);
+    assert(folded > 0);
+    let st = mem_stats(m);
+    assert(st[0] > 0);
+    let err = surprise([1.0, 0.0], [0.0, 1.0]);
+    assert(round(err * 10.0) > 0);
+    assert(save_mind(m, "kv_mind.txt") == 1);
     println("mem kv ok");
     return 0;
 }

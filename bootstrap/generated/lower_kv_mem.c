@@ -52,34 +52,86 @@ int main(void) {
   KVal loss = kval_i64(0);
   KVal p = kval_i64(0);
   KVal f = kval_i64(0);
-  m = k_memory_config(kval_as_i64(kval_i64(5LL)), kval_as_i64(kval_i64(16LL)), kval_as_i64(kval_i64(8LL)));
+  KVal traj = kval_i64(0);
+  KVal folded = kval_i64(0);
+  KVal st = kval_i64(0);
+  KVal err = kval_i64(0);
+  m = k_memory_config(kval_as_f64(kval_f64(0.12)), kval_as_i64(kval_i64(16LL)), kval_as_i64(kval_i64(8LL)));
   {
-  int64_t _lk64 = klist_new();
-  klist_push_val(_lk64, kval_i64(1LL));
-  klist_push_val(_lk64, kval_i64(2LL));
-  klist_push_val(_lk64, kval_i64(3LL));
-  int64_t _lk75 = klist_new();
-  klist_push_val(_lk75, kval_i64(2LL));
-  klist_push_val(_lk75, kval_i64(3LL));
-  klist_push_val(_lk75, kval_i64(4LL));
-    loss = k_learn(m, kval_list(_lk64), kval_list(_lk75));
+  int64_t _lk67 = klist_new();
+  klist_push_val(_lk67, kval_i64(1LL));
+  klist_push_val(_lk67, kval_i64(2LL));
+  klist_push_val(_lk67, kval_i64(3LL));
+  int64_t _lk78 = klist_new();
+  klist_push_val(_lk78, kval_i64(2LL));
+  klist_push_val(_lk78, kval_i64(3LL));
+  klist_push_val(_lk78, kval_i64(4LL));
+    loss = k_learn(m, kval_list(_lk67), kval_list(_lk78));
   }
   {
-  int64_t _lk110 = klist_new();
-  klist_push_val(_lk110, kval_i64(1LL));
-  klist_push_val(_lk110, kval_i64(2LL));
-  klist_push_val(_lk110, kval_i64(3LL));
-    p = k_predict(m, kval_list(_lk110));
+  int64_t _lk113 = klist_new();
+  klist_push_val(_lk113, kval_i64(1LL));
+  klist_push_val(_lk113, kval_i64(2LL));
+  klist_push_val(_lk113, kval_i64(3LL));
+    p = k_predict(m, kval_list(_lk113));
   }
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(kval_len(p))) == kval_as_i64(kval_i64(3LL)))));
   {
-  int64_t _lk170 = klist_new();
-  klist_push_val(_lk170, kval_i64(1LL));
-  klist_push_val(_lk170, kval_i64(2LL));
-  klist_push_val(_lk170, kval_i64(3LL));
-    f = k_foresee(m, kval_list(_lk170));
+  int64_t _lk173 = klist_new();
+  klist_push_val(_lk173, kval_i64(1LL));
+  klist_push_val(_lk173, kval_i64(2LL));
+  klist_push_val(_lk173, kval_i64(3LL));
+    f = k_foresee(m, kval_list(_lk173));
   }
   k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(kval_len(f))) == kval_as_i64(kval_i64(3LL)))));
+{
+  int64_t _lk233 = klist_new();
+  klist_push_val(_lk233, kval_i64(9LL));
+  klist_push_val(_lk233, kval_i64(0LL));
+  klist_push_val(_lk233, kval_i64(9LL));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_remember(m, kval_list(_lk233), kval_i64(80LL))) == kval_as_i64(kval_i64(1LL)))));
+}
+{
+  int64_t _lk278 = klist_new();
+  klist_push_val(_lk278, kval_i64(1LL));
+  klist_push_val(_lk278, kval_i64(1LL));
+  klist_push_val(_lk278, kval_i64(1LL));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_remember(m, kval_list(_lk278), kval_f64(0.01))) == kval_as_i64(kval_i64(0LL)))));
+}
+{
+  int64_t _lk323 = klist_new();
+  klist_push_val(_lk323, kval_i64(1LL));
+  klist_push_val(_lk323, kval_i64(2LL));
+  klist_push_val(_lk323, kval_i64(3LL));
+  int64_t _lk334 = klist_new();
+  klist_push_val(_lk334, kval_i64(2LL));
+  klist_push_val(_lk334, kval_i64(3LL));
+  klist_push_val(_lk334, kval_i64(4LL));
+  (void)(k_remember_next(m, kval_list(_lk323), kval_list(_lk334), kval_i64(55LL)));
+}
+  {
+  int64_t _lk375 = klist_new();
+  klist_push_val(_lk375, kval_i64(1LL));
+  klist_push_val(_lk375, kval_i64(2LL));
+  klist_push_val(_lk375, kval_i64(3LL));
+    traj = k_unroll(m, kval_list(_lk375), kval_i64(2LL));
+  }
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(kval_len(traj))) == kval_as_i64(kval_i64(2LL)))));
+  folded = k_consolidate(m);
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(folded) > kval_as_i64(kval_i64(0LL)))));
+  st = k_mem_stats(m);
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_index(st, kval_as_i64(kval_i64(0LL)))) > kval_as_i64(kval_i64(0LL)))));
+  {
+  int64_t _lk548 = klist_new();
+  klist_push_val(_lk548, kval_f64(1.0));
+  klist_push_val(_lk548, kval_f64(0.0));
+  int64_t _lk560 = klist_new();
+  klist_push_val(_lk560, kval_f64(0.0));
+  klist_push_val(_lk560, kval_f64(1.0));
+    err = k_surprise(kval_list(_lk548), kval_list(_lk560));
+  }
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(err) * kval_as_f64(kval_f64(10.0))))))) > kval_as_i64(kval_i64(0LL)))));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_save_mind(m, kval_str("kv_mind.txt"))) == kval_as_i64(kval_i64(1LL)))));
   kenga_println_val(kval_str("mem kv ok"));
   return (int)kval_as_i64(kval_i64(0LL));
   return 0;
