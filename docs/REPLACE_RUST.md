@@ -14,7 +14,7 @@
 | `memory.rs` | ✅ на lite | `bootstrap/prophet_lite.inc.c` |
 | `talk.rs` (chat) | ✅ на lite | `bootstrap/chat_lite.inc.c` |
 | `codegen.rs` (emit-c) | 🟢 растёт | `lower_c` + **`lower_kv`/`rt_kval`** (KVal path к `more`) |
-| `main.rs` / `driver.rs` | ⬜ | CLI = `kenga-lite` пока |
+| `main.rs` / `driver.rs` | 🟡 | CLI `main` пишет `kenga/emit/rt_cli.kenga` |
 | `demo.rs` / `build.rs` | ⬜ | позже |
 
 ## Как добиваем Rust
@@ -32,4 +32,5 @@ bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
 
 `more` уже гоняет `for_lite` / `elif_lite` / `struct_lite` / `float_lite` / `lists_lite` / **`agent.kenga`** через свой bytecode VM.  
-`bc_src_c` пишет тот же диалект в native C (`bc_from_agent`, `bc_from_import`, **`bc_from_net`**, **`bc_from_birth`**).
+`bc_src_c` пишет тот же диалект в native C (`bc_from_agent`, `bc_from_import`, **`bc_from_net`**, **`bc_from_birth`**).  
+`rt_cli.kenga` пишет `main` хоста в `bootstrap/generated/rt_cli.inc.c`.

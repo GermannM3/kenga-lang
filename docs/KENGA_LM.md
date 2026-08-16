@@ -27,7 +27,7 @@ scripts\hf-pack.cmd
 ```
 
 Word-LM на CPU lite: L=2, D=16, V=20. Дописывает `<s> kenga zhivet v yazyke .`  
-Char-LM читает seed + selfhost, учит next-char, веса в `minds/kenga_char_*`. Talk грузит их без повторного обучения.  
+Char-LM / mm-gen: тот же decoder, **CTX=12** (промпт `"kenga vidit "` больше не режется). Веса в `minds/kenga_char_*`. Talk грузит их без повторного обучения.  
 Триграмма пишет обрывки синтаксиса. Ощутимый результат: `scripts\kenga-birth.cmd` — модель дописывает seed с `"fn add"`, кладёт `examples/ml/kenga_born.kenga`, lite выполняет и печатает **24** (`fact(add(2,3)-1)`). Не GGUF.
 
 ## Что это доказывает
