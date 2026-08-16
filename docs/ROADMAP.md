@@ -39,6 +39,7 @@
 | ✅ | **`more.kenga`**: `unroll` / `remember_next` |
 | ✅ | **`more.kenga`**: `foresee_n` |
 | ✅ | **`more.kenga`**: `examples/ml/living_multimodal.kenga` (PPM+WAV → Prophet) |
+| ✅ | **`more.kenga`**: `examples/ml/word_lm.kenga` (2-layer CE, ~3 мин) |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
