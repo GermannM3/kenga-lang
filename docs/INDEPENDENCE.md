@@ -21,7 +21,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 3. **`lower_c` / `lower_kv`** вытесняют `codegen.rs`.  
 4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM. Сетка: **`kenga_net.kenga`**. Birth: **`kenga_birth.kenga`** → native C пишет программу. Запуск одного файла: **`scripts\bc-run.cmd`**.  
 5. Emit lite runtime закрыт: `kenga_lite.c` только includes. Дальше — VM на Kenga без C.  
-6. Releases без cargo; `src/` → archive.  
+6. Releases: `kenga-lite` обязателен в CI/zip; cargo `kenga` ещё legacy. `src/` → archive, когда zip = только lite.  
 7. VM на Kenga → C уходит.
 
 Карта модулей: **`docs/REPLACE_RUST.md`**.

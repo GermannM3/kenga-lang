@@ -49,14 +49,11 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/kenga.exe" "dist/${{ matrix.artifact }}.exe"
-          # Rust-free lite companion
           cmd /c "bootstrap\build.cmd"
-          if (Test-Path "bootstrap\bin\kenga-lite.exe") {
-            Copy-Item "bootstrap\bin\kenga-lite.exe" "dist\kenga-lite.exe"
-            Compress-Archive -Path "dist/${{ matrix.artifact }}.exe","dist\kenga-lite.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip" -Force
-          } else {
-            Compress-Archive -Path "dist/${{ matrix.artifact }}.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip" -Force
-          }
+          if ($LASTEXITCODE -ne 0) { throw "bootstrap\build.cmd failed" }
+          if (-not (Test-Path "bootstrap\bin\kenga-lite.exe")) { throw "kenga-lite.exe missing" }
+          Copy-Item "bootstrap\bin\kenga-lite.exe" "dist\kenga-lite.exe"
+          Compress-Archive -Path "dist/${{ matrix.artifact }}.exe","dist\kenga-lite.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip" -Force
 
       - name: Pack (Unix)
         if: runner.os != 'Windows'
@@ -64,17 +61,15 @@ jobs:
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/kenga" "dist/${{ matrix.artifact }}"
           chmod +x "dist/${{ matrix.artifact }}"
-          if command -v cc >/dev/null; then
-            mkdir -p bootstrap/bin
-            cc -O2 -std=c99 bootstrap/kenga_lite.c -o bootstrap/bin/kenga-lite || true
+          mkdir -p bootstrap/bin
+          cc -O2 -std=c99 bootstrap/kenga_lite.c -lm -o bootstrap/bin/kenga-lite
+          if [ ! -f bootstrap/bin/kenga-lite ]; then
+            echo "kenga-lite missing" >&2
+            exit 1
           fi
-          if [ -f bootstrap/bin/kenga-lite ]; then
-            cp bootstrap/bin/kenga-lite dist/kenga-lite
-            chmod +x dist/kenga-lite
-            cd dist && tar -czf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}" kenga-lite
-          else
-            cd dist && tar -czf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
-          fi
+          cp bootstrap/bin/kenga-lite dist/kenga-lite
+          chmod +x dist/kenga-lite
+          cd dist && tar -czf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}" kenga-lite
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

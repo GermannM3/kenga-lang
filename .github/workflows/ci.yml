@@ -71,3 +71,23 @@ jobs:
           /tmp/kenga_native_lists
           cargo run --quiet -- build examples/native_struct.kenga -o /tmp/kenga_native_struct
           /tmp/kenga_native_struct
+
+  lite:
+    name: kenga-lite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build kenga-lite
+        run: |
+          mkdir -p bootstrap/bin
+          cc -O2 -std=c99 bootstrap/kenga_lite.c -lm -o bootstrap/bin/kenga-lite
+
+      - name: Selftest
+        run: ./bootstrap/bin/kenga-lite
+
+      - name: Examples (no Rust)
+        run: |
+          ./bootstrap/bin/kenga-lite run examples/hello.kenga
+          ./bootstrap/bin/kenga-lite run examples/prophet.kenga
+          ./bootstrap/bin/kenga-lite run examples/selfhost/fact_lite.kenga
