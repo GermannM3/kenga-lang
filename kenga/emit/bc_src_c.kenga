@@ -37,6 +37,10 @@ fn OP_PUMP() -> i64 { return 30; }
 fn OP_PENDING() -> i64 { return 31; }
 fn OP_READ_FILE() -> i64 { return 36; }
 fn OP_WRITE_FILE() -> i64 { return 37; }
+fn OP_MOD() -> i64 { return 38; }
+fn OP_AND() -> i64 { return 39; }
+fn OP_OR() -> i64 { return 40; }
+fn OP_NOT() -> i64 { return 41; }
 fn OP_POP() -> i64 { return 20; }
 
 fn dirname_of(path: str) -> str {
@@ -134,6 +138,21 @@ fn emit_code(code: list) -> str {
     return s;
 }
 
+fn code_has_seq(code: list, seq: list) -> i64 {
+    let i: i64 = 0;
+    while i + len(seq) <= len(code) {
+        let ok: i64 = 1;
+        let j: i64 = 0;
+        while j < len(seq) {
+            if code[i + j] != seq[j] { ok = 0; break; }
+            j = j + 1;
+        }
+        if ok == 1 { return 1; }
+        i = i + 1;
+    }
+    return 0;
+}
+
 fn is_space(ch: str) -> i64 {
     if ch == " " { return 1; }
     if ch == "\t" { return 1; }
@@ -162,6 +181,22 @@ fn skip(s: str, i: i64) -> i64 {
                         if s[i] == "\n" { break; }
                         i = i + 1;
                     }
+                    continue;
+                }
+                if s[i + 1] == "*" {
+                    i = i + 2;
+                    let closed: i64 = 0;
+                    while i + 1 < len(s) {
+                        if s[i] == "*" {
+                            if s[i + 1] == "/" {
+                                i = i + 2;
+                                closed = 1;
+                                break;
+                            }
+                        }
+                        i = i + 1;
+                    }
+                    assert(closed == 1);
                     continue;
                 }
             }
@@ -381,6 +416,11 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
         code = emit2(code, OP_CONST(), 0);
         let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_SUB());
+        return [code, r[1], r[2]];
+    }
+    if s[i] == "!" {
+        let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+        code = push(r[0], OP_NOT());
         return [code, r[1], r[2]];
     }
     if s[i] == "(" {
@@ -665,7 +705,13 @@ fn emit_term(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
                 r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
                 code = push(r[0], OP_DIV());
                 i = r[1]; vnames = r[2];
-            } else { break; }
+            } else {
+                if s[i] == "%" {
+                    r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+                    code = push(r[0], OP_MOD());
+                    i = r[1]; vnames = r[2];
+                } else { break; }
+            }
         }
     }
     return [code, i, vnames];
@@ -692,7 +738,7 @@ fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     return [code, i, vnames];
 }
 
-fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+fn emit_rel(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
     let r = emit_sum(s, i, code, vnames, fnames, faddrs, fargc, strbox);
     code = r[0]; i = r[1]; vnames = r[2];
     i = skip(s, i);
@@ -728,6 +774,36 @@ fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
         return [code, r[1], r[2]];
     }
     return [code, i, vnames];
+}
+
+fn emit_and(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    let r = emit_rel(s, i, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if starts_with(s, i, "&&") == 1 {
+            r = emit_rel(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+            code = push(r[0], OP_AND()); i = r[1]; vnames = r[2];
+        } else { break; }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_or(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    let r = emit_and(s, i, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if starts_with(s, i, "||") == 1 {
+            r = emit_and(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+            code = push(r[0], OP_OR()); i = r[1]; vnames = r[2];
+        } else { break; }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_cmp(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    return emit_or(s, i, code, vnames, fnames, faddrs, fargc, strbox);
 }
 
 fn loops_pop(loops: list) -> list {
@@ -1304,6 +1380,7 @@ fn write_runtime() -> str {
     let s: str = "";
     s = s + "/* GENERATED by kenga/emit/bc_src_c.kenga ? shared bytecode VM runtime */\n";
     s = s + "/* Driver: #include opcodes.inc.c; define g_strs, g_f64s, g_handlers, g_nhandlers; then #include this file. */\n\n";
+    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41 };\n";
     s = s + "typedef struct { int tag; int64_t i; double f; } V;\n";
     s = s + "static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }\n";
     s = s + "static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }\n";
@@ -1469,6 +1546,10 @@ fn write_runtime() -> str {
     s = s + "    else if (op == OP_SUB) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)-as_f(b)); else stack[sp++]=Vi(a.i-b.i); }\n";
     s = s + "    else if (op == OP_MUL) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)*as_f(b)); else stack[sp++]=Vi(a.i*b.i); }\n";
     s = s + "    else if (op == OP_DIV) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vf(as_f(a)/as_f(b)); else stack[sp++]=Vi(a.i/b.i); }\n";
+    s = s + "    else if (op == OP_MOD) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) % as_i(b)); }\n";
+    s = s + "    else if (op == OP_AND) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi((as_i(a)!=0 && as_i(b)!=0)?1:0); }\n";
+    s = s + "    else if (op == OP_OR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi((as_i(a)!=0 || as_i(b)!=0)?1:0); }\n";
+    s = s + "    else if (op == OP_NOT) { V a=stack[--sp]; stack[sp++]=Vi(as_i(a)==0?1:0); }\n";
     s = s + "    else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }\n";
     s = s + "    else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }\n";
     s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
@@ -1703,6 +1784,13 @@ fn main() -> i64 {
     let r20 = compile_src(resolve_imports("examples/ml/kenga_birth.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_birth.c", write_c_driver(r20[0], r20[1], r20[2], r20[3])) == true);
 
+    let r21 = compile_src(resolve_imports("examples/selfhost/bc_logic.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_logic.c", write_c_driver(r21[0], r21[1], r21[2], r21[3])) == true);
+    assert(code_has_seq(r21[0], [OP_CONST(), 10, OP_CONST(), 3, OP_MOD()]) == 1);
+    assert(code_has_seq(r21[0], [OP_CONST(), 1, OP_CONST(), 0, OP_AND()]) == 1);
+    assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_CONST(), 1, OP_OR()]) == 1);
+    assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_NOT()]) == 1);
+
     let raw: str = read_file("bootstrap/generated/_bc_path.txt");
     let one: str = trim_path(raw);
     if len(one) > 0 {
@@ -1711,7 +1799,7 @@ fn main() -> i64 {
         println("wrote bc_one_out.c for " + one);
     }
 
-    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net/birth");
+    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net/birth/logic");
     println("bc_src_c ok");
     return 0;
 }
