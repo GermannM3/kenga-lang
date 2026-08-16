@@ -2,7 +2,7 @@
  *
  * Dialect:
  *   fn / let / while / if-else / return / calls
- *   i64 / f64 arith + cmp (< > <= >= == !=)
+ *   i64 / f64 arith + cmp (< > <= >= == !=) + && || ! + i64 %
  *   println(expr);          — print i64, f64, string, i64-list, or struct
  *   "string" literals       — values (println, == / !=)
  *   i64 lists: [1,2,3], len(xs), push(xs, v), xs[i], xs[i] = v

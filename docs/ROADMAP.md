@@ -7,6 +7,7 @@
 | ✅ | C99 bootstrap `kenga-lite` |
 | ✅ | `kenga run --lite` + auto для `*_lite` / `selfhost/` |
 | ✅ | Lite: f64, assert, else if, type/ttl ignore |
+| ✅ | Lite + `more`: **`&&` `||` `!` `%`** (`logic_lite.kenga`) |
 | ✅ | Lite: **for / break / continue** (`native_lists.kenga` без Rust) |
 | ✅ | Lite: forward `fn` calls, `str+str`, import, nested lists, `true`/`false` |
 | ✅ | Self-host seed on lite: `arith` / `mini` / `iffy` / `loopfn` |

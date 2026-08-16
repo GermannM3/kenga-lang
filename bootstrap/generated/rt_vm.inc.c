@@ -935,6 +935,41 @@ static int64_t vm_exec(Program *prog) {
       BIN_NUM(a / b, a / b, 0);
       continue;
     }
+    if (op == OP_MOD) {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, "% expects i64");
+      int64_t b = as_i64(vb, "% expects i64");
+      if (b == 0) die("% by zero");
+      vala_push(&stack, V_i64(a % b));
+      continue;
+    }
+    if (op == OP_AND) {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, "&& expects i64");
+      int64_t b = as_i64(vb, "&& expects i64");
+      vala_push(&stack, V_i64((a != 0 && b != 0) ? 1 : 0));
+      continue;
+    }
+    if (op == OP_OR) {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, "|| expects i64");
+      int64_t b = as_i64(vb, "|| expects i64");
+      vala_push(&stack, V_i64((a != 0 || b != 0) ? 1 : 0));
+      continue;
+    }
+    if (op == OP_NOT) {
+      if (!stack.len) die("stack underflow NOT");
+      Value v = stack.data[--stack.len];
+      int64_t a = as_i64(v, "! expects i64");
+      vala_push(&stack, V_i64(a == 0 ? 1 : 0));
+      continue;
+    }
     if (op == OP_LT) {
       BIN_NUM(a < b, a < b, 1);
       continue;

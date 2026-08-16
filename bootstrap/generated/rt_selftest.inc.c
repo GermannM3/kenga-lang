@@ -6,6 +6,7 @@ static int64_t run_lite(const char *src) {
   return r;
 }
 
+
 static int selftest(void) {
   struct {
     const char *src;
@@ -126,6 +127,15 @@ static int selftest(void) {
        "kt\"))) == 1); assert(write_file(\"minds/_lite_w.txt\", \"hi\") == 1); "
        "assert(ord(read_file(\"minds/_lite_w.txt\")[0]) == 104); 0 }",
        0},
+      {"fn main() { 10 % 3 }", 1},
+      {"fn main() { 1 && 0 }", 0},
+      {"fn main() { 1 && 1 }", 1},
+      {"fn main() { 0 || 1 }", 1},
+      {"fn main() { !0 }", 1},
+      {"fn main() { !1 }", 0},
+      {"fn main() { 1 < 2 && 3 > 1 }", 1},
+      {"fn main() { 1 > 2 || 2 > 1 }", 1},
+      {"fn main() { !(1 == 2) }", 1},
   };
   size_t n = sizeof(cases) / sizeof(cases[0]);
   for (size_t i = 0; i < n; i++) {

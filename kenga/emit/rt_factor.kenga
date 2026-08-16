@@ -19,6 +19,10 @@ fn main() -> i64 {
     s = s + "    i = emit_factor(s, i + 1, n, code, vnames, fnames, faddrs, fargc);\n";
     s = s + "    i64a_push(code, OP_SUB);\n";
     s = s + "    return i; /* unary-minus already includes postfix via recurse */\n";
+    s = s + "  } else if (s[i] == '!') {\n";
+    s = s + "    i = emit_factor(s, i + 1, n, code, vnames, fnames, faddrs, fargc);\n";
+    s = s + "    i64a_push(code, OP_NOT);\n";
+    s = s + "    return i;\n";
     s = s + "  } else if (s[i] == '\"') {\n";
     s = s + "    size_t ii = i;\n";
     s = s + "    char *lit = parse_string(s, &ii, n);\n";

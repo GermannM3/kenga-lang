@@ -11,6 +11,9 @@ static size_t emit_term(const char *s, size_t i, size_t n, I64A *code, StrA *vna
     } else if (s[i] == '/') {
       i = emit_factor(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
       i64a_push(code, OP_DIV);
+    } else if (s[i] == '%') {
+      i = emit_factor(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_MOD);
     } else break;
   }
   return i;
@@ -31,7 +34,7 @@ static size_t emit_sum(const char *s, size_t i, size_t n, I64A *code, StrA *vnam
   }
   return i;
 }
-static size_t emit_cmp(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+static size_t emit_rel(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
                       StrA *fnames, I64A *faddrs, I64A *fargc) {
   i = emit_sum(s, i, n, code, vnames, fnames, faddrs, fargc);
   i = skip(s, i, n);
@@ -61,6 +64,36 @@ static size_t emit_cmp(const char *s, size_t i, size_t n, I64A *code, StrA *vnam
     i64a_push(code, OP_GT); return i;
   }
   return i;
+}
+static size_t emit_and(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+                      StrA *fnames, I64A *faddrs, I64A *fargc) {
+  i = emit_rel(s, i, n, code, vnames, fnames, faddrs, fargc);
+  for (;;) {
+    i = skip(s, i, n);
+    if (i >= n) break;
+    if (starts_with(s, i, n, "&&")) {
+      i = emit_rel(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_AND);
+    } else break;
+  }
+  return i;
+}
+static size_t emit_or(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+                     StrA *fnames, I64A *faddrs, I64A *fargc) {
+  i = emit_and(s, i, n, code, vnames, fnames, faddrs, fargc);
+  for (;;) {
+    i = skip(s, i, n);
+    if (i >= n) break;
+    if (starts_with(s, i, n, "||")) {
+      i = emit_and(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_OR);
+    } else break;
+  }
+  return i;
+}
+static size_t emit_cmp(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+                      StrA *fnames, I64A *faddrs, I64A *fargc) {
+  return emit_or(s, i, n, code, vnames, fnames, faddrs, fargc);
 }
 static size_t emit_block(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
                         StrA *fnames, I64A *faddrs, I64A *fargc) {
