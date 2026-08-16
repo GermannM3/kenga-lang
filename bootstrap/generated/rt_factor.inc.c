@@ -569,6 +569,23 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         j++;
         i64a_push(code, op);
         i = j;
+      } else if (strcmp(id.name, "foresee_n") == 0) {
+        free(id.name);
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ',') die("expected ,");
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ',') die("expected ,");
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected )");
+        j++;
+        i64a_push(code, OP_FORESEE_N);
+        i = j;
       } else if (strcmp(id.name, "emit") == 0) {
         free(id.name);
         j++;

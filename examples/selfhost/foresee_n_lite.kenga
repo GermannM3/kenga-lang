@@ -1,0 +1,9 @@
+fn main() -> i64 {
+    let m = memory_config(5, 16, 8);
+    learn(m, [1, 2, 3], [2, 3, 4]);
+    let t = foresee_n(m, [1, 2, 3], 2);
+    assert(len(t) == 2);
+    assert(len(t[0]) == 3);
+    println("foresee_n lite ok");
+    return 0;
+}

@@ -736,6 +736,24 @@ static void pl_foresee(const ProphetMem *mem, const double *obs, int on, double 
   *out_n = dim;
 }
 
+static void pl_foresee_n(const ProphetMem *mem, const double *obs, int on, int steps, double *traj,
+                      int *out_steps, int *out_dim) {
+  double cur[PL_DIM_MAX], nxt[PL_DIM_MAX];
+  int cn = 0, nn = 0, s, i;
+  if (steps < 1) steps = 1;
+  if (steps > 64) steps = 64;
+  for (i = 0; i < on && i < PL_DIM_MAX; i++) cur[i] = obs[i];
+  cn = on < PL_DIM_MAX ? on : PL_DIM_MAX;
+  for (s = 0; s < steps; s++) {
+    pl_foresee(mem, cur, cn, nxt, &nn);
+    for (i = 0; i < nn; i++) traj[s * PL_DIM_MAX + i] = nxt[i];
+    for (i = 0; i < nn; i++) cur[i] = nxt[i];
+    cn = nn;
+  }
+  *out_steps = steps;
+  *out_dim = cn;
+}
+
 static int64_t pl_consolidate(ProphetMem *mem) {
   int folded = 0;
   int e;

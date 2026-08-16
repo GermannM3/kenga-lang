@@ -108,7 +108,8 @@ enum {
   OP_NOT,
   OP_TO_STR,
   OP_PRINT,
-  OP_SLEEP_MS
+  OP_SLEEP_MS,
+  OP_FORESEE_N
 };
 
 enum { TAG_I64 = 0, TAG_STR = 1, TAG_LIST = 2, TAG_STRUCT = 3, TAG_F64 = 4, TAG_MEMORY = 5,

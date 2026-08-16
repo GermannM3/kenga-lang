@@ -19,6 +19,7 @@
 | ✅ | Lite: **`kenga-lite chat`** / `kenga chat --lite` — диалог без Rust |
 | ✅ | Lite: **Tensor core** (`tensor` / `t_from` / matmul / ew / reshape / softmax…) — `examples/ml/tensor_core.kenga` |
 | ✅ | Lite: **`load_ppm` / `load_wav` / `t_mean`** + `learn`/`predict`/`unroll`/`remember_next` — living multimodal без Rust |
+| ✅ | Lite: **`foresee_n`** — `examples/unroll.kenga` без Rust |
 | ✅ | Lite: **events** — `on "e"(x) { }` / `emit` / `pump` / `pending` / `listen` — `examples/agent.kenga` |
 | ✅ | Lite: **`ag_*` / tape** — `examples/ml/autograd_tape.kenga`, `mlp_autograd.kenga` |
 | ✅ | Lite: **`t_mse` / `t_patch_mean` / `t_linear_grad`** — `encoder_grad.kenga` |

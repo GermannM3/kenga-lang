@@ -91,3 +91,5 @@ jobs:
           ./bootstrap/bin/kenga-lite run examples/hello.kenga
           ./bootstrap/bin/kenga-lite run examples/prophet.kenga
           ./bootstrap/bin/kenga-lite run examples/selfhost/fact_lite.kenga
+          ./bootstrap/bin/kenga-lite run examples/selfhost/foresee_n_lite.kenga
+          ./bootstrap/bin/kenga-lite run examples/unroll.kenga

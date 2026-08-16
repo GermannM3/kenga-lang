@@ -677,6 +677,29 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_list(oh));
       continue;
     }
+    if (op == OP_FORESEE_N) {
+      double pat[PL_DIM_MAX], traj[64 * PL_DIM_MAX];
+      int pn = 0, steps, os = 0, od = 0, s;
+      Value vk, vo, vm;
+      ValA empty = {0};
+      int64_t oh;
+      if (stack.len < 3) die("stack underflow foresee_n");
+      vk = stack.data[--stack.len];
+      vo = stack.data[--stack.len];
+      vm = stack.data[--stack.len];
+      if (vm.tag != TAG_MEMORY) die("foresee_n expects Memory");
+      steps = (int)as_i64(vk, "foresee_n steps");
+      pl_value_to_pat(vo, &lists, pat, &pn);
+      pl_foresee_n(pl_get(vm.payload), pat, pn, steps, traj, &os, &od);
+      oh = (int64_t)lists.len;
+      listh_push(&lists, empty);
+      for (s = 0; s < os; s++) {
+        Value inner = pl_pat_to_list(traj + s * PL_DIM_MAX, od, &lists);
+        vala_push(&lists.data[oh], inner);
+      }
+      vala_push(&stack, V_list(oh));
+      continue;
+    }
     if (op == OP_REMEMBER_NEXT) {
       double a[PL_DIM_MAX], b[PL_DIM_MAX];
       int an = 0, bn = 0;

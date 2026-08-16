@@ -42,6 +42,7 @@ kenga run --lite examples/hello.kenga
 - `&&` `||` `!` `%` `typeof` `to_str` (lite, `more`, lowerers, `bc_src_c`)
 - `print` без `\n`, `sleep_ms` (lite, `more`; `lower_c` / `lower_kv` / `bc_src_c`)
 - `learn` / `predict` / `unroll` / `remember_next` на `more` VM (хост — lite builtins)
+- `foresee_n` на lite (`examples/unroll.kenga` без Rust)
 - `now_ms` — часы, не заглушка (lite, `more`, `lower_c` / `lower_kv` / `bc_src_c`); комментарии `//` и `/* … */`
 
 ## 3. Списки и struct
