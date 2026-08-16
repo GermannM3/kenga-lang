@@ -1,7 +1,8 @@
-// Char trigram on our .kenga. No Tensor, no GGUF — list/i64 only.
-// Same corpus idea as kenga_charlm; this one can ride bc_src later.
+// Char trigram on our .kenga. Sparse counts (no V^3 table).
+// No Tensor, no GGUF. Runs on lite and bytecode VM.
 //
 //   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
+//   scripts\bc-run.cmd examples\ml\kenga_trigram.kenga
 
 fn ch_id(alpha: str, ch: str) -> i64 {
     let i: i64 = 0;
@@ -54,14 +55,15 @@ fn strip_line_comments(src: str) -> str {
     return out;
 }
 
-fn zeros_i(n: i64) -> list {
-    let xs = [];
+fn take(s: str, n: i64) -> str {
+    if len(s) <= n { return s; }
+    let out: str = "";
     let i: i64 = 0;
     while i < n {
-        xs = push(xs, 0);
+        out = out + s[i];
         i = i + 1;
     }
-    return xs;
+    return out;
 }
 
 fn load_corpus() -> str {
@@ -71,48 +73,76 @@ fn load_corpus() -> str {
     s = s + strip_line_comments(read_file("examples/selfhost/fact_lite.kenga"));
     s = s + "\n";
     s = s + strip_line_comments(read_file("examples/selfhost/lists_lite.kenga"));
+    s = s + "\n";
+    s = s + take(read_file("kenga/compiler/lite.kenga"), 800);
     return s;
 }
 
-fn best_next(counts: list, a: i64, b: i64, vv: i64, banned: i64) -> i64 {
-    let base: i64 = (a * vv + b) * vv;
-    let best: i64 = 0;
-    let bv: i64 = 0 - 1;
-    let c: i64 = 0;
-    while c < vv {
-        if c != banned {
-            let n: i64 = counts[base + c];
-            if n > bv {
-                bv = n;
-                best = c;
+fn find_tri(ta: list, tb: list, tc: list, a: i64, b: i64, c: i64) -> i64 {
+    let i: i64 = 0;
+    while i < len(ta) {
+        if ta[i] == a {
+            if tb[i] == b {
+                if tc[i] == c { return i; }
             }
         }
-        c = c + 1;
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn best_next(ta: list, tb: list, tc: list, tn: list, a: i64, b: i64, banned: i64) -> i64 {
+    let best: i64 = 0;
+    let bv: i64 = 0 - 1;
+    let i: i64 = 0;
+    while i < len(ta) {
+        if ta[i] == a {
+            if tb[i] == b {
+                if tc[i] != banned {
+                    if tn[i] > bv {
+                        bv = tn[i];
+                        best = tc[i];
+                    }
+                }
+            }
+        }
+        i = i + 1;
     }
     return best;
 }
 
 fn main() -> i64 {
-    println("=== kenga trigram (our .kenga, list/i64) ===");
+    println("=== kenga trigram (our .kenga, sparse list/i64) ===");
     let src: str = load_corpus();
     let alpha: str = build_alpha(src);
     let ids = encode(src, alpha);
-    let vv: i64 = len(alpha);
     println("chars");
     println(len(src));
     println("vocab");
-    println(vv);
+    println(len(alpha));
 
-    let counts = zeros_i(vv * vv * vv);
+    let ta = [];
+    let tb = [];
+    let tc = [];
+    let tn = [];
     let i: i64 = 2;
     while i < len(ids) {
         let a: i64 = ids[i - 2];
         let b: i64 = ids[i - 1];
         let c: i64 = ids[i];
-        let k: i64 = (a * vv + b) * vv + c;
-        counts[k] = counts[k] + 1;
+        let hit = find_tri(ta, tb, tc, a, b, c);
+        if hit < 0 {
+            ta = push(ta, a);
+            tb = push(tb, b);
+            tc = push(tc, c);
+            tn = push(tn, 1);
+        } else {
+            tn[hit] = tn[hit] + 1;
+        }
         i = i + 1;
     }
+    println("trigrams");
+    println(len(ta));
 
     let prompt: str = "fn add";
     let ctx = encode(prompt, alpha);
@@ -120,12 +150,12 @@ fn main() -> i64 {
     let step: i64 = 0;
     let last: i64 = 0 - 1;
     let prev2: i64 = 0 - 1;
-    while step < 48 {
+    while step < 56 {
         let a: i64 = ctx[len(ctx) - 2];
         let b: i64 = ctx[len(ctx) - 1];
-        let nxt = best_next(counts, a, b, vv, 0 - 1);
-        if nxt == prev2 { nxt = best_next(counts, a, b, vv, nxt); }
-        if nxt == last { nxt = best_next(counts, a, b, vv, nxt); }
+        let nxt = best_next(ta, tb, tc, tn, a, b, 0 - 1);
+        if nxt == prev2 { nxt = best_next(ta, tb, tc, tn, a, b, nxt); }
+        if nxt == last { nxt = best_next(ta, tb, tc, tn, a, b, nxt); }
         prev2 = last;
         last = nxt;
         out = out + alpha[nxt];

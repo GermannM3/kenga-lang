@@ -1,4 +1,3 @@
 fn add(a: i64 {
- fact(n: i64 {
- fact(n: i64 {
- fact(n:
+ fn OP_LOAD() -> i64 {
+ fn OP_LOAD() -> i64 {

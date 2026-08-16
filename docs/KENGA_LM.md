@@ -20,7 +20,7 @@ scripts\bc-run.cmd examples\ml\kenga_trigram.kenga
 
 Word-LM на CPU lite: L=2, D=16, V=20. Дописывает `<s> kenga zhivet v yazyke .`  
 Char-LM читает seed + selfhost, учит next-char, веса в `minds/kenga_char_*`. Talk грузит их без повторного обучения.  
-Триграмма на том же корпусе пишет `fn add(a: i64 {` — синтаксис нашего языка, не GGUF.
+Триграмма (sparse counts) ест seed + selfhost + кусок `kenga/compiler/lite.kenga` и пишет `fn add(a: i64 {` / `fn OP_LOAD() -> i64 {`. Синтаксис нашего языка, не GGUF.
 
 ## Что это доказывает
 
