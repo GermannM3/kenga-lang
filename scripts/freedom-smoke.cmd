@@ -79,6 +79,30 @@ echo === kenga/emit/rt_expr.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_expr.kenga
 if errorlevel 1 exit /b 1
 
+echo === kenga/emit/rt_factor.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_factor.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_stmt.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_stmt.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_compile.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_compile.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_print.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_print.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_vm.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_vm.kenga
+if errorlevel 1 exit /b 1
+
+echo === kenga/emit/rt_selftest.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_selftest.kenga
+if errorlevel 1 exit /b 1
+
 echo === kenga/emit/lower_kv.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 if errorlevel 1 exit /b 1

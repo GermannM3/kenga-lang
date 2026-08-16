@@ -6,7 +6,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 
 | Слой | Без Rust? | Без C? |
 |---|---|---|
-| Living runtime | ✅ `kenga-lite` (`rt_*` пишет host: Value/arena/lex/parse/loop/scan/import) | ❌ C99 host |
+| Living runtime | ✅ `kenga-lite` — компилятор, VM, selftest пишет `rt_*.kenga`; в C остались типы и prophet/tensor | ❌ C99 glue |
 | Word-LM / tape / tensor / Prophet | ✅ | ❌ |
 | Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** (for / elif / struct / import / events) | ❌ |
 | Emit на Kenga | ✅ **`lower_c`** + **`lower_kv`/`rt_kval`** | ❌ gcc/cl |
@@ -20,7 +20,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 2. **`kenga/compiler`** вытесняет `src/compiler.rs` + кусок VM.  
 3. **`lower_c` / `lower_kv`** вытесняют `codegen.rs`.  
 4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM. Сетка: **`kenga_net.kenga`**. Birth: **`kenga_birth.kenga`** → native C пишет программу. Запуск одного файла: **`scripts\bc-run.cmd`**.  
-5. Emit полного lite runtime (`rt_kval` → host) → ручной `kenga_lite.c` уходит.  
+5. Emit lite runtime почти закрыт (`rt_factor`/`rt_stmt`/`rt_compile`/`rt_vm`/`rt_selftest`). В C — типы, opcodes, prophet/tensor includes.  
 6. Releases без cargo; `src/` → archive.  
 7. VM на Kenga → C уходит.
 
@@ -46,6 +46,12 @@ bootstrap\bin\kenga-lite.exe run kenga\emit\rt_loop.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_prog.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_scan.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_expr.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_factor.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_stmt.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_compile.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_print.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_vm.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_selftest.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 ```
 

@@ -32,6 +32,12 @@ scripts\freedom-smoke.cmd
 | `emit/rt_prog.kenga` | program_free | кусок runtime host |
 | `emit/rt_scan.kenga` | type annot / slice / braces | кусок parser.rs |
 | `emit/rt_expr.kenga` | * / + - compare / `{ }` | кусок compiler.rs |
+| `emit/rt_factor.kenga` | literals / calls / postfix | кусок compiler.rs |
+| `emit/rt_stmt.kenga` | let / if / for / println | кусок compiler.rs |
+| `emit/rt_compile.kenga` | compile_lite | кусок compiler.rs |
+| `emit/rt_print.kenga` | print_value | кусок vm.rs |
+| `emit/rt_vm.kenga` | bytecode VM | кусок vm.rs |
+| `emit/rt_selftest.kenga` | run_lite + 52 cases | кусок demo.rs |
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.

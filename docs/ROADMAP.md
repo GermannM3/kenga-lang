@@ -36,7 +36,7 @@
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
-| 🟡 | Emit lite runtime: **`rt_cli` … `rt_expr`**; `emit_factor` / `emit_stmt` / `compile_lite` / VM ещё руками |
+| ✅ | Emit lite runtime: **`rt_cli` … `rt_vm` / `rt_selftest`** — компилятор и VM пишет Kenga |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 
@@ -82,4 +82,4 @@
 | ✅ | LEARN / LANGUAGE / UNIX / LIVING_MULTIMODAL / CHAT_AND_LM / INDEPENDENCE / REPLACE_RUST / HUGGINGFACE / … |
 | ✅ | Marketplace: ручной Upload `.vsix` (без Azure PAT) |
 
-Версия: **3.13.0**. VSIX на Marketplace: залей `editors/vscode/kenga-3.13.0.vsix` (3.10.0 уже отстал).
+Версия: **3.13.0**. Marketplace уже 3.13.0. Следующий VSIX — когда накопится в расширении.

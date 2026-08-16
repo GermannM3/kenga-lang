@@ -7,8 +7,8 @@
 |---|---|---|
 | `lexer.rs` / `token.rs` | 🟡 частично | парсер внутри `kenga/compiler/*.kenga` |
 | `parser.rs` / `ast.rs` | 🟡 частично | то же (рекурсивный descent в `.kenga`) |
-| `compiler.rs` / `bytecode.rs` | 🟢 растёт | `kenga/compiler/more.kenga` (for/elif/struct/import/SET/events) |
-| `vm.rs` (ядро) | 🟢 растёт | VM в `more.kenga` (вкл. emit/pump) + runtime в `bootstrap/` |
+| `compiler.rs` / `bytecode.rs` | 🟢 растёт | `more.kenga` + `rt_factor`/`rt_stmt`/`rt_compile` пишут lite compiler |
+| `vm.rs` (ядро) | 🟢 растёт | VM в `more.kenga` + **`rt_vm.kenga`** пишет C VM lite |
 | `tensor.rs` | ✅ на lite | `bootstrap/tensor_lite.inc.c` |
 | `autograd.rs` | ✅ на lite | `bootstrap/tape_lite.inc.c` |
 | `memory.rs` | ✅ на lite | `bootstrap/prophet_lite.inc.c` |
@@ -20,7 +20,7 @@
 ## Как добиваем Rust
 
 1. `kenga/compiler/more.kenga` покрывает диалект `*_lite` + всё больше examples.  
-2. Emit из Kenga пишет C/bytecode → `bootstrap/kenga_lite.c` перестаёт правиться руками.  
+2. Emit из Kenga пишет C/bytecode. `kenga_lite.c` уже каркас (типы + includes); prophet/tensor ещё C.  
 3. Releases = только lite-бинарник; `cargo` уходит из README.  
 4. `src/` удаляем или архивируем в `legacy/`, когда п.2–3 зелёные.
 
@@ -33,4 +33,4 @@ bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 
 `more` уже гоняет `for_lite` / `elif_lite` / `struct_lite` / `float_lite` / `lists_lite` / **`agent.kenga`** через свой bytecode VM.  
 `bc_src_c` пишет тот же диалект в native C (`bc_from_agent`, `bc_from_import`, **`bc_from_net`**, **`bc_from_birth`**).  
-`rt_cli` … `rt_expr` пишут `main`, die, Value, heaps, skip/ident/number/string, break/CALL, Program teardown, type-annot/braces, * / + - compare, import.
+`rt_*` пишут почти весь lite host: CLI, Value, lex/parse, factor/stmt/compile, VM, selftest. В `kenga_lite.c` остались типы, opcodes и `#include` prophet/tensor/tape.

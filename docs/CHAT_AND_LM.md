@@ -38,9 +38,9 @@ kenga chat --lite minds\multi.km
 
 | Есть без Rust | Ещё нужно |
 |---|---|
-| Весь living runtime на `kenga-lite` (C99) | Убрать ручной C → codegen из `.kenga` |
-| Word-LM / tape / tensor / Prophet / events | Self-host VM на Kenga |
-| `emit_c_seed.kenga` пишет `.c` через `write_file` | Полный emit диалекта из Kenga |
-| Лестница `examples/selfhost/` | Полный CLI без `src/` |
+| Living runtime: компилятор/VM/selftest пишет `rt_*.kenga` | Типы + prophet/tensor ещё C; Releases ещё `src/` |
+| Word-LM / tape / tensor / Prophet / events | Self-host VM без C glue |
+| `emit_c_seed.kenga` пишет `.c` через `write_file` | Archive `src/` когда Releases = lite-only |
+| Лестница `examples/selfhost/` | GPU + большой корпус |
 
 Итог: **друзьям Rust не нужен**. C — временный host. Цель — язык, который компилирует и учит себя сам.
