@@ -96,6 +96,8 @@ static int selftest(void) {
       /* void helper: trailing RET with empty stack → 0 */
       {"fn bump(x) { println(x); } fn main() { bump(1); 9 }", 9},
       /* Prophet Memory (no Rust) */
+      {"fn main() { let m = memory_config(10, 8, 4); 0 }",
+       0},
       {"fn main() { let m = memory_config(10, 8, 4); assert(remember(m, [9, 0, 9], "
        "80) == true); assert(remember(m, [1, 1, 1], 5) == false); let st = "
        "mem_stats(m); assert(st[0] == 1); 0 }",

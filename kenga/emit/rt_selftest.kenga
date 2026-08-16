@@ -101,6 +101,8 @@ fn main() -> i64 {
     s = s + "      /* void helper: trailing RET with empty stack → 0 */\n";
     s = s + "      {\"fn bump(x) { println(x); } fn main() { bump(1); 9 }\", 9},\n";
     s = s + "      /* Prophet Memory (no Rust) */\n";
+    s = s + "      {\"fn main() { let m = memory_config(10, 8, 4); 0 }\",\n";
+    s = s + "       0},\n";
     s = s + "      {\"fn main() { let m = memory_config(10, 8, 4); assert(remember(m, [9, 0, 9], \"\n";
     s = s + "       \"80) == true); assert(remember(m, [1, 1, 1], 5) == false); let st = \"\n";
     s = s + "       \"mem_stats(m); assert(st[0] == 1); 0 }\",\n";

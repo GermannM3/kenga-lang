@@ -40,7 +40,7 @@ scripts\freedom-smoke.cmd
 | `emit/rt_compile.kenga` | compile_lite | кусок compiler.rs |
 | `emit/rt_print.kenga` | print_value | кусок vm.rs |
 | `emit/rt_vm.kenga` | bytecode VM | кусок vm.rs |
-| `emit/rt_selftest.kenga` | run_lite + 69 cases | кусок demo.rs |
+| `emit/rt_selftest.kenga` | run_lite + 70 cases | кусок demo.rs |
 | `emit/rt_types.kenga` | opcodes + Value/Program | кусок bytecode.rs |
 | `emit/rt_prophet.kenga` | Prophet Memory | `memory.rs` |
 | `emit/rt_tensor.kenga` | dense f64 tensors | `tensor.rs` |
