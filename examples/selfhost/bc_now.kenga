@@ -1,0 +1,9 @@
+fn main() -> i64 {
+    let t = now_ms();
+    sleep_ms(0);
+    let t2 = now_ms();
+    assert(t >= 0);
+    assert(t2 >= t);
+    println("now bc ok");
+    return 0;
+}

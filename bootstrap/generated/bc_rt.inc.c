@@ -5,9 +5,10 @@
 #include <windows.h>
 #else
 #include <unistd.h>
+#include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46 };
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
@@ -261,6 +262,17 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
 #endif
       }
       stack[sp++] = Vi(0);
+    }
+    else if (op == OP_NOW_MS) {
+#ifdef _WIN32
+      stack[sp++] = Vi((int64_t)GetTickCount64());
+#else
+      {
+        struct timeval tv;
+        gettimeofday(&tv, 0);
+        stack[sp++] = Vi((int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000);
+      }
+#endif
     }
     else if (op == OP_ASSERT) { if (!as_i(stack[--sp])) { fprintf(stderr, "assert failed\n"); exit(1); } }
     else if (op == OP_POP) { if (sp > 0) sp--; }
