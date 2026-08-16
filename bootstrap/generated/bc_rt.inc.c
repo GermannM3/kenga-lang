@@ -48,11 +48,17 @@ static char *v_to_cstr(V v) {
   return NULL;
 }
 
-typedef struct { int64_t *d; size_t n, cap; } LObj;
+typedef struct { V *d; size_t n, cap; } LObj;
 static LObj gL[256];
 static const char *g_ltype[256];
 static int gLn = 0;
 
+static void vprint(V v) {
+  if (v.tag==1) printf("%g", v.f);
+  else if (v.tag==3) printf("%s", as_str(v));
+  else if (v.tag==2) printf("[list:%lld]", (long long)v.i);
+  else printf("%lld", (long long)v.i);
+}
 static int64_t lnew(void) {
   if (gLn >= 256) { fprintf(stderr, "list heap full\n"); exit(1); }
   gL[gLn].d = NULL; gL[gLn].n = 0; gL[gLn].cap = 0;
@@ -62,21 +68,21 @@ static int64_t lnew(void) {
 static void lgrow(int id) {
   LObj *L = &gL[id];
   size_t nc = L->cap ? L->cap * 2 : 4;
-  int64_t *nd = (int64_t*)realloc(L->d, nc * sizeof(int64_t));
+  V *nd = (V*)realloc(L->d, nc * sizeof(V));
   if (!nd) { fprintf(stderr, "oom\n"); exit(1); }
   L->d = nd; L->cap = nc;
 }
-static void lpush(int64_t id, int64_t v) {
+static void lpush(int64_t id, V v) {
   LObj *L = &gL[id];
   if (L->n >= L->cap) lgrow((int)id);
   L->d[L->n++] = v;
 }
-static int64_t lget(int64_t id, int64_t i) {
+static V lget(int64_t id, int64_t i) {
   LObj *L = &gL[id];
   if (i < 0 || (size_t)i >= L->n) { fprintf(stderr, "index oob\n"); exit(1); }
   return L->d[i];
 }
-static void lset(int64_t id, int64_t i, int64_t v) {
+static void lset(int64_t id, int64_t i, V v) {
   LObj *L = &gL[id];
   if (i < 0 || (size_t)i >= L->n) { fprintf(stderr, "index oob\n"); exit(1); }
   L->d[i] = v;
@@ -188,11 +194,11 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
         int64_t lid=v.i; LObj *L=&gL[lid]; const char *tn=g_ltype[lid]; size_t li;
         if (tn && tn[0]) {
           printf("%s{", tn);
-          for (li=0; li<L->n; li++) { if (li) printf(", "); printf("%lld", (long long)L->d[li]); }
+          for (li=0; li<L->n; li++) { if (li) printf(", "); vprint(L->d[li]); }
           printf("}\n");
         } else {
           printf("[");
-          for (li=0; li<L->n; li++) { if (li) printf(", "); printf("%lld", (long long)L->d[li]); }
+          for (li=0; li<L->n; li++) { if (li) printf(", "); vprint(L->d[li]); }
           printf("]\n");
         }
       } else if (v.tag==3) printf("%s\n", as_str(v));
@@ -200,6 +206,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       else printf("%lld\n", (long long)v.i);
     }
     else if (op == OP_ASSERT) { if (!as_i(stack[--sp])) { fprintf(stderr, "assert failed\n"); exit(1); } }
+    else if (op == OP_POP) { if (sp > 0) sp--; }
     else if (op == OP_PRINT_STR) { puts(g_strs[code[ip++]]); }
     else if (op == OP_LIST_NEW) { stack[sp++] = Vl(lnew()); }
     else if (op == OP_LIST_TAG) {
@@ -207,7 +214,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       g_ltype[lid]=g_strs[idx]; stack[sp++]=Vl(lid);
     }
     else if (op == OP_LIST_PUSH) {
-      int64_t v = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);
+      V v = stack[--sp]; int64_t lid = as_list(stack[--sp]);
       lpush(lid, v); stack[sp++] = Vl(lid);
     }
     else if (op == OP_LEN) {
@@ -218,7 +225,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     }
     else if (op == OP_GET) {
       int64_t ix = as_i(stack[--sp]); V lv = stack[--sp];
-      if (lv.tag==2) stack[sp++]=Vi(lget(lv.i, ix));
+      if (lv.tag==2) stack[sp++]=lget(lv.i, ix);
       else if (lv.tag==3) stack[sp++]=Vs(s_char_at(lv.i, ix));
       else { fprintf(stderr, "get: bad type\n"); exit(1); }
     }
@@ -229,7 +236,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       else { fprintf(stderr, "ord: bad type\n"); exit(1); }
     }
     else if (op == OP_SET) {
-      int64_t v = as_i(stack[--sp]); int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);
+      V v = stack[--sp]; int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);
       lset(lid, ix, v);
     }
     else if (op == OP_CALL) {
@@ -247,6 +254,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     else if (op == OP_RET) {
       V val = sp > 0 ? stack[--sp] : Vi(0);
       if (rsp == 0) return as_i(val);
+      slot_used = slot_base;
       rsp--;
       slot_base = slot_bases[rsp];
       if (ret_ips[rsp] == -1) {

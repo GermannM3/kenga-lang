@@ -37,6 +37,7 @@ fn OP_PUMP() -> i64 { return 30; }
 fn OP_PENDING() -> i64 { return 31; }
 fn OP_READ_FILE() -> i64 { return 36; }
 fn OP_WRITE_FILE() -> i64 { return 37; }
+fn OP_POP() -> i64 { return 20; }
 
 fn dirname_of(path: str) -> str {
     let i: i64 = len(path) - 1;
@@ -1051,6 +1052,7 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
     }
     let r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, strbox);
     code = r[0]; i = r[1]; vnames = r[2];
+    code = push(code, OP_POP());
     i = skip(s, i);
     if i < len(s) { if s[i] == ";" { i = i + 1; } }
     return [code, i, vnames];
@@ -1348,10 +1350,16 @@ fn write_runtime() -> str {
     s = s + "  fprintf(stderr, \"cannot stringify\\n\"); exit(1);\n";
     s = s + "  return NULL;\n";
     s = s + "}\n\n";
-    s = s + "typedef struct { int64_t *d; size_t n, cap; } LObj;\n";
+    s = s + "typedef struct { V *d; size_t n, cap; } LObj;\n";
     s = s + "static LObj gL[256];\n";
     s = s + "static const char *g_ltype[256];\n";
     s = s + "static int gLn = 0;\n\n";
+    s = s + "static void vprint(V v) {\n";
+    s = s + "  if (v.tag==1) printf(\"%g\", v.f);\n";
+    s = s + "  else if (v.tag==3) printf(\"%s\", as_str(v));\n";
+    s = s + "  else if (v.tag==2) printf(\"[list:%lld]\", (long long)v.i);\n";
+    s = s + "  else printf(\"%lld\", (long long)v.i);\n";
+    s = s + "}\n";
     s = s + "static int64_t lnew(void) {\n";
     s = s + "  if (gLn >= 256) { fprintf(stderr, \"list heap full\\n\"); exit(1); }\n";
     s = s + "  gL[gLn].d = NULL; gL[gLn].n = 0; gL[gLn].cap = 0;\n";
@@ -1361,21 +1369,21 @@ fn write_runtime() -> str {
     s = s + "static void lgrow(int id) {\n";
     s = s + "  LObj *L = &gL[id];\n";
     s = s + "  size_t nc = L->cap ? L->cap * 2 : 4;\n";
-    s = s + "  int64_t *nd = (int64_t*)realloc(L->d, nc * sizeof(int64_t));\n";
+    s = s + "  V *nd = (V*)realloc(L->d, nc * sizeof(V));\n";
     s = s + "  if (!nd) { fprintf(stderr, \"oom\\n\"); exit(1); }\n";
     s = s + "  L->d = nd; L->cap = nc;\n";
     s = s + "}\n";
-    s = s + "static void lpush(int64_t id, int64_t v) {\n";
+    s = s + "static void lpush(int64_t id, V v) {\n";
     s = s + "  LObj *L = &gL[id];\n";
     s = s + "  if (L->n >= L->cap) lgrow((int)id);\n";
     s = s + "  L->d[L->n++] = v;\n";
     s = s + "}\n";
-    s = s + "static int64_t lget(int64_t id, int64_t i) {\n";
+    s = s + "static V lget(int64_t id, int64_t i) {\n";
     s = s + "  LObj *L = &gL[id];\n";
     s = s + "  if (i < 0 || (size_t)i >= L->n) { fprintf(stderr, \"index oob\\n\"); exit(1); }\n";
     s = s + "  return L->d[i];\n";
     s = s + "}\n";
-    s = s + "static void lset(int64_t id, int64_t i, int64_t v) {\n";
+    s = s + "static void lset(int64_t id, int64_t i, V v) {\n";
     s = s + "  LObj *L = &gL[id];\n";
     s = s + "  if (i < 0 || (size_t)i >= L->n) { fprintf(stderr, \"index oob\\n\"); exit(1); }\n";
     s = s + "  L->d[i] = v;\n";
@@ -1484,11 +1492,11 @@ fn write_runtime() -> str {
     s = s + "        int64_t lid=v.i; LObj *L=&gL[lid]; const char *tn=g_ltype[lid]; size_t li;\n";
     s = s + "        if (tn && tn[0]) {\n";
     s = s + "          printf(\"%s{\", tn);\n";
-    s = s + "          for (li=0; li<L->n; li++) { if (li) printf(\", \"); printf(\"%lld\", (long long)L->d[li]); }\n";
+    s = s + "          for (li=0; li<L->n; li++) { if (li) printf(\", \"); vprint(L->d[li]); }\n";
     s = s + "          printf(\"}\\n\");\n";
     s = s + "        } else {\n";
     s = s + "          printf(\"[\");\n";
-    s = s + "          for (li=0; li<L->n; li++) { if (li) printf(\", \"); printf(\"%lld\", (long long)L->d[li]); }\n";
+    s = s + "          for (li=0; li<L->n; li++) { if (li) printf(\", \"); vprint(L->d[li]); }\n";
     s = s + "          printf(\"]\\n\");\n";
     s = s + "        }\n";
     s = s + "      } else if (v.tag==3) printf(\"%s\\n\", as_str(v));\n";
@@ -1496,6 +1504,7 @@ fn write_runtime() -> str {
     s = s + "      else printf(\"%lld\\n\", (long long)v.i);\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_ASSERT) { if (!as_i(stack[--sp])) { fprintf(stderr, \"assert failed\\n\"); exit(1); } }\n";
+    s = s + "    else if (op == OP_POP) { if (sp > 0) sp--; }\n";
     s = s + "    else if (op == OP_PRINT_STR) { puts(g_strs[code[ip++]]); }\n";
     s = s + "    else if (op == OP_LIST_NEW) { stack[sp++] = Vl(lnew()); }\n";
     s = s + "    else if (op == OP_LIST_TAG) {\n";
@@ -1503,7 +1512,7 @@ fn write_runtime() -> str {
     s = s + "      g_ltype[lid]=g_strs[idx]; stack[sp++]=Vl(lid);\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_LIST_PUSH) {\n";
-    s = s + "      int64_t v = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
+    s = s + "      V v = stack[--sp]; int64_t lid = as_list(stack[--sp]);\n";
     s = s + "      lpush(lid, v); stack[sp++] = Vl(lid);\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_LEN) {\n";
@@ -1514,7 +1523,7 @@ fn write_runtime() -> str {
     s = s + "    }\n";
     s = s + "    else if (op == OP_GET) {\n";
     s = s + "      int64_t ix = as_i(stack[--sp]); V lv = stack[--sp];\n";
-    s = s + "      if (lv.tag==2) stack[sp++]=Vi(lget(lv.i, ix));\n";
+    s = s + "      if (lv.tag==2) stack[sp++]=lget(lv.i, ix);\n";
     s = s + "      else if (lv.tag==3) stack[sp++]=Vs(s_char_at(lv.i, ix));\n";
     s = s + "      else { fprintf(stderr, \"get: bad type\\n\"); exit(1); }\n";
     s = s + "    }\n";
@@ -1525,7 +1534,7 @@ fn write_runtime() -> str {
     s = s + "      else { fprintf(stderr, \"ord: bad type\\n\"); exit(1); }\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_SET) {\n";
-    s = s + "      int64_t v = as_i(stack[--sp]); int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
+    s = s + "      V v = stack[--sp]; int64_t ix = as_i(stack[--sp]); int64_t lid = as_list(stack[--sp]);\n";
     s = s + "      lset(lid, ix, v);\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_CALL) {\n";
@@ -1543,6 +1552,7 @@ fn write_runtime() -> str {
     s = s + "    else if (op == OP_RET) {\n";
     s = s + "      V val = sp > 0 ? stack[--sp] : Vi(0);\n";
     s = s + "      if (rsp == 0) return as_i(val);\n";
+    s = s + "      slot_used = slot_base;\n";
     s = s + "      rsp--;\n";
     s = s + "      slot_base = slot_bases[rsp];\n";
     s = s + "      if (ret_ips[rsp] == -1) {\n";
@@ -1685,6 +1695,9 @@ fn main() -> i64 {
     let r18 = compile_src(resolve_imports("examples/selfhost/bc_io.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_io.c", write_c_driver(r18[0], r18[1], r18[2], r18[3])) == true);
 
+    let r19 = compile_src(resolve_imports("examples/ml/kenga_net.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_net.c", write_c_driver(r19[0], r19[1], r19[2], r19[3])) == true);
+
     let raw: str = read_file("bootstrap/generated/_bc_path.txt");
     let one: str = trim_path(raw);
     if len(one) > 0 {
@@ -1693,7 +1706,7 @@ fn main() -> i64 {
         println("wrote bc_one_out.c for " + one);
     }
 
-    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/arith/struct/fact_lite/str/io");
+    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net");
     println("bc_src_c ok");
     return 0;
 }

@@ -34,7 +34,7 @@
 | ✅ | **`kenga/emit/lower_c.kenga`** — agent / for / lists / **struct** / **elif** / **f64** / import → native C |
 | ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
-| ✅ | **`bc_src_c`** — parse → bytecode → C VM (lite suite + **struct** + **events/agent** + **import** + **fact_lite** + **runtime str** + **read_file/write_file**); shared **`bc_rt.inc.c`** runtime; **`scripts\bc-run.cmd`** — один `.kenga` → native |
+| ✅ | **`bc_src_c`** — parse → bytecode → C VM (lite + agent + import + str + **file I/O** + **V-lists/f64**); **`kenga_net.kenga`** — своя XOR-MLP без tensor host; **`scripts\bc-run.cmd`** |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ⬜ | Emit полный lite runtime → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
@@ -60,6 +60,7 @@
 | ✅ | Chat intents + tiny word-LM seed (`tiny_lm.kenga`) |
 | ✅ | 2-layer word-LM + CE + weight files (`word_lm.kenga`) |
 | ⬜ | f32 / tiled matmul (efficiency под рост) |
+| ✅ | **`kenga_net.kenga`** — 2-2-1 MLP + SGD на list/f64 (XOR), lite и bytecode→C |
 | ⬜ | Larger generative LM (больше vocab/слоёв) |
 | ⬜ | GPU backend (wgpu/CUDA) под 1660-class |
 | ⬜ | Pretrained encoders |

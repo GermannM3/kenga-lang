@@ -1,0 +1,80 @@
+// Kenga-native net: 2-2-1 MLP, softsign, SGD. No tensor host, no Python.
+// XOR on lists + f64 — runs on lite and on bc_src → C.
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_net.kenga
+//   scripts\bc-run.cmd examples\ml\kenga_net.kenga
+
+fn absf(x: f64) -> f64 {
+    if x < 0.0 { return 0.0 - x; }
+    return x;
+}
+
+fn sig(x: f64) -> f64 {
+    return 0.5 + 0.5 * x / (1.0 + absf(x));
+}
+
+fn dsig(x: f64) -> f64 {
+    let u = 1.0 + absf(x);
+    return 0.5 / (u * u);
+}
+
+fn step(w1: list, b1: list, w2: list, b2: list, x0: f64, x1: f64, t: f64, lr: f64) -> f64 {
+    let z0 = w1[0] * x0 + w1[1] * x1 + b1[0];
+    let z1 = w1[2] * x0 + w1[3] * x1 + b1[1];
+    let h0 = sig(z0);
+    let h1 = sig(z1);
+    let zo = w2[0] * h0 + w2[1] * h1 + b2[0];
+    let y = sig(zo);
+    let e = y - t;
+    let dy = e * dsig(zo);
+    let w20 = w2[0];
+    let w21 = w2[1];
+    w2[0] = w20 - lr * dy * h0;
+    w2[1] = w21 - lr * dy * h1;
+    b2[0] = b2[0] - lr * dy;
+    let dh0 = dy * w20 * dsig(z0);
+    let dh1 = dy * w21 * dsig(z1);
+    w1[0] = w1[0] - lr * dh0 * x0;
+    w1[1] = w1[1] - lr * dh0 * x1;
+    w1[2] = w1[2] - lr * dh1 * x0;
+    w1[3] = w1[3] - lr * dh1 * x1;
+    b1[0] = b1[0] - lr * dh0;
+    b1[1] = b1[1] - lr * dh1;
+    return e * e;
+}
+
+fn pred(w1: list, b1: list, w2: list, b2: list, x0: f64, x1: f64) -> f64 {
+    let h0 = sig(w1[0] * x0 + w1[1] * x1 + b1[0]);
+    let h1 = sig(w1[2] * x0 + w1[3] * x1 + b1[1]);
+    return sig(w2[0] * h0 + w2[1] * h1 + b2[0]);
+}
+
+fn main() -> i64 {
+    let w1 = [0.9, 0.0 - 0.8, 0.8, 0.0 - 0.9];
+    let b1 = [0.2, 0.0 - 0.2];
+    let w2 = [1.4, 0.0 - 1.4];
+    let b2 = [0.0];
+    let lr = 0.35;
+    let ep = 0;
+    while ep < 400 {
+        step(w1, b1, w2, b2, 0.0, 0.0, 0.0, lr);
+        step(w1, b1, w2, b2, 0.0, 1.0, 1.0, lr);
+        step(w1, b1, w2, b2, 1.0, 0.0, 1.0, lr);
+        step(w1, b1, w2, b2, 1.0, 1.0, 0.0, lr);
+        ep = ep + 1;
+    }
+    let p00 = pred(w1, b1, w2, b2, 0.0, 0.0);
+    let p01 = pred(w1, b1, w2, b2, 0.0, 1.0);
+    let p10 = pred(w1, b1, w2, b2, 1.0, 0.0);
+    let p11 = pred(w1, b1, w2, b2, 1.0, 1.0);
+    println(round(p00 * 10.0));
+    println(round(p01 * 10.0));
+    println(round(p10 * 10.0));
+    println(round(p11 * 10.0));
+    assert(p00 < 0.35);
+    assert(p01 > 0.65);
+    assert(p10 > 0.65);
+    assert(p11 < 0.35);
+    println("kenga net xor ok");
+    return 0;
+}

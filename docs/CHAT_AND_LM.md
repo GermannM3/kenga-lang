@@ -11,6 +11,7 @@
 | Chat intents | ✅ `kenga-lite chat` |
 | Bigram LM | ✅ `examples/ml/tiny_lm.kenga` |
 | **2-layer word-LM + CE** | ✅ `examples/ml/word_lm.kenga` → `minds/word_lm_*.kt` |
+| **Своя MLP (XOR)** | ✅ `examples/ml/kenga_net.kenga` — list/f64, без tensor host |
 | Большая LLM / GPU | ⬜ данные + слои + (позже) GPU |
 
 ```bat
