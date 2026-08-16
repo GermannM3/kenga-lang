@@ -51,6 +51,7 @@
 | ✅ | **`lower_kv`**: Memory как lite (`memory_config` / `remember` / `unroll` / `surprise` / `save_mind` / `load_mind`) |
 | ✅ | **`lower_kv`**: Tensor как lite (`t_set`/`t_sub`/`t_mul`/`t_softmax`/`t_mean`/`load_ppm`/`save_tensor`/…) |
 | ✅ | **`lower_kv`**: tape как lite (`ag_softmax`/`ag_log`/`ag_neg`/`ag_sum`/`ag_mul`/… + CE native) |
+| ✅ | **`lower_kv`**: полный living (`living_multimodal` 24 эпохи, 3 сцены, save/load) — короткий `lower_kv_living` остаётся smoke |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
 | ✅ | **`bc_src_c`**: `print` / `sleep_ms` / `now_ms` |

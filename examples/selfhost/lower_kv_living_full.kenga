@@ -1,0 +1,110 @@
+// Native KVal living multimodal: PPM+WAV, dim=9, 3 scenes, 24 epochs.
+// Paths relative to cwd bootstrap/generated. 24 epochs of tiny Prophet is fine on CPU.
+
+fn encode(img_path: str, wav_path: str, t: f64) -> list {
+    let img = t_mean(load_ppm(img_path));
+    let r = t_get(img, 0);
+    let g = t_get(img, 1);
+    let b = t_get(img, 2);
+    let wav = load_wav(wav_path);
+    let am = t_mean(wav);
+    let energy = t_mean(t_mul(wav, wav));
+    let peak = energy * 2.0;
+    return [r, g, b, am, energy, peak, t, t * 0.1, 1.0 - t * 0.05];
+}
+
+fn scene(i: i64) -> list {
+    if i == 0 {
+        return encode("../../examples/ml/assets/frame0.ppm", "../../examples/ml/assets/tone0.wav", 0.0);
+    }
+    if i == 1 {
+        return encode("../../examples/ml/assets/frame1.ppm", "../../examples/ml/assets/tone1.wav", 1.0);
+    }
+    return encode("../../examples/ml/assets/frame2.ppm", "../../examples/ml/assets/tone2.wav", 2.0);
+}
+
+fn train_pair(mind, a: list, b: list) -> f64 {
+    remember_next(mind, a, b, 55);
+    return learn(mind, a, b);
+}
+
+fn train_pass(mind) -> f64 {
+    let s0 = scene(0);
+    let s1 = scene(1);
+    let s2 = scene(2);
+    let loss: f64 = 0.0;
+    loss = loss + train_pair(mind, s0, s1);
+    loss = loss + train_pair(mind, s1, s2);
+    let s0b = [s0[0], s0[1], s0[2], s0[3], s0[4], s0[5], 0.2, 0.02, 0.99];
+    let s1b = [s1[0], s1[1], s1[2], s1[3], s1[4], s1[5], 1.2, 0.12, 0.94];
+    loss = loss + train_pair(mind, s0b, s1b);
+    let s1c = [s1[0], s1[1], s1[2], s1[3], s1[4], s1[5], 0.8, 0.08, 0.96];
+    let s2b = [s2[0], s2[1], s2[2], s2[3], s2[4], s2[5], 1.8, 0.18, 0.91];
+    loss = loss + train_pair(mind, s1c, s2b);
+    return loss / 4.0;
+}
+
+fn main() -> i64 {
+    println("=== living multimodal full (PPM+WAV -> Prophet) ===");
+    let mind = memory_config(0.12, 64, 32);
+
+    let loss0 = train_pass(mind) + 0.0;
+    println("epoch0 loss");
+    println(loss0);
+
+    let e: i64 = 1;
+    let loss = loss0;
+    while e < 24 {
+        loss = train_pass(mind) + 0.0;
+        e = e + 1;
+    }
+    println("epoch23 loss");
+    println(loss);
+    assert(loss < loss0);
+
+    let s0 = scene(0);
+    let s1 = scene(1);
+    let pred = predict(mind, s0);
+    assert(len(pred) == 9);
+    let err = surprise(pred, s1);
+    println("predict s0->s1 rmse");
+    println(err);
+    assert(err < 0.55);
+
+    println("unroll 3 from scene0");
+    let traj = unroll(mind, s0, 3);
+    assert(len(traj) == 3);
+    println(traj[0]);
+    println(traj[1]);
+    println(traj[2]);
+
+    let odd = encode("../../examples/ml/assets/dot.ppm", "../../examples/ml/assets/beep.wav", 9.0);
+    let odd_pred = foresee(mind, odd);
+    let odd_s = surprise(odd_pred, odd);
+    println("live surprise on odd frame");
+    println(odd_s);
+    let stored: i64 = 0;
+    if odd_s > 0.12 {
+        if remember(mind, odd, odd_s) == 1 {
+            stored = 1;
+            println("stored odd episode");
+        }
+    }
+    assert(stored == 1);
+
+    let folded = consolidate(mind);
+    println("sleep folded");
+    println(folded);
+    assert(folded > 0);
+    println(mem_stats(mind));
+
+    let pred_saved = predict(mind, s0);
+    assert(save_mind(mind, "kv_living_full.km") == 1);
+    println("saved kv_living_full.km");
+    let mind2 = load_mind("kv_living_full.km");
+    let pred_loaded = predict(mind2, s0);
+    assert(len(pred_loaded) == 9);
+    assert(round(pred_loaded[0] * 100.0) == round(pred_saved[0] * 100.0));
+    println("living multimodal full ok");
+    return 0;
+}

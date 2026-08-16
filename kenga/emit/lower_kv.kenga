@@ -1721,7 +1721,10 @@ fn main() -> i64 {
     let kvlive = resolve_imports("examples/selfhost/lower_kv_living.kenga", 0);
     assert(write_file("bootstrap/generated/lower_kv_living.c", lower_program(kvlive)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape,kv_mlp,kv_ce,kv_living}.c");
+    let kvlivef = resolve_imports("examples/selfhost/lower_kv_living_full.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_kv_living_full.c", lower_program(kvlivef)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape,kv_mlp,kv_ce,kv_living,kv_living_full}.c");
     println("lower_kv ok");
     return 0;
 }
