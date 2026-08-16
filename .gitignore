@@ -18,10 +18,10 @@ bootstrap/kenga_lite.gen.c
 bootstrap/generated/*.exe
 bootstrap/generated/*.obj
 bootstrap/generated/*.txt
-bootstrap/generated/bc_one_out.c
 !bootstrap/generated/.gitkeep
 !bootstrap/generated/*.c
 !bootstrap/generated/*.inc.c
+bootstrap/generated/bc_one_out.c
 
 # emit-c / chicken-egg artifacts next to sources
 examples/**/*.kenga.c
@@ -33,7 +33,7 @@ examples/*.c
 minds/_*
 minds/word_lm_*.kt
 minds/kenga_lm_*.kt
-minds/kenga_char_*.kt
+minds/kenga_char_*
 bootstrap/minds/
 
 # === Dev clutter ===

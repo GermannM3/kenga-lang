@@ -39,10 +39,9 @@ if not "%VCVARS%"=="" (
     popd
     exit /b 1
   )
-  bc_one_out.exe
-  set RC=%ERRORLEVEL%
   popd
-  exit /b %RC%
+  bootstrap\generated\bc_one_out.exe
+  exit /b %ERRORLEVEL%
 )
 
 where gcc >nul 2>&1
@@ -57,7 +56,6 @@ if errorlevel 1 (
   popd
   exit /b 1
 )
-bc_one_out.exe
-set RC=%ERRORLEVEL%
 popd
-exit /b %RC%
+bootstrap\generated\bc_one_out.exe
+exit /b %ERRORLEVEL%

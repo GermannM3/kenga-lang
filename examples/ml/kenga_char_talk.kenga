@@ -1,0 +1,31 @@
+// Generate from saved Kenga-native char-LM weights. No training, no GGUF.
+// Run after kenga_charlm.kenga:
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_char_talk.kenga
+
+import "kenga_dec.kenga";
+
+fn main() -> i64 {
+    println("=== kenga char-LM talk (load our weights) ===");
+    let alpha: str = read_file("minds/kenga_char_alpha.txt");
+    let e = load_tensor("minds/kenga_char_e.kt");
+    let wlm = load_tensor("minds/kenga_char_w.kt");
+    let d: i64 = D();
+    let ff: i64 = FF();
+    let att = frozen_attn(d, ff);
+    let wq = att[0];
+    let wk = att[1];
+    let wv = att[2];
+    let wo = att[3];
+    let wf1 = att[4];
+    let wf2 = att[5];
+
+    let a: str = generate("fn add", alpha, e, wq, wk, wv, wo, wf1, wf2, wlm, 40);
+    let b: str = generate("fn main", alpha, e, wq, wk, wv, wo, wf1, wf2, wlm, 40);
+    println(a);
+    println(b);
+    assert(len(a) > 10);
+    assert(ch_id(a, "(") >= 0);
+    assert(write_file("examples/ml/kenga_char_talk.txt", a + "\n" + b) == 1);
+    println("kenga char-talk ok");
+    return 0;
+}

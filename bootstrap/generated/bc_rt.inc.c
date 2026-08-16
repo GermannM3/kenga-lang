@@ -12,12 +12,14 @@ static int64_t as_list(V v) {
   if (v.tag != 2) { fprintf(stderr, "expected list\n"); exit(1); }
   return v.i;
 }
-static char *gS[4096];
+static char *gS[65536];
 static int gSn = 0;
 static int64_t s_new(const char *s) {
   size_t n;
   char *p;
-  if (gSn >= 4096) { fprintf(stderr, "str heap full\n"); exit(1); }
+  int i;
+  for (i = 0; i < gSn; i++) if (strcmp(gS[i], s) == 0) return (int64_t)i;
+  if (gSn >= 65536) { fprintf(stderr, "str heap full\n"); exit(1); }
   n = strlen(s);
   p = (char*)malloc(n + 1);
   if (!p) { fprintf(stderr, "oom\n"); exit(1); }

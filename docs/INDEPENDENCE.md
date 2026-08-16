@@ -19,7 +19,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 1. Lite host (C) — living без Rust.  
 2. **`kenga/compiler`** вытесняет `src/compiler.rs` + кусок VM.  
 3. **`lower_c` / `lower_kv`** вытесняют `codegen.rs`.  
-4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM (lite + agent + import + file I/O + **V-lists**). Своя сетка: **`examples/ml/kenga_net.kenga`**. Decoder на нашем исходнике: **`examples/ml/kenga_charlm.kenga`**. Запуск одного файла: **`scripts\bc-run.cmd`**.  
+4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM. Сетка: **`kenga_net.kenga`**. Модель языка: **`kenga_charlm.kenga`** / **`kenga_trigram.kenga`**. Запуск одного файла с корня репо: **`scripts\bc-run.cmd`**.  
 5. Emit полного lite runtime (`rt_kval` → host) → ручной `kenga_lite.c` уходит.  
 6. Releases без cargo; `src/` → archive.  
 7. VM на Kenga → C уходит.

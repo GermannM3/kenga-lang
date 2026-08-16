@@ -1,0 +1,141 @@
+// Char trigram on our .kenga. No Tensor, no GGUF — list/i64 only.
+// Same corpus idea as kenga_charlm; this one can ride bc_src later.
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
+
+fn ch_id(alpha: str, ch: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(alpha) {
+        if alpha[i] == ch { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn build_alpha(src: str) -> str {
+    let a: str = "";
+    let i: i64 = 0;
+    while i < len(src) {
+        if ch_id(a, src[i]) < 0 { a = a + src[i]; }
+        i = i + 1;
+    }
+    return a;
+}
+
+fn encode(src: str, alpha: str) -> list {
+    let ids = [];
+    let i: i64 = 0;
+    while i < len(src) {
+        let id = ch_id(alpha, src[i]);
+        if id >= 0 { ids = push(ids, id); }
+        i = i + 1;
+    }
+    return ids;
+}
+
+fn strip_line_comments(src: str) -> str {
+    let out: str = "";
+    let i: i64 = 0;
+    while i < len(src) {
+        if i + 1 < len(src) {
+            if src[i] == "/" {
+                if src[i + 1] == "/" {
+                    while i < len(src) {
+                        if src[i] == "\n" { break; }
+                        i = i + 1;
+                    }
+                    continue;
+                }
+            }
+        }
+        out = out + src[i];
+        i = i + 1;
+    }
+    return out;
+}
+
+fn zeros_i(n: i64) -> list {
+    let xs = [];
+    let i: i64 = 0;
+    while i < n {
+        xs = push(xs, 0);
+        i = i + 1;
+    }
+    return xs;
+}
+
+fn load_corpus() -> str {
+    let s: str = "";
+    s = s + strip_line_comments(read_file("examples/ml/kenga_seed.kenga"));
+    s = s + "\n";
+    s = s + strip_line_comments(read_file("examples/selfhost/fact_lite.kenga"));
+    s = s + "\n";
+    s = s + strip_line_comments(read_file("examples/selfhost/lists_lite.kenga"));
+    return s;
+}
+
+fn best_next(counts: list, a: i64, b: i64, vv: i64, banned: i64) -> i64 {
+    let base: i64 = (a * vv + b) * vv;
+    let best: i64 = 0;
+    let bv: i64 = 0 - 1;
+    let c: i64 = 0;
+    while c < vv {
+        if c != banned {
+            let n: i64 = counts[base + c];
+            if n > bv {
+                bv = n;
+                best = c;
+            }
+        }
+        c = c + 1;
+    }
+    return best;
+}
+
+fn main() -> i64 {
+    println("=== kenga trigram (our .kenga, list/i64) ===");
+    let src: str = load_corpus();
+    let alpha: str = build_alpha(src);
+    let ids = encode(src, alpha);
+    let vv: i64 = len(alpha);
+    println("chars");
+    println(len(src));
+    println("vocab");
+    println(vv);
+
+    let counts = zeros_i(vv * vv * vv);
+    let i: i64 = 2;
+    while i < len(ids) {
+        let a: i64 = ids[i - 2];
+        let b: i64 = ids[i - 1];
+        let c: i64 = ids[i];
+        let k: i64 = (a * vv + b) * vv + c;
+        counts[k] = counts[k] + 1;
+        i = i + 1;
+    }
+
+    let prompt: str = "fn add";
+    let ctx = encode(prompt, alpha);
+    let out: str = prompt;
+    let step: i64 = 0;
+    let last: i64 = 0 - 1;
+    let prev2: i64 = 0 - 1;
+    while step < 48 {
+        let a: i64 = ctx[len(ctx) - 2];
+        let b: i64 = ctx[len(ctx) - 1];
+        let nxt = best_next(counts, a, b, vv, 0 - 1);
+        if nxt == prev2 { nxt = best_next(counts, a, b, vv, nxt); }
+        if nxt == last { nxt = best_next(counts, a, b, vv, nxt); }
+        prev2 = last;
+        last = nxt;
+        out = out + alpha[nxt];
+        ctx = push(ctx, nxt);
+        step = step + 1;
+    }
+    println(out);
+    assert(len(out) > 16);
+    assert(ch_id(out, "(") >= 0);
+    assert(write_file("examples/ml/kenga_trigram_sample.txt", out) == 1);
+    println("kenga trigram ok");
+    return 0;
+}

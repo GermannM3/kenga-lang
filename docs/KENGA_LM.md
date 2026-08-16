@@ -2,20 +2,25 @@
 
 Половина Grok — это не другой алгоритм. Это **тот же decoder** (внимание, residual, FFN, норма, LM-head) с другими числами: ширина, глубина, словарь, данные, GPU.
 
-Kenga уже выражает эту машину. Два файла:
+Kenga уже выражает эту машину. Три файла:
 
 - `examples/ml/kenga_lm.kenga` — decoder на закрытом словесном словаре
-- `examples/ml/kenga_charlm.kenga` — тот же decoder, корпус = наш `.kenga` (`kenga_seed.kenga` через `read_file`)
+- `examples/ml/kenga_charlm.kenga` — тот же decoder, корпус = наши `.kenga`
+- `examples/ml/kenga_trigram.kenga` — char-триграмма на list/i64 (без Tensor), тот же корпус
 
 Скачанный GGUF из папки «kenga ai» сюда не кладём. Это чужой граф и чужие веса. Доказательство языка — сеть, написанная на Kenga и обученная на Kenga.
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_char_talk.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
+scripts\bc-run.cmd examples\ml\kenga_trigram.kenga
 ```
 
-Word-LM на CPU lite: L=2, D=16, V=20, ~6k весов. Дописывает `<s> kenga zhivet v yazyke .`  
-Char-LM читает `examples/ml/kenga_seed.kenga`, строит charset, учит next-char, пишет с `"fn add"` что-то вроде `fn add(y);` плюс скобки языка. Не Grok и не скачанный GGUF — сеть из этого файла, корпус из нашего `.kenga`.
+Word-LM на CPU lite: L=2, D=16, V=20. Дописывает `<s> kenga zhivet v yazyke .`  
+Char-LM читает seed + selfhost, учит next-char, веса в `minds/kenga_char_*`. Talk грузит их без повторного обучения.  
+Триграмма на том же корпусе пишет `fn add(a: i64 {` — синтаксис нашего языка, не GGUF.
 
 ## Что это доказывает
 
@@ -40,8 +45,9 @@ Char-LM читает `examples/ml/kenga_seed.kenga`, строит charset, уч�
 1. XOR-MLP на list/f64 — `kenga_net.kenga` (алгоритм в языке, без tensor host).
 2. 2-layer word-LM + CE — `word_lm.kenga`.
 3. **Decoder GPT-формы** — `kenga_lm.kenga`.
-4. **Char-LM на нашем исходнике** — `kenga_charlm.kenga` ← вы здесь.
-5. Больше D/L, байтовый/BPE словарь, длинный контекст.
-6. GPU backend. Чужой GGUF — не доказательство.
+4. **Char-LM на нашем исходнике** — `kenga_charlm.kenga` + `kenga_char_talk.kenga`.
+5. **Триграмма на list/i64** — `kenga_trigram.kenga` ← вы здесь.
+6. Больше D/L, байтовый/BPE словарь, длинный контекст.
+7. GPU backend. Чужой GGUF — не доказательство.
 
 Расти `fn D()` / `fn L()` / корпус в том же файле. Менять язык не нужно.

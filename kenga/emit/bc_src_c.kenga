@@ -1315,12 +1315,14 @@ fn write_runtime() -> str {
     s = s + "  if (v.tag != 2) { fprintf(stderr, \"expected list\\n\"); exit(1); }\n";
     s = s + "  return v.i;\n";
     s = s + "}\n";
-    s = s + "static char *gS[4096];\n";
+    s = s + "static char *gS[65536];\n";
     s = s + "static int gSn = 0;\n";
     s = s + "static int64_t s_new(const char *s) {\n";
     s = s + "  size_t n;\n";
     s = s + "  char *p;\n";
-    s = s + "  if (gSn >= 4096) { fprintf(stderr, \"str heap full\\n\"); exit(1); }\n";
+    s = s + "  int i;\n";
+    s = s + "  for (i = 0; i < gSn; i++) if (strcmp(gS[i], s) == 0) return (int64_t)i;\n";
+    s = s + "  if (gSn >= 65536) { fprintf(stderr, \"str heap full\\n\"); exit(1); }\n";
     s = s + "  n = strlen(s);\n";
     s = s + "  p = (char*)malloc(n + 1);\n";
     s = s + "  if (!p) { fprintf(stderr, \"oom\\n\"); exit(1); }\n";

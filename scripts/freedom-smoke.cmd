@@ -131,5 +131,9 @@ if exist "%VCVARS%" (
   )
 )
 
+echo === examples/ml/kenga_trigram.kenga ===
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
+if errorlevel 1 exit /b 1
+
 echo.
 echo OK: freedom smoke ^(more + lower_c + KVal lower_kv → native^)

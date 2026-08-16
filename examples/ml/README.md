@@ -3,7 +3,10 @@
 | File | Story |
 |---|---|
 | `living_multimodal.kenga` | **PPM+WAV → Prophet → sleep → `minds/multi.km`** |
-| `kenga_charlm.kenga` | decoder на нашем `.kenga` (`kenga_seed.kenga`) |
+| `kenga_charlm.kenga` | decoder на наших `.kenga` (seed + selfhost) |
+| `kenga_char_talk.kenga` | generate из `minds/kenga_char_*` |
+| `kenga_trigram.kenga` | char-триграмма list/i64, без Tensor |
+| `kenga_dec.kenga` | общие блоки decoder (import) |
 | `kenga_lm.kenga` | decoder GPT-формы, закрытый словарь |
 | `tiny_lm.kenga` | tiny word-LM на tape (генерация фразы) |
 | `world_model.kenga` | residual MLP учит физику агента |
@@ -21,6 +24,7 @@
 kenga run examples/ml/living_multimodal.kenga
 kenga chat minds/multi.km
 kenga run examples/ml/kenga_charlm.kenga
+kenga run examples/ml/kenga_trigram.kenga
 kenga run examples/ml/tiny_lm.kenga
 kenga run examples/ml/fusion.kenga
 kenga run examples/ml/train_sgd.kenga
