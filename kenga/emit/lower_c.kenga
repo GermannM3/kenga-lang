@@ -1,7 +1,7 @@
 // General lowerer: Kenga i64/str/list subset → C99 (no Rust).
 // + multi-fn, string literals, list [ ] / push / len / index,
 //   events (on/emit/pump), import flatten, for-in-list, true/false,
-//   && || % ! and block comments.
+//   && || % ! and block comments, typeof / to_str.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
 
 fn is_space(ch: str) -> i64 {
@@ -276,6 +276,14 @@ fn runtime_c() -> str {
     s = s + "static void klist_println(KList *L) {\n";
     s = s + "  size_t i; printf(\"[\"); for (i=0;i<L->n;i++) { if (i) printf(\", \"); printf(\"%lld\", (long long)L->d[i]); }\n";
     s = s + "  printf(\"]\\n\");\n}\n\n";
+    s = s + "static const char *k_to_str_i64(int64_t v) { static char b[32]; snprintf(b, sizeof(b), \"%lld\", (long long)v); return b; }\n";
+    s = s + "static const char *k_to_str_f64(double v) { static char b[64]; snprintf(b, sizeof(b), \"%g\", v); return b; }\n";
+    s = s + "static const char *kstr_concat(const char *a, const char *b) {\n";
+    s = s + "  size_t na, nb; char *o;\n";
+    s = s + "  if (!a) a = \"\"; if (!b) b = \"\";\n";
+    s = s + "  na = strlen(a); nb = strlen(b);\n";
+    s = s + "  o = (char *)malloc(na + nb + 1); if (!o) abort();\n";
+    s = s + "  memcpy(o, a, na); memcpy(o + na, b, nb); o[na + nb] = 0; return o;\n}\n\n";
     s = s + "typedef void (*KeHandler)(int64_t);\n";
     s = s + "typedef struct { const char *name; KeHandler fn; int arity; } KeBind;\n";
     s = s + "static KeBind g_binds[64]; static int g_nbinds = 0;\n";
@@ -424,6 +432,28 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
                 return ["((int64_t)llround((double)(" + ar[0] + ")))", j, 0];
             }
+            if id[0] == "typeof" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                let tname: str = "i64";
+                if ar[2] == 1 { tname = "list"; }
+                if ar[2] == 2 { tname = "str"; }
+                if ar[2] == 3 { tname = "f64"; }
+                return ["\"" + tname + "\"", j, 2];
+            }
+            if id[0] == "to_str" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                if ar[2] == 2 {
+                    return [ar[0], j, 2];
+                } else {
+                    if ar[2] == 3 {
+                        return ["k_to_str_f64(" + ar[0] + ")", j, 2];
+                    } else {
+                        return ["k_to_str_i64(" + ar[0] + ")", j, 2];
+                    }
+                }
+            }
             if id[0] == "emit" {
                 let ar = lower_cmp(s, j, decls);
                 j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
@@ -530,7 +560,7 @@ fn lower_sum(s: str, i: i64, decls: list) -> list {
             r = lower_term(s, i + 1, decls);
             if kind == 2 {
                 if r[2] == 2 {
-                    out = "\"/*str+str not lowered*/\"";
+                    out = "kstr_concat(" + out + ", " + r[0] + ")";
                     kind = 2;
                 } else {
                     out = "(" + out + " + " + r[0] + ")"; kind = 0;
@@ -562,10 +592,24 @@ fn lower_rel(s: str, i: i64, decls: list) -> list {
         r = lower_sum(s, i + 2, decls); return ["(" + out + " >= " + r[0] + ")", r[1], 0];
     }
     if starts_with(s, i, "==") == 1 {
-        r = lower_sum(s, i + 2, decls); return ["(" + out + " == " + r[0] + ")", r[1], 0];
+        r = lower_sum(s, i + 2, decls);
+        if kind == 2 {
+            return ["(strcmp(" + out + ", " + r[0] + ") == 0)", r[1], 0];
+        }
+        if r[2] == 2 {
+            return ["(strcmp(" + out + ", " + r[0] + ") == 0)", r[1], 0];
+        }
+        return ["(" + out + " == " + r[0] + ")", r[1], 0];
     }
     if starts_with(s, i, "!=") == 1 {
-        r = lower_sum(s, i + 2, decls); return ["(" + out + " != " + r[0] + ")", r[1], 0];
+        r = lower_sum(s, i + 2, decls);
+        if kind == 2 {
+            return ["(strcmp(" + out + ", " + r[0] + ") != 0)", r[1], 0];
+        }
+        if r[2] == 2 {
+            return ["(strcmp(" + out + ", " + r[0] + ") != 0)", r[1], 0];
+        }
+        return ["(" + out + " != " + r[0] + ")", r[1], 0];
     }
     if s[i] == "<" {
         r = lower_sum(s, i + 1, decls); return ["(" + out + " < " + r[0] + ")", r[1], 0];
@@ -1099,11 +1143,23 @@ fn main() -> i64 {
     assert(em_mod[0] == "(10LL % 3LL)");
     let em_not = lower_cmp("!0", 0, []);
     assert(em_not[0] == "(!(0LL))");
+    let em_typeof = lower_cmp("typeof(1)", 0, []);
+    assert(em_typeof[0] == "\"i64\"");
+    assert(em_typeof[2] == 2);
+    let em_tostr = lower_cmp("to_str(42)", 0, []);
+    assert(em_tostr[0] == "k_to_str_i64(42LL)");
+    assert(em_tostr[2] == 2);
+    let em_cat = lower_cmp("\"n=\" + to_str(42)", 0, []);
+    assert(em_cat[0] == "kstr_concat(\"n=\", k_to_str_i64(42LL))");
+    assert(em_cat[2] == 2);
 
     let logic = resolve_imports("examples/selfhost/lower_logic.kenga", 0);
     assert(write_file("bootstrap/bin/lower_logic.c", lower_program(logic)) == true);
 
-    println("wrote bootstrap/bin/lower_*.c (events/agent/import/for/lists/struct/elif/float/logic)");
+    let tof = resolve_imports("examples/selfhost/lower_typeof.kenga", 0);
+    assert(write_file("bootstrap/bin/lower_typeof.c", lower_program(tof)) == true);
+
+    println("wrote bootstrap/bin/lower_*.c (events/agent/import/for/lists/struct/elif/float/logic/typeof)");
     println("lower_c ok");
     return 0;
 }
