@@ -717,9 +717,18 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         j++;
         i64a_push(code, OP_NOW_MS);
         i = j;
-      } else if (strcmp(id.name, "println") == 0) {
+      } else if (strcmp(id.name, "sleep_ms") == 0) {
         free(id.name);
-        die("println is a statement, not an expression");
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in sleep_ms");
+        j++;
+        i64a_push(code, OP_SLEEP_MS);
+        i = j;
+      } else if (strcmp(id.name, "println") == 0 || strcmp(id.name, "print") == 0) {
+        free(id.name);
+        die("print/println is a statement, not an expression");
       } else {
         j++;
         int argc = 0;

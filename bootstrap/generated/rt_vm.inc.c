@@ -126,6 +126,13 @@ static int64_t vm_exec(Program *prog) {
       print_value(v, strs, &lists, &structs, prog->stypes, prog->nstypes);
       continue;
     }
+    if (op == OP_PRINT) {
+      if (!stack.len) die("stack underflow PRINT");
+      Value v = stack.data[--stack.len];
+      print_val_raw(v, strs, &lists, &structs, prog->stypes, prog->nstypes);
+      fflush(stdout);
+      continue;
+    }
     if (op == OP_LIST_NEW) {
       ValA empty = {0};
       int64_t h = (int64_t)lists.len;
@@ -485,6 +492,20 @@ static int64_t vm_exec(Program *prog) {
         vala_push(&stack, V_i64((int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000));
       }
 #endif
+      continue;
+    }
+    if (op == OP_SLEEP_MS) {
+      if (!stack.len) die("stack underflow SLEEP_MS");
+      {
+        int64_t n = as_i64(stack.data[--stack.len], "sleep_ms: expected i64");
+        if (n < 0) die("sleep_ms: n >= 0");
+#ifdef _WIN32
+        Sleep((DWORD)n);
+#else
+        usleep((useconds_t)n * 1000);
+#endif
+        vala_push(&stack, V_i64(0));
+      }
       continue;
     }
     if (op == OP_LOAD_PPM || op == OP_LOAD_WAV || op == OP_LOAD_TENSOR || op == OP_READ_FILE) {

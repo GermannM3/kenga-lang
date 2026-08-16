@@ -3,7 +3,8 @@
  * Dialect:
  *   fn / let / while / if-else / return / calls
  *   i64 / f64 arith + cmp (< > <= >= == !=) + && || ! + i64 %
- *   println(expr);          — print i64, f64, string, i64-list, or struct
+ *   println(expr); print(expr);  — with / without newline
+ *   sleep_ms(n)             — wall-clock sleep, n >= 0
  *   "string" literals       — values (println, == / !=)
  *   i64 lists: [1,2,3], len(xs), push(xs, v), xs[i], xs[i] = v
  *   round(x) / assert(c)    — f64→i64 / die if false
@@ -41,6 +42,7 @@
 #include <windows.h>
 #else
 #include <sys/time.h>
+#include <unistd.h>
 #endif
 #ifdef _WIN32
 #include <direct.h>

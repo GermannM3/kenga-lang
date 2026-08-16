@@ -175,6 +175,18 @@ fn main() -> i64 {
     s = s + "    if (i < n && s[i] == ';') i++;\n";
     s = s + "    return i;\n";
     s = s + "  }\n";
+    s = s + "  if (starts_kw(s, i, n, \"print\")) {\n";
+    s = s + "    i = skip(s, i + 5, n);\n";
+    s = s + "    if (i >= n || s[i] != '(') die(\"expected ( after print\");\n";
+    s = s + "    i = emit_cmp(s, i + 1, n, code, vnames, fnames, faddrs, fargc);\n";
+    s = s + "    i = skip(s, i, n);\n";
+    s = s + "    if (i >= n || s[i] != ')') die(\"expected ) after print\");\n";
+    s = s + "    i++;\n";
+    s = s + "    i64a_push(code, OP_PRINT);\n";
+    s = s + "    i = skip(s, i, n);\n";
+    s = s + "    if (i < n && s[i] == ';') i++;\n";
+    s = s + "    return i;\n";
+    s = s + "  }\n";
     s = s + "  if (is_ident_start(s[i])) {\n";
     s = s + "    size_t save = i;\n";
     s = s + "    Ident id = parse_ident(s, i, n);\n";

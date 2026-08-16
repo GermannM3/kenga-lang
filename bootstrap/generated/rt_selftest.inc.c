@@ -140,6 +140,8 @@ static int selftest(void) {
       {"fn main() { let x = 1; /*\n x = 9; \n*/ x }", 1},
       {"fn main() { ord(to_str(42)[0]) }", 52},
       {"fn main() { now_ms() >= 0 }", 1},
+      {"fn main() { print(\"x\"); 0 }", 0},
+      {"fn main() { sleep_ms(0); 1 }", 1},
   };
   size_t n = sizeof(cases) / sizeof(cases[0]);
   for (size_t i = 0; i < n; i++) {

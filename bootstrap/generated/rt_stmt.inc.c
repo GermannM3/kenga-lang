@@ -170,6 +170,18 @@ static size_t emit_stmt(const char *s, size_t i, size_t n, I64A *code, StrA *vna
     if (i < n && s[i] == ';') i++;
     return i;
   }
+  if (starts_kw(s, i, n, "print")) {
+    i = skip(s, i + 5, n);
+    if (i >= n || s[i] != '(') die("expected ( after print");
+    i = emit_cmp(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+    i = skip(s, i, n);
+    if (i >= n || s[i] != ')') die("expected ) after print");
+    i++;
+    i64a_push(code, OP_PRINT);
+    i = skip(s, i, n);
+    if (i < n && s[i] == ';') i++;
+    return i;
+  }
   if (is_ident_start(s[i])) {
     size_t save = i;
     Ident id = parse_ident(s, i, n);
