@@ -63,6 +63,7 @@ static int64_t vm_exec(Program *prog) {
   I64A *code = &prog->code;
   StrA *strs = &prog->strs;
   size_t bi;
+  int64_t ml_box_h = -1;
   g_strtab = strs;
   ev_reset();
   for (bi = 0; bi < prog->nbinds; bi++)
@@ -556,6 +557,40 @@ static int64_t vm_exec(Program *prog) {
         vala_push(&stack, V_str(intern_str(buf)));
         free(buf);
       }
+      continue;
+    }
+    if (op == OP_READ_BYTES) {
+      Value vp;
+      const char *path;
+      unsigned char *b;
+      size_t n = 0, bi2;
+      int64_t h;
+      ValA empty = {0};
+      if (!stack.len) die("stack underflow read_bytes");
+      vp = stack.data[--stack.len];
+      if (vp.tag != TAG_STR) die("read_bytes: path must be str");
+      if (vp.payload < 0 || (size_t)vp.payload >= strs->len) die("bad str");
+      path = strs->data[vp.payload];
+      b = tl_read_bytes(path, &n);
+      if (!b) die("read_bytes: cannot read file");
+      h = (int64_t)lists.len;
+      listh_push(&lists, empty);
+      for (bi2 = 0; bi2 < n; bi2++) vala_push(&lists.data[h], V_i64((int64_t)b[bi2]));
+      free(b);
+      vala_push(&stack, V_list(h));
+      continue;
+    }
+    if (op == OP_ML_BOX) {
+      if (ml_box_h < 0) {
+        ValA tape = {0};
+        ValA box = {0};
+        int64_t tape_h = (int64_t)lists.len;
+        listh_push(&lists, tape);
+        vala_push(&box, V_list(tape_h));
+        ml_box_h = (int64_t)lists.len;
+        listh_push(&lists, box);
+      }
+      vala_push(&stack, V_list(ml_box_h));
       continue;
     }
     if (op == OP_SAVE_TENSOR) {

@@ -1,0 +1,68 @@
+// t_* / ag_* / Prophet names ? native_ml lists. lite run auto-imports this.
+import "native_ml.kenga"
+
+fn t_from(sh: list, data: list) -> list { return nt_from(sh, data); }
+fn t_get(t: list, i: i64) -> f64 { return nt_get(t, i); }
+fn t_set(t: list, i: i64, v: f64) -> list { return nt_set(t, i, v); }
+fn t_shape(t: list) -> list { return nt_shape(t); }
+fn t_add(a: list, b: list) -> list { return nt_add(a, b); }
+fn t_sub(a: list, b: list) -> list { return nt_sub(a, b); }
+fn t_mul(a: list, b: list) -> list { return nt_mul(a, b); }
+fn t_matmul(a: list, b: list) -> list { return nt_matmul(a, b); }
+fn t_fill(t: list, x: f64) -> list { return nt_fill(t, x); }
+fn tensor(r: i64, c: i64) -> list { return nt_tensor(r, c); }
+fn t_reshape(a: list, sh: list) -> list { return nt_reshape(a, sh); }
+fn t_transpose(a: list) -> list { return nt_transpose(a); }
+fn t_scale(a: list, s: f64) -> list { return nt_scale(a, s); }
+fn t_sum(a: list) -> f64 { return nt_sum(a); }
+fn t_dot(a: list, b: list) -> f64 { return nt_dot(a, b); }
+fn t_exp(a: list) -> list { return nt_texp(a); }
+fn t_log(a: list) -> list { return nt_tlog(a); }
+fn t_softmax(a: list) -> list { return nt_softmax(a); }
+fn t_mean(a: list) { return nt_mean(a); }
+fn t_mse(a: list, b: list) -> f64 { return nt_mse(a, b); }
+fn t_patch_mean(a: list, gh: i64, gw: i64) -> list { return nt_patch_mean(a, gh, gw); }
+fn t_linear_grad(w: list, x: list, y: list) -> list { return nt_linear_grad(w, x, y); }
+fn save_tensor(t: list, path: str) -> i64 { return nt_save_tensor(t, path); }
+fn load_tensor(path: str) -> list { return nt_load_tensor(path); }
+fn load_ppm(path: str) -> list { return nt_load_ppm(path); }
+fn load_wav(path: str) -> list { return nt_load_wav(path); }
+
+fn memory_config(thr: f64, cap: i64, hid: i64) -> list { return nt_mind(thr, cap, hid); }
+fn memory() -> list { return nt_mind(0.15, 64, 32); }
+fn remember(m: list, pat: list, sur: f64) -> i64 { return nt_remember(m, pat, sur); }
+fn remember_next(m: list, a: list, b: list, sur: f64) -> i64 { return nt_remember_next(m, a, b, sur); }
+fn surprise(a: list, b: list) -> f64 { return nt_surprise(a, b); }
+fn foresee(m: list, x: list) -> list { return nt_foresee(m, x); }
+fn foresee_n(m: list, x: list, steps: i64) -> list { return nt_foresee_n(m, x, steps); }
+fn consolidate(m: list) -> i64 { return nt_consolidate(m); }
+fn mem_stats(m: list) -> list { return nt_mem_stats(m); }
+fn recall(m: list, q: list, k: i64) -> list { return nt_recall(m, q, k); }
+fn save_mind(m: list, path: str) -> i64 { return nt_save_mind(m, path); }
+fn load_mind(path: str) -> list { return nt_load_mind(path); }
+fn learn(m: list, x: list, y: list) -> f64 { return nt_learn(m, x, y); }
+fn predict(m: list, x: list) -> list { return nt_predict(m, x); }
+fn unroll(m: list, x: list, steps: i64) -> list { return nt_unroll(m, x, steps); }
+fn sweep() -> i64 { return 0; }
+
+fn ag_clear() -> i64 { return nt_ag_clear(ml_box()); }
+fn ag_param(t: list) -> i64 { return nt_ag_param(ml_box(), t); }
+fn ag_const(t) -> i64 { return nt_ag_const(ml_box(), t); }
+fn ag_add(a: i64, b: i64) -> i64 { return nt_ag_add(ml_box(), a, b); }
+fn ag_sub(a: i64, b: i64) -> i64 { return nt_ag_sub(ml_box(), a, b); }
+fn ag_mul(a: i64, b: i64) -> i64 { return nt_ag_mul(ml_box(), a, b); }
+fn ag_matmul(a: i64, b: i64) -> i64 { return nt_ag_matmul(ml_box(), a, b); }
+fn ag_mse(a: i64, b: i64) -> i64 { return nt_ag_mse(ml_box(), a, b); }
+fn ag_scale(a: i64, s: f64) -> i64 { return nt_ag_scale(ml_box(), a, s); }
+fn ag_relu(a: i64) -> i64 { return nt_ag_relu(ml_box(), a); }
+fn ag_neg(a: i64) -> i64 { return nt_ag_neg(ml_box(), a); }
+fn ag_transpose(a: i64) -> i64 { return nt_ag_transpose(ml_box(), a); }
+fn ag_reshape(a: i64, sh: list) -> i64 { return nt_ag_reshape(ml_box(), a, sh); }
+fn ag_exp(a: i64) -> i64 { return nt_ag_exp(ml_box(), a); }
+fn ag_log(a: i64) -> i64 { return nt_ag_log(ml_box(), a); }
+fn ag_softmax(a: i64) -> i64 { return nt_ag_softmax(ml_box(), a); }
+fn ag_sum(a: i64) -> i64 { return nt_ag_sum(ml_box(), a); }
+fn ag_value(id: i64) { return nt_ag_value(ml_box(), id); }
+fn ag_grad(id: i64) { return nt_ag_grad(ml_box(), id); }
+fn ag_backward(id: i64) -> i64 { return nt_ag_backward(ml_box(), id); }
+fn ag_step(id: i64, lr: f64) -> list { return nt_ag_step(ml_box(), id, lr); }

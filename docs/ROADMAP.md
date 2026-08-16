@@ -65,7 +65,7 @@
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ✅ | Emit lite runtime: **`rt_types` / Prophet / tensor / tape / compiler / VM / selftest** — `kenga_lite.c` каркас |
 | ✅ | CI job `lite` без cargo; release **требует** `kenga-lite` (cargo `kenga` ещё legacy в архиве) |
-| ✅ | more VM: тензор / tape / Prophet на списках Kenga (`native_ml.kenga`), не lite `t_*`/`ag_*`. CRT и ppm/wav I/O остаются |
+| ✅ | `lite run` + more: тензор / tape / Prophet на списках (`native_ml` / `ml_host`). CRT = байты/печать; ppm/wav парсит Kenga |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 
 ## 2. Ядро и тензоры

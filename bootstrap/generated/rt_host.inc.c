@@ -84,5 +84,29 @@ static char *load_with_imports(const char *path, int depth) {
   free(acc);
   free(src);
   free(dir);
+  if (depth == 0 && strstr(path, "native_ml.kenga") == NULL &&
+      strstr(path, "ml_host.kenga") == NULL && strstr(out, "fn nt_from(") == NULL) {
+    const char *hp = NULL;
+    FILE *tf;
+    tf = fopen("kenga/compiler/ml_host.kenga", "rb");
+    if (tf) { fclose(tf); hp = "kenga/compiler/ml_host.kenga"; }
+    if (!hp) {
+      tf = fopen("kenga\\compiler\\ml_host.kenga", "rb");
+      if (tf) { fclose(tf); hp = "kenga\\compiler\\ml_host.kenga"; }
+    }
+    if (hp) {
+      char *host = load_with_imports(hp, 1);
+      size_t hl = strlen(host);
+      size_t ol = strlen(out);
+      char *mix = (char *)malloc(hl + ol + 2);
+      if (!mix) die("oom");
+      memcpy(mix, host, hl);
+      mix[hl] = '\n';
+      memcpy(mix + hl + 1, out, ol + 1);
+      free(host);
+      free(out);
+      out = mix;
+    }
+  }
   return out;
 }

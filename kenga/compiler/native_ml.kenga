@@ -395,6 +395,164 @@ fn nt_wrap_host(t: list) -> list {
     return ["T", sh, d];
 }
 
+fn nt_u16le(xs: list, i: i64) -> i64 {
+    return xs[i] + xs[i + 1] * 256;
+}
+
+fn nt_u32le(xs: list, i: i64) -> i64 {
+    return xs[i] + xs[i + 1] * 256 + xs[i + 2] * 65536 + xs[i + 3] * 16777216;
+}
+
+fn nt_ppm_skip(xs: list, i: i64) -> i64 {
+    while i < len(xs) {
+        let c: i64 = xs[i];
+        if c == 32 { i = i + 1; continue; }
+        if c == 9 { i = i + 1; continue; }
+        if c == 10 { i = i + 1; continue; }
+        if c == 13 { i = i + 1; continue; }
+        if c == 35 {
+            while i < len(xs) {
+                if xs[i] == 10 { i = i + 1; break; }
+                i = i + 1;
+            }
+            continue;
+        }
+        break;
+    }
+    return i;
+}
+
+fn nt_ppm_tok(xs: list, i: i64) -> list {
+    i = nt_ppm_skip(xs, i);
+    let a: i64 = i;
+    while i < len(xs) {
+        let c: i64 = xs[i];
+        if c == 32 { break; }
+        if c == 9 { break; }
+        if c == 10 { break; }
+        if c == 13 { break; }
+        if c == 35 { break; }
+        i = i + 1;
+    }
+    let n: i64 = 0;
+    let j: i64 = a;
+    let neg: i64 = 0;
+    if j < i {
+        if xs[j] == 45 { neg = 1; j = j + 1; }
+    }
+    while j < i {
+        n = n * 10 + (xs[j] - 48);
+        j = j + 1;
+    }
+    if neg == 1 { n = 0 - n; }
+    return [n, i, a];
+}
+
+fn nt_load_ppm(path: str) -> list {
+    let xs = read_bytes(path);
+    let p = nt_ppm_tok(xs, 0);
+    assert(p[2] + 2 == p[1]);
+    assert(xs[p[2]] == 80);
+    assert(xs[p[2] + 1] == 54);
+    p = nt_ppm_tok(xs, p[1]);
+    let w: i64 = p[0];
+    p = nt_ppm_tok(xs, p[1]);
+    let h: i64 = p[0];
+    p = nt_ppm_tok(xs, p[1]);
+    let maxv: i64 = p[0];
+    assert(w > 0);
+    assert(h > 0);
+    assert(maxv > 0);
+    let i: i64 = p[1];
+    if i < len(xs) {
+        let c: i64 = xs[i];
+        if c == 32 { i = i + 1; } else {
+            if c == 9 { i = i + 1; } else {
+                if c == 10 { i = i + 1; } else {
+                    if c == 13 { i = i + 1; }
+                }
+            }
+        }
+    }
+    let need: i64 = w * h * 3;
+    assert(i + need <= len(xs));
+    let scale: f64 = 1.0 / (maxv + 0.0);
+    let d: list = [];
+    let k: i64 = 0;
+    while k < need {
+        d = push(d, (xs[i + k] + 0.0) * scale);
+        k = k + 1;
+    }
+    return ["T", [h, w, 3], d];
+}
+
+fn nt_load_wav(path: str) -> list {
+    let xs = read_bytes(path);
+    assert(len(xs) >= 44);
+    assert(xs[0] == 82);
+    assert(xs[1] == 73);
+    assert(xs[2] == 70);
+    assert(xs[3] == 70);
+    assert(xs[8] == 87);
+    assert(xs[9] == 65);
+    assert(xs[10] == 86);
+    assert(xs[11] == 69);
+    let pos: i64 = 12;
+    let channels: i64 = 1;
+    let bits: i64 = 16;
+    let data_off: i64 = 0;
+    let data_len: i64 = 0;
+    while pos + 8 <= len(xs) {
+        let id0: i64 = xs[pos];
+        let id1: i64 = xs[pos + 1];
+        let id2: i64 = xs[pos + 2];
+        let id3: i64 = xs[pos + 3];
+        let size: i64 = nt_u32le(xs, pos + 4);
+        let chunk: i64 = pos + 8;
+        if id0 == 102 {
+            if id1 == 109 {
+                if id2 == 116 {
+                    if id3 == 32 {
+                        assert(size >= 16);
+                        assert(nt_u16le(xs, chunk) == 1);
+                        channels = nt_u16le(xs, chunk + 2);
+                        bits = nt_u16le(xs, chunk + 14);
+                    }
+                }
+            }
+        }
+        if id0 == 100 {
+            if id1 == 97 {
+                if id2 == 116 {
+                    if id3 == 97 {
+                        data_off = chunk;
+                        data_len = size;
+                        break;
+                    }
+                }
+            }
+        }
+        pos = chunk + size + (size % 2);
+    }
+    assert(data_off > 0);
+    assert(bits == 16);
+    assert(data_off + data_len <= len(xs));
+    let step: i64 = channels;
+    if step < 1 { step = 1; }
+    let samples: i64 = data_len / 2 / step;
+    if samples < 1 { samples = 0; }
+    let d: list = [];
+    let s: i64 = 0;
+    while s < samples {
+        let off: i64 = data_off + s * step * 2;
+        let u: i64 = nt_u16le(xs, off);
+        if u >= 32768 { u = u - 65536; }
+        d = push(d, (u + 0.0) / 32768.0);
+        s = s + 1;
+    }
+    return ["T", [samples], d];
+}
+
 fn nt_save_tensor(t: list, path: str) -> i64 {
     let sh = t[1];
     let d = t[2];

@@ -12,7 +12,7 @@
 //          load_ppm/load_wav/t_patch_mean/t_linear_grad,
 //          print/sleep_ms/learn/predict/unroll/remember_next/foresee_n
 // Tensor/tape/Prophet dispatch → native_ml.kenga (Kenga lists).
-// Host left: CRT + load_ppm/load_wav bytes.
+// Host left: CRT. ppm/wav via read_bytes + Kenga parse.
 
 import "native_ml.kenga"
 
@@ -583,10 +583,10 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
             stack = push(stack, nt_mind(0.12, 16, 8));
         }
         if op == OP_LOAD_PPM() {
-            let p = list_pop(stack); stack = push(p[0], nt_wrap_host(load_ppm(p[1])));
+            let p = list_pop(stack); stack = push(p[0], nt_load_ppm(p[1]));
         }
         if op == OP_LOAD_WAV() {
-            let p = list_pop(stack); stack = push(p[0], nt_wrap_host(load_wav(p[1])));
+            let p = list_pop(stack); stack = push(p[0], nt_load_wav(p[1]));
         }
         if op == OP_T_PATCH_MEAN() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
