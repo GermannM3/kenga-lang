@@ -35,6 +35,7 @@ scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval_mem.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_cli.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_mem.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_host.kenga

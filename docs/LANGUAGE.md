@@ -122,9 +122,9 @@ kenga run --lite examples/selfhost/for_lite.kenga
 ## emit-c / build
 
 `lower_c` → C99: i64, f64, list, struct, for/if, events, `println`/`print`, `round`, `typeof`/`to_str`, `&&` `||` `!` `%`, `sleep_ms`, `now_ms`.  
-`lower_kv` → tagged KVal C, тот же диалект + str/ord + `now_ms`.  
+`lower_kv` → tagged KVal C, тот же диалект + str/ord + `now_ms` + Memory (`learn`/`predict`; `foresee` пока = `predict`).  
 `bc_src_c` → bytecode C VM: то же плюс birth/net/agent + `now_ms`.  
-Нет в native C: Tensor, Memory, tape — это lite и `more`.
+Нет в native C: Tensor, tape, полный Prophet hybrid — это lite и `more`.
 
 ## Примеры по темам
 

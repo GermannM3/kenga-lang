@@ -7,7 +7,7 @@
 #include <string.h>
 #include <math.h>
 
-enum { KV_I64 = 0, KV_STR = 1, KV_LIST = 2, KV_F64 = 3 };
+enum { KV_I64 = 0, KV_STR = 1, KV_LIST = 2, KV_F64 = 3, KV_MEM = 4 };
 typedef struct { int tag; union { int64_t i; const char *s; int64_t list_id; double f; } u; } KVal;
 typedef struct { KVal *data; size_t len; size_t cap; } KListObj;
 static KListObj *g_lists = NULL; static size_t g_lists_len = 0; static size_t g_lists_cap = 0;
@@ -16,6 +16,7 @@ static KVal kval_i64(int64_t x) { KVal v; v.tag = KV_I64; v.u.i = x; return v; }
 static KVal kval_f64(double x) { KVal v; v.tag = KV_F64; v.u.f = x; return v; }
 static KVal kval_str(const char *s) { KVal v; v.tag = KV_STR; v.u.s = s ? s : ""; return v; }
 static KVal kval_list(int64_t id) { KVal v; v.tag = KV_LIST; v.u.list_id = id; return v; }
+static KVal kval_mem(int64_t id) { KVal v; v.tag = KV_MEM; v.u.i = id; return v; }
 static int64_t kval_as_i64(KVal v) {
   if (v.tag == KV_I64) return v.u.i;
   if (v.tag == KV_F64) return (int64_t)v.u.f;
@@ -90,6 +91,7 @@ static int64_t kval_eq(KVal a, KVal b) {
   if (a.tag == KV_F64) return a.u.f == b.u.f;
   if (a.tag == KV_STR) return strcmp(a.u.s ? a.u.s : "", b.u.s ? b.u.s : "") == 0;
   if (a.tag == KV_LIST) return a.u.list_id == b.u.list_id;
+  if (a.tag == KV_MEM) return a.u.i == b.u.i;
   return 0;
 }
 static void kenga_print_val(KVal v);
@@ -101,7 +103,8 @@ static void kenga_print_val(KVal v) {
     KListObj *l = klist_obj(v.u.list_id); size_t i; putchar('[');
     for (i = 0; i < l->len; i++) { if (i) printf(", "); kenga_print_val(l->data[i]); }
     putchar(']');
-  } else k_die("tag");
+  } else if (v.tag == KV_MEM) printf("memory");
+  else k_die("tag");
 }
 static void kenga_println_val(KVal v) { kenga_print_val(v); putchar('\n'); }
 static void k_assert(int64_t c) { if (!c) k_die("assert failed"); }
