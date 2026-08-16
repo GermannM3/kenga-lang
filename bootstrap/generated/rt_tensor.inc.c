@@ -160,6 +160,7 @@ static int64_t tl_matmul(int64_t ha, int64_t hb) {
   shape[1] = n;
   h = tl_zeros(shape, 2);
   o = tl_get(h);
+  if (tl_gemm_cl(m, n, k, ad, bd, o->data)) return h;
   for (i = 0; i < m; i++)
     for (j = 0; j < n; j++) {
       double s = 0.0;

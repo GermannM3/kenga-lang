@@ -92,7 +92,7 @@
 | ✅ | Карточка HF: `hf/kenga-seed/` + `scripts\hf-pack.cmd` |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |
-| ⬜ | GPU backend (wgpu/CUDA) под 1660-class |
+| ◐ | GPU: OpenCL за `t_matmul` (Windows, оси ≥ 32). Не CUDA/wgpu |
 | ⬜ | Pretrained encoders |
 
 ## 4. Docs / marketplace

@@ -1,0 +1,15 @@
+// GEMM large enough for the OpenCL path (32+). CPU fallback if no GPU.
+// Ones @ ones ? every cell equals K.
+
+fn main() -> i64 {
+    let n: i64 = 64;
+    let a = t_fill(tensor(n, n), 1.0);
+    let b = t_fill(tensor(n, n), 1.0);
+    let c = t_matmul(a, b);
+    let k: f64 = n + 0.0;
+    assert(t_get(c, 0) == k);
+    assert(t_get(c, n - 1) == k);
+    assert(t_get(c, n * n - 1) == k);
+    println("matmul cl ok");
+    return 0;
+}

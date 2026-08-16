@@ -37,4 +37,4 @@ kenga chat --lite minds\multi.km
 kenga run --lite examples\ml\autograd_tape.kenga
 ```
 
-Tape: `docs/TAPE_LITE.md`. Пока не на lite: GPU.
+Tape: `docs/TAPE_LITE.md`. `t_matmul` на Windows пробует OpenCL GPU, если все три оси ≥ 32; иначе тот же CPU-цикл. SDK не линкуем — `OpenCL.dll` с драйвера.

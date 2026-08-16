@@ -58,6 +58,7 @@
 #include "generated/rt_arena.inc.c"
 
 #include "generated/rt_prophet.inc.c"
+#include "generated/rt_matmul_cl.inc.c"
 #include "generated/rt_tensor.inc.c"
 #include "generated/rt_tape.inc.c"
 #include "generated/rt_events.inc.c"

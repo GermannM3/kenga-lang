@@ -98,3 +98,4 @@ jobs:
           ./bootstrap/bin/kenga-lite run examples/unroll.kenga
           ./bootstrap/bin/kenga-lite run examples/ml/kenga_net.kenga
           ./bootstrap/bin/kenga-lite run examples/ml/vision_ppm.kenga
+          ./bootstrap/bin/kenga-lite run examples/ml/matmul_cl.kenga
