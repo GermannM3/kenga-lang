@@ -19,6 +19,7 @@ bootstrap/generated/*.exe
 bootstrap/generated/*.obj
 bootstrap/generated/*.txt
 bootstrap/generated/*.kt
+bootstrap/generated/*.km
 !bootstrap/generated/.gitkeep
 !bootstrap/generated/*.c
 !bootstrap/generated/*.inc.c

@@ -597,6 +597,11 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 let pre: str = merge_pre(ar[3], ap[3]);
                 return ["k_save_mind(" + ar[0] + ", " + ap[0] + ")", j, 0, pre];
             }
+            if id[0] == "load_mind" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_load_mind(" + ar[0] + ")", j, 0, ar[3]];
+            }
             if id[0] == "sweep" {
                 assert(s[j] == ")"); j = j + 1;
                 return ["k_sweep()", j, 0, ""];
@@ -1713,7 +1718,10 @@ fn main() -> i64 {
     let kvce = resolve_imports("examples/selfhost/lower_kv_ce.kenga", 0);
     assert(write_file("bootstrap/generated/lower_kv_ce.c", lower_program(kvce)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape,kv_mlp,kv_ce}.c");
+    let kvlive = resolve_imports("examples/selfhost/lower_kv_living.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_kv_living.c", lower_program(kvlive)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape,kv_mlp,kv_ce,kv_living}.c");
     println("lower_kv ok");
     return 0;
 }

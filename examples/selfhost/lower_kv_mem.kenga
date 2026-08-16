@@ -16,7 +16,12 @@ fn main() -> i64 {
     assert(st[0] > 0);
     let err = surprise([1.0, 0.0], [0.0, 1.0]);
     assert(round(err * 10.0) > 0);
-    assert(save_mind(m, "kv_mind.txt") == 1);
+    let p_saved = predict(m, [1, 2, 3]);
+    assert(save_mind(m, "kv_mind.km") == 1);
+    let m2 = load_mind("kv_mind.km");
+    let p2 = predict(m2, [1, 2, 3]);
+    assert(len(p2) == 3);
+    assert(round(p2[0] * 100.0) == round(p_saved[0] * 100.0));
     println("mem kv ok");
     return 0;
 }

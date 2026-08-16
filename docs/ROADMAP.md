@@ -48,7 +48,7 @@
 | ✅ | **`lower_c`**: `now_ms` |
 | ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
 | ✅ | **`lower_kv`**: `now_ms` |
-| ✅ | **`lower_kv`**: Memory как lite (`memory_config(thr,ep,core)` / `remember` / `unroll` / `surprise` / `save_mind`) |
+| ✅ | **`lower_kv`**: Memory как lite (`memory_config` / `remember` / `unroll` / `surprise` / `save_mind` / `load_mind`) |
 | ✅ | **`lower_kv`**: Tensor как lite (`t_set`/`t_sub`/`t_mul`/`t_softmax`/`t_mean`/`load_ppm`/`save_tensor`/…) |
 | ✅ | **`lower_kv`**: tape как lite (`ag_softmax`/`ag_log`/`ag_neg`/`ag_sum`/`ag_mul`/… + CE native) |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |

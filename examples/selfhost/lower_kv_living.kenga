@@ -1,0 +1,37 @@
+// Native KVal living slice: PPM+WAV ? mean ? Prophet. Short epochs.
+
+fn encode(img_path: str, wav_path: str, t: f64) -> list {
+    let img = t_mean(load_ppm(img_path));
+    let wav = load_wav(wav_path);
+    let am = t_mean(wav);
+    let energy = t_mean(t_mul(wav, wav));
+    return [t_get(img, 0), t_get(img, 1), t_get(img, 2), am, energy, t];
+}
+
+fn main() -> i64 {
+    let img0: str = "../../examples/ml/assets/frame0.ppm";
+    let img1: str = "../../examples/ml/assets/frame1.ppm";
+    let wav0: str = "../../examples/ml/assets/tone0.wav";
+    let wav1: str = "../../examples/ml/assets/tone1.wav";
+    let a = encode(img0, wav0, 0.0);
+    let b = encode(img1, wav1, 1.0);
+    let mind = memory_config(0.05, 16, 8);
+    let e: i64 = 0;
+    let loss0 = learn(mind, a, b);
+    while e < 8 {
+        learn(mind, a, b);
+        remember_next(mind, a, b, 40);
+        e = e + 1;
+    }
+    let pred = predict(mind, a);
+    let err = surprise(pred, b);
+    assert(len(pred) == 6);
+    assert(err < 2.0);
+    assert(save_mind(mind, "kv_living.km") == 1);
+    let mind2 = load_mind("kv_living.km");
+    let pred2 = predict(mind2, a);
+    assert(len(pred2) == 6);
+    assert(round(pred2[0] * 100.0) == round(pred[0] * 100.0));
+    println("living kv ok");
+    return 0;
+}

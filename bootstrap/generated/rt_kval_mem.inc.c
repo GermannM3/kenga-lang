@@ -404,11 +404,104 @@ static KVal k_mem_stats(KVal mem) {
   klist_push_val(id, kval_f64(m->threshold));
   return kval_list(id);
 }
+static void km_write_f64s(FILE *f, const double *xs, int n) {
+  int i; for (i = 0; i < n; i++) { if (i) fputc(' ', f); fprintf(f, "%.17g", xs[i]); }
+  fputc('\n', f);
+}
+static int km_read_f64s(FILE *f, double *out, int n) {
+  int i; for (i = 0; i < n; i++) if (fscanf(f, "%lf", &out[i]) != 1) return -1; return 0;
+}
+static int km_parse_f64s(const char *line, double *out, int expect) {
+  int n = 0; const char *p = line;
+  while (*p && n < expect) {
+    char *end = NULL; double v;
+    while (*p == ' ' || *p == '\t') p++;
+    if (!*p || *p == '\n' || *p == '\r') break;
+    v = strtod(p, &end); if (end == p) return -1;
+    out[n++] = v; p = end;
+  }
+  return n == expect ? n : -1;
+}
 static KVal k_save_mind(KVal mem, KVal path) {
   KmMind *m = km_get(mem); FILE *f = fopen(kval_as_str(path), "wb");
+  int d, h, i;
   if (!f) return kval_i64(0);
-  fprintf(f, "KENGA_MIND 1\n%d %d %.17g\n", m->nep, (int)m->model.steps, m->threshold);
+  d = m->model.dim; h = m->model.hidden;
+  fprintf(f, "KENGA_MIND 1\n");
+  fprintf(f, "threshold %.17g\n", m->threshold);
+  fprintf(f, "ep_cap %d\n", m->ep_cap);
+  fprintf(f, "core_cap %d\n", h);
+  fprintf(f, "lr %.17g\n", m->lr);
+  fprintf(f, "model %d %d %llu\n", d, h, (unsigned long long)m->model.steps);
+  km_write_f64s(f, m->model.w1, h * d);
+  km_write_f64s(f, m->model.b1, h);
+  km_write_f64s(f, m->model.w2, d * h);
+  km_write_f64s(f, m->model.b2, d);
+  km_write_f64s(f, m->model.w1_lock, h * d);
+  km_write_f64s(f, m->model.b1_lock, h);
+  km_write_f64s(f, m->model.w2_lock, d * h);
+  km_write_f64s(f, m->model.b2_lock, d);
+  fprintf(f, "core 0\n");
+  fprintf(f, "episodic %d\n", m->nep);
+  for (i = 0; i < m->nep; i++) {
+    int has_t = m->ep[i].has_target ? 1 : 0;
+    int tlen = has_t ? (m->ep[i].target_dim > 0 ? m->ep[i].target_dim : m->ep[i].dim) : 0;
+    fprintf(f, "%.17g 0 %d %d %d\n", m->ep[i].surprise, m->ep[i].dim, has_t, tlen);
+    km_write_f64s(f, m->ep[i].pattern, m->ep[i].dim);
+    if (has_t) km_write_f64s(f, m->ep[i].target, tlen);
+  }
   fclose(f); return kval_i64(1);
+}
+static KVal k_load_mind(KVal path) {
+  FILE *f = fopen(kval_as_str(path), "rb");
+  KmMind m; char line[8192]; int d, h, i, core_n, ep_n; unsigned long long steps;
+  memset(&m, 0, sizeof(m));
+  if (!f) k_die("load_mind: cannot open");
+  if (!fgets(line, sizeof(line), f) || strncmp(line, "KENGA_MIND 1", 12) != 0) { fclose(f); k_die("load_mind: bad header"); }
+  if (!fgets(line, sizeof(line), f) || sscanf(line, "threshold %lf", &m.threshold) != 1) { fclose(f); k_die("load_mind: threshold"); }
+  if (!fgets(line, sizeof(line), f) || sscanf(line, "ep_cap %d", &m.ep_cap) != 1) { fclose(f); k_die("load_mind: ep_cap"); }
+  if (!fgets(line, sizeof(line), f)) { fclose(f); k_die("load_mind: core_cap"); }
+  if (!fgets(line, sizeof(line), f) || sscanf(line, "lr %lf", &m.lr) != 1) { fclose(f); k_die("load_mind: lr"); }
+  if (!fgets(line, sizeof(line), f) || sscanf(line, "model %d %d %llu", &d, &h, &steps) != 3) { fclose(f); k_die("load_mind: model"); }
+  if (d < 1 || d > KM_DIM_MAX || h < 1 || h > KM_HID_MAX) { fclose(f); k_die("load_mind: dims"); }
+  if (m.ep_cap < 1 || m.ep_cap > KM_EP_MAX) m.ep_cap = KM_EP_MAX;
+  m.model.dim = d; m.model.hidden = h; m.model.steps = (uint64_t)steps;
+  if (km_read_f64s(f, m.model.w1, h * d) != 0) { fclose(f); k_die("load_mind: w1"); }
+  if (km_read_f64s(f, m.model.b1, h) != 0) { fclose(f); k_die("load_mind: b1"); }
+  if (km_read_f64s(f, m.model.w2, d * h) != 0) { fclose(f); k_die("load_mind: w2"); }
+  if (km_read_f64s(f, m.model.b2, d) != 0) { fclose(f); k_die("load_mind: b2"); }
+  if (km_read_f64s(f, m.model.w1_lock, h * d) != 0) { fclose(f); k_die("load_mind: w1_lock"); }
+  if (km_read_f64s(f, m.model.b1_lock, h) != 0) { fclose(f); k_die("load_mind: b1_lock"); }
+  if (km_read_f64s(f, m.model.w2_lock, d * h) != 0) { fclose(f); k_die("load_mind: w2_lock"); }
+  if (km_read_f64s(f, m.model.b2_lock, d) != 0) { fclose(f); k_die("load_mind: b2_lock"); }
+  if (fscanf(f, " core %d", &core_n) != 1) { fclose(f); k_die("load_mind: core"); }
+  for (i = 0; i < core_n; i++) {
+    double dummy[KM_DIM_MAX]; int plen; unsigned long long rep; double imp;
+    if (fscanf(f, "%lf %llu %d", &imp, &rep, &plen) != 3) { fclose(f); k_die("load_mind: core meta"); }
+    if (plen < 1 || plen > KM_DIM_MAX || km_read_f64s(f, dummy, plen) != 0) { fclose(f); k_die("load_mind: core pat"); }
+    (void)imp; (void)rep;
+  }
+  if (fscanf(f, " episodic %d", &ep_n) != 1) { fclose(f); k_die("load_mind: episodic"); }
+  if (ep_n < 0 || ep_n > KM_EP_MAX) { fclose(f); k_die("load_mind: too many ep"); }
+  m.nep = ep_n;
+  for (i = 0; i < ep_n; i++) {
+    unsigned long long ts; int plen, has_t, tlen;
+    if (fscanf(f, "%lf %llu %d %d %d", &m.ep[i].surprise, &ts, &plen, &has_t, &tlen) != 5) { fclose(f); k_die("load_mind: ep meta"); }
+    m.ep[i].has_target = has_t ? 1 : 0; m.ep[i].dim = plen;
+    if (plen < 1 || plen > KM_DIM_MAX || km_read_f64s(f, m.ep[i].pattern, plen) != 0) { fclose(f); k_die("load_mind: ep pat"); }
+    if (has_t) {
+      m.ep[i].target_dim = tlen;
+      if (tlen < 1 || tlen > KM_DIM_MAX || km_read_f64s(f, m.ep[i].target, tlen) != 0) { fclose(f); k_die("load_mind: ep tgt"); }
+    }
+  }
+  fclose(f);
+  if (g_minds_len + 1 > g_minds_cap) {
+    size_t ncap = g_minds_cap ? g_minds_cap * 2 : 4;
+    KmMind *nd = (KmMind *)realloc(g_minds, ncap * sizeof(KmMind));
+    if (!nd) k_die("oom"); g_minds = nd; g_minds_cap = ncap;
+  }
+  g_minds[g_minds_len] = m;
+  return kval_mem((int64_t)g_minds_len++);
 }
 static KVal k_sweep(void) { return kval_i64(0); }
 static KVal k_memory(void) { return k_memory_config(0.12, 16, 8); }
