@@ -62,6 +62,7 @@ static int is_host_kenga(const char *path) {
   if (strstr(path, "kenga/compiler/more.kenga") || strstr(path, "kenga\\compiler\\more.kenga")) return 1;
   if (strstr(path, "kenga/compiler/native_ml.kenga") || strstr(path, "kenga\\compiler\\native_ml.kenga")) return 1;
   if (strstr(path, "kenga/compiler/ml_host.kenga") || strstr(path, "kenga\\compiler\\ml_host.kenga")) return 1;
+  if (strstr(path, "kenga/compiler/chat.kenga") || strstr(path, "kenga\\compiler\\chat.kenga")) return 1;
   return 0;
 }
 static int src_mentions_ml(const char *s) {

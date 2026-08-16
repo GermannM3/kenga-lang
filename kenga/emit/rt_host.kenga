@@ -64,6 +64,7 @@ fn main() -> i64 {
     s = s + "  if (strstr(path, \"kenga/compiler/more.kenga\") || strstr(path, \"kenga\\\\compiler\\\\more.kenga\")) return 1;\n";
     s = s + "  if (strstr(path, \"kenga/compiler/native_ml.kenga\") || strstr(path, \"kenga\\\\compiler\\\\native_ml.kenga\")) return 1;\n";
     s = s + "  if (strstr(path, \"kenga/compiler/ml_host.kenga\") || strstr(path, \"kenga\\\\compiler\\\\ml_host.kenga\")) return 1;\n";
+    s = s + "  if (strstr(path, \"kenga/compiler/chat.kenga\") || strstr(path, \"kenga\\\\compiler\\\\chat.kenga\")) return 1;\n";
     s = s + "  return 0;\n";
     s = s + "}\n";
     s = s + "static int src_mentions_ml(const char *s) {\n";

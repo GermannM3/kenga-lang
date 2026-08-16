@@ -8,7 +8,7 @@
 | Слой | Статус |
 |---|---|
 | Prophet / multimodal | ✅ lite без Rust |
-| Chat intents | ✅ `kenga-lite chat` |
+| Chat intents | ✅ `kenga-lite chat` → `chat.kenga` / `native_ml` |
 | Bigram LM | ✅ `examples/ml/tiny_lm.kenga` |
 | **2-layer word-LM + CE** | ✅ `examples/ml/word_lm.kenga` → `minds/word_lm_*.kt`; lite и `more` VM |
 | **Своя MLP (XOR)** | ✅ `examples/ml/kenga_net.kenga` — list/f64, без tensor host; lite, bc→C и `more` VM |

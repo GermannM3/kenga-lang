@@ -118,7 +118,9 @@ fn main() -> i64 {
     s = s + "  OP_READ_BYTES,\n";
     s = s + "  OP_ML_BOX,\n";
     s = s + "  OP_ARGC,\n";
-    s = s + "  OP_ARG\n";
+    s = s + "  OP_ARG,\n";
+    s = s + "  OP_FILE_EXISTS,\n";
+    s = s + "  OP_READ_LINE\n";
     s = s + "};\n";
     s = s + "static int g_kargc = 0;\n";
     s = s + "static char **g_kargv = NULL;\n";

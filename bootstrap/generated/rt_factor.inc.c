@@ -818,6 +818,23 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         j++;
         i64a_push(code, OP_ML_BOX);
         i = j;
+      } else if (strcmp(id.name, "file_exists") == 0) {
+        free(id.name);
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in file_exists");
+        j++;
+        i64a_push(code, OP_FILE_EXISTS);
+        i = j;
+      } else if (strcmp(id.name, "read_line") == 0) {
+        free(id.name);
+        j++;
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in read_line");
+        j++;
+        i64a_push(code, OP_READ_LINE);
+        i = j;
       } else if (strcmp(id.name, "now_ms") == 0) {
         free(id.name);
         j++;

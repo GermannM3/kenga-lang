@@ -36,9 +36,12 @@ int main(int argc, char **argv) {
   }
   if (argc >= 2 && strcmp(argv[1], "chat") == 0) {
     const char *mind = "minds/agent.km";
-    const char *script_path = NULL;
-    char *script = NULL;
-    int i, rc;
+    const char *script_path = "";
+    const char *chat;
+    char *src;
+    static char *abuf[4];
+    int i;
+    int64_t r;
     for (i = 2; i < argc; i++) {
       if (strcmp(argv[i], "--script") == 0 && i + 1 < argc) {
         script_path = argv[++i];
@@ -46,16 +49,20 @@ int main(int argc, char **argv) {
         mind = argv[i];
       }
     }
-    if (script_path) {
-      script = pl_read_file(script_path, NULL);
-      if (!script) {
-        fprintf(stderr, "cannot read script %s\n", script_path);
-        return 1;
-      }
+    chat = find_kenga_file("kenga/compiler/chat.kenga", "kenga\\compiler\\chat.kenga");
+    if (!chat) {
+      fprintf(stderr, "cannot find kenga/compiler/chat.kenga\n");
+      return 1;
     }
-    rc = run_chat_lite(mind, script);
-    free(script);
-    return rc;
+    abuf[0] = (char *)chat;
+    abuf[1] = (char *)mind;
+    abuf[2] = (char *)script_path;
+    g_kargc = 3;
+    g_kargv = abuf;
+    src = load_with_imports(chat, 0);
+    r = run_lite(src);
+    free(src);
+    return (int)r;
   }
   fprintf(stderr,
           "usage:\n  kenga-lite\n  kenga-lite run <file.kenga>\n  kenga-lite "

@@ -1,4 +1,4 @@
-// Emit chat intents for the lite host.
+// Emit leftover C chat (CLI no longer calls it — kenga/compiler/chat.kenga).
 // Run: bootstrap\bin\kenga-lite.exe run kenga\emit\rt_chat.kenga
 
 fn main() -> i64 {

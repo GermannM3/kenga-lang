@@ -12,7 +12,7 @@
 | `tensor.rs` | ✅ на lite | `kenga/emit/rt_tensor.kenga` → `generated/rt_tensor.inc.c` |
 | `autograd.rs` | ✅ на lite + KVal emit | `rt_tape.kenga` / `rt_kval_tape.kenga` |
 | `memory.rs` | ✅ на lite | `kenga/emit/rt_prophet.kenga` |
-| `talk.rs` (chat) | ✅ на lite | `kenga/emit/rt_chat.kenga` |
+| `talk.rs` (chat) | ✅ на lite | `kenga/compiler/chat.kenga` (`native_ml`); `rt_chat` больше не в CLI |
 | `codegen.rs` (emit-c) | 🟢 растёт | `lower_c` + **`lower_kv`**: Tensor/tape как lite, native CE |
 | `main.rs` / `driver.rs` | 🟡 | CLI `main` пишет `kenga/emit/rt_cli.kenga` |
 | `demo.rs` / `build.rs` | ⬜ | позже |

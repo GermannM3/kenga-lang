@@ -113,7 +113,9 @@ enum {
   OP_READ_BYTES,
   OP_ML_BOX,
   OP_ARGC,
-  OP_ARG
+  OP_ARG,
+  OP_FILE_EXISTS,
+  OP_READ_LINE
 };
 static int g_kargc = 0;
 static char **g_kargv = NULL;

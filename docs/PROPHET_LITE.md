@@ -1,6 +1,6 @@
 # Prophet Memory на kenga-lite (без Rust)
 
-С **3.2** ядро Prophet + `.km` + chat живут в lite без Rust. C пишет `kenga/emit/rt_prophet.kenga` и `rt_chat.kenga`. Демо `examples/prophet.kenga` и `minds/multi.km`.
+С **3.2** ядро Prophet + `.km` живут в lite без Rust. Chat — `kenga/compiler/chat.kenga` на `native_ml` (не C Prophet). Демо `examples/prophet.kenga` и `minds/multi.km`.
 
 ```bat
 bootstrap\build.cmd

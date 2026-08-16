@@ -592,6 +592,41 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_str(intern_str(g_kargv[ai])));
       continue;
     }
+    if (op == OP_FILE_EXISTS) {
+      Value vp;
+      const char *path;
+      FILE *tf;
+      if (!stack.len) die("stack underflow file_exists");
+      vp = stack.data[--stack.len];
+      if (vp.tag != TAG_STR) die("file_exists: path must be str");
+      if (vp.payload < 0 || (size_t)vp.payload >= strs->len) die("bad str");
+      path = strs->data[vp.payload];
+      tf = fopen(path, "rb");
+      if (tf) { fclose(tf); vala_push(&stack, V_i64(1)); }
+      else vala_push(&stack, V_i64(0));
+      continue;
+    }
+    if (op == OP_READ_LINE) {
+      char line[1024];
+      ValA row = {0};
+      int64_t h;
+      size_t ln;
+      fflush(stdout);
+      h = (int64_t)lists.len;
+      listh_push(&lists, row);
+      if (!fgets(line, (int)sizeof(line), stdin)) {
+        vala_push(&lists.data[h], V_i64(0));
+        vala_push(&lists.data[h], V_str(intern_str("")));
+        vala_push(&stack, V_list(h));
+        continue;
+      }
+      ln = strlen(line);
+      while (ln && (line[ln - 1] == '\n' || line[ln - 1] == '\r')) line[--ln] = 0;
+      vala_push(&lists.data[h], V_i64(1));
+      vala_push(&lists.data[h], V_str(intern_str(line)));
+      vala_push(&stack, V_list(h));
+      continue;
+    }
     if (op == OP_ML_BOX) {
       if (ml_box_h < 0) {
         ValA tape = {0};
