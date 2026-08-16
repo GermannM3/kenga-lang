@@ -1,0 +1,7 @@
+fn main() -> i64 {
+    assert(typeof(1) == "i64");
+    assert(typeof("a") == "str");
+    assert("n=" + to_str(42) == "n=42");
+    println("bc typeof ok");
+    return 0;
+}
