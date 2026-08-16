@@ -2,7 +2,7 @@
   "name": "kenga",
   "displayName": "Kenga Language",
   "description": "Syntax highlighting and file icons for the Kenga programming language",
-  "version": "3.10.0",
+  "version": "3.13.0",
   "publisher": "Kenga-ai",
   "engines": {
     "vscode": "^1.74.0"

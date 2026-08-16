@@ -7,7 +7,7 @@ bootstrap\build.cmd
 bootstrap\bin\kenga-lite.exe version
 ```
 
-или с Releases: `kenga version` (3.12+).
+или с Releases: `kenga version` (3.13+).
 
 ## 0. Demo
 
@@ -122,6 +122,7 @@ scripts\freedom-smoke.cmd
 scripts\kenga-birth.cmd
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga
+scripts\kenga-mm.cmd
 ```
 
 Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, lite запускает — на экране **24**.  

@@ -1,0 +1,60 @@
+// Shared vision+audio fuse for the multimodal seed. No main().
+
+fn zeros(n: i64) -> list {
+    let xs = [];
+    let i: i64 = 0;
+    while i < n {
+        xs = push(xs, 0.05);
+        i = i + 1;
+    }
+    return xs;
+}
+
+fn onehot(idx: i64, n: i64) -> list {
+    let xs = [];
+    let j: i64 = 0;
+    while j < n {
+        if j == idx { xs = push(xs, 1.0); } else { xs = push(xs, 0.0); }
+        j = j + 1;
+    }
+    return xs;
+}
+
+fn fuse_col(img_path: str, wav_path: str) -> Tensor {
+    let img = t_mean(load_ppm(img_path));
+    let wav = load_wav(wav_path);
+    let am = t_mean(wav);
+    let energy = t_mean(t_mul(wav, wav));
+    return t_from([6, 1], [t_get(img, 0), t_get(img, 1), t_get(img, 2), am, energy, energy * 2.0]);
+}
+
+fn scene_col(i: i64) -> Tensor {
+    if i == 0 { return fuse_col("examples/ml/assets/frame0.ppm", "examples/ml/assets/tone0.wav"); }
+    if i == 1 { return fuse_col("examples/ml/assets/frame1.ppm", "examples/ml/assets/tone1.wav"); }
+    return fuse_col("examples/ml/assets/frame2.ppm", "examples/ml/assets/tone2.wav");
+}
+
+fn caption(i: i64) -> str {
+    if i == 0 { return "kenga vidit krasnyj kadr i slyshit ton"; }
+    if i == 1 { return "kenga vidit zelenyj kadr i slyshit ton"; }
+    return "kenga vidit sinij kadr i slyshit ton";
+}
+
+fn argmax3(t: Tensor) -> i64 {
+    let best: i64 = 0;
+    let bv = t_get(t, 0);
+    let i: i64 = 1;
+    while i < 3 {
+        let x = t_get(t, i);
+        if x > bv {
+            bv = x;
+            best = i;
+        }
+        i = i + 1;
+    }
+    return best;
+}
+
+fn label_of(w: Tensor, b: Tensor, x: Tensor) -> i64 {
+    return argmax3(t_softmax(t_add(t_matmul(w, x), b)));
+}

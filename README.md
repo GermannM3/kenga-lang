@@ -13,7 +13,7 @@
   <a href="https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga"><img src="https://img.shields.io/visual-studio-marketplace/v/Kenga-ai.kenga?label=VS%20Marketplace&color=5b9dff&labelColor=12151a" alt="VS Marketplace"/></a>
   <a href="https://github.com/GermannM3/kenga-lang/releases"><img src="https://img.shields.io/github/v/release/GermannM3/kenga-lang?include_prereleases&color=5b9dff&labelColor=12151a" alt="release"/></a>
   <p align="center">
-  <img src="https://img.shields.io/badge/friends--ready-3.12-5b9dff?labelColor=12151a" alt="friends-ready"/>
+  <img src="https://img.shields.io/badge/friends--ready-3.13-5b9dff?labelColor=12151a" alt="friends-ready"/>
 </p>
 
 ---
@@ -61,7 +61,7 @@ kenga run --lite examples\selfhost\struct_lite.kenga
 Обычные стеки для ML — Python-клей вокруг C++/CUDA.  
 **Kenga** — язык, где тензор, `ttl`, консолидация и агентный цикл часть семантики.
 
-Сейчас — **3.12**: `more` + `lower_c`/`lower_kv` + **`bc_src_c` (parse→bytecode→VM, вкл. fn)** → native без cargo.  
+Сейчас — **3.13**: `more` + `bc_src_c` + своя LM (birth→24, PPM+WAV→текст). Канон без cargo.  
 Карта: `docs/REPLACE_RUST.md`. Что в git: `docs/REPO.md`.  
 Расширение: [VS Marketplace](https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga) (`Kenga-ai.kenga`).  
 Rust ещё держит GPU / production-scale path. **Python не нужен.** Linux/macOS/Git Bash: `docs/UNIX.md`.

@@ -54,7 +54,7 @@ Thumbs.db
 node_modules/
 npm-debug.log*
 editors/vscode/*.vsix
-!editors/vscode/kenga-3.10.0.vsix
+!editors/vscode/kenga-3.13.0.vsix
 
 # Misc
 dist/

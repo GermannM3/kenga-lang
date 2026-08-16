@@ -66,7 +66,7 @@
 | ✅ | **`kenga_char_talk.kenga`** — generate из сохранённых весов |
 | ✅ | **`kenga_trigram.kenga`** — char-триграмма на list/i64, корпус наш |
 | ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
-| ✅ | **`kenga_mm_lm.kenga`** — PPM+WAV → caption (сид мультимодального LM) |
+| ✅ | **`kenga_mm_lm.kenga`** / **`kenga_mm_talk.kenga`** — PPM+WAV → caption |
 | ✅ | Карточка HF: `hf/kenga-seed/` + `scripts\hf-pack.cmd` |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |
@@ -80,4 +80,4 @@
 | ✅ | LEARN / LANGUAGE / UNIX / LIVING_MULTIMODAL / CHAT_AND_LM / INDEPENDENCE / REPLACE_RUST / HUGGINGFACE / … |
 | ✅ | Marketplace: ручной Upload `.vsix` (без Azure PAT) |
 
-Версия: **3.11.0**.
+Версия: **3.13.0**. VSIX на Marketplace: залей `editors/vscode/kenga-3.13.0.vsix` (3.10.0 уже отстал).

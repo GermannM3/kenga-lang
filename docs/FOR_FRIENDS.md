@@ -57,7 +57,7 @@ World-model предсказывает динамику векторов сос�
 
 ## Если сломалось
 
-- `kenga version` → **3.12.x** (или `kenga-lite` после `bootstrap\build.cmd`)
+- `kenga version` → **3.13.x** (или `kenga-lite` после `bootstrap\build.cmd`)
 - Linux/Mac/Git Bash: `docs/UNIX.md` · `bash scripts/unix-smoke.sh`
 - `unknown command chat` → старый бинарник: обнови Releases / `cargo install --path . --force`
 - `kenga-lite not built` → `bootstrap\build.cmd` (нужен MSVC/gcc)

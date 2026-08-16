@@ -1,0 +1,26 @@
+// Load trained mm weights, caption three scenes. No training.
+// Run after kenga_mm_lm.kenga:
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_talk.kenga
+
+import "kenga_mm_core.kenga";
+
+fn main() -> i64 {
+    println("=== kenga mm-talk (load our vision+audio weights) ===");
+    let w = load_tensor("minds/kenga_mm_w.kt");
+    let b = load_tensor("minds/kenga_mm_b.kt");
+    let c0 = label_of(w, b, scene_col(0));
+    let c1 = label_of(w, b, scene_col(1));
+    let c2 = label_of(w, b, scene_col(2));
+    let a: str = caption(c0);
+    let s1: str = caption(c1);
+    let s2: str = caption(c2);
+    println(a);
+    println(s1);
+    println(s2);
+    assert(c0 == 0);
+    assert(c1 == 1);
+    assert(c2 == 2);
+    assert(write_file("examples/ml/kenga_mm_sample.txt", a + "\n" + s1 + "\n" + s2 + "\n") == 1);
+    println("kenga mm-talk ok");
+    return 0;
+}

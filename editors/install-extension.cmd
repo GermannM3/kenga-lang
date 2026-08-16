@@ -1,15 +1,15 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-set VSIX=%~dp0vscode\kenga-3.10.0.vsix
+set VSIX=%~dp0vscode\kenga-3.13.0.vsix
 
 if not exist "%VSIX%" (
   where npx >nul 2>&1 || (
-    echo Need Node.js/npx to build the VSIX, or ship kenga-3.10.0.vsix in editors\vscode\
+    echo Need Node.js/npx to build the VSIX, or ship kenga-3.13.0.vsix in editors\vscode\
     exit /b 1
   )
   pushd vscode
-  call npx --yes @vscode/vsce package --skip-license -o kenga-3.10.0.vsix
+  call npx --yes @vscode/vsce package --skip-license -o kenga-3.13.0.vsix
   if errorlevel 1 exit /b 1
   popd
 )

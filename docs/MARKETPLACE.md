@@ -1,6 +1,7 @@
 # Publishing the VS Code / Cursor extension
 
-Publisher id in `editors/vscode/package.json`: **`Kenga-ai`**.
+Publisher id in `editors/vscode/package.json`: **`Kenga-ai`**.  
+На маркетплейсе сейчас **3.10.0** — язык уже **3.13.0** (birth, mm, HF-сид). Следующая заливка: `kenga-3.13.0.vsix`.
 
 ## Ручная заливка (без Azure / без vsce login)
 
@@ -10,7 +11,7 @@ Publisher id in `editors/vscode/package.json`: **`Kenga-ai`**.
 
 ```bat
 cd editors\vscode
-npx --yes @vscode/vsce package --skip-license -o kenga-3.10.0.vsix
+npx --yes @vscode/vsce package --skip-license -o kenga-3.13.0.vsix
 ```
 
 2. Открой https://marketplace.visualstudio.com/manage/publishers/Kenga-ai  

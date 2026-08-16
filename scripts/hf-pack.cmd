@@ -15,7 +15,9 @@ if exist hf\kenga-seed\weights.md copy /y hf\kenga-seed\weights.md "%OUT%\weight
 copy /y docs\HUGGINGFACE.md "%OUT%\HUGGINGFACE.md" >nul
 copy /y docs\KENGA_LM.md "%OUT%\KENGA_LM.md" >nul
 
+copy /y examples\ml\kenga_mm_core.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_mm_lm.kenga "%OUT%\examples\ml\" >nul
+copy /y examples\ml\kenga_mm_talk.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_birth.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_born.kenga "%OUT%\examples\ml\" >nul
 copy /y examples\ml\kenga_dec.kenga "%OUT%\examples\ml\" >nul
