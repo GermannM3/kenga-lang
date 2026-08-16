@@ -30,9 +30,9 @@
 | ✅ | Каталог **`kenga/`** — каноническая замена `src/` (`compiler/more`, `emit/c_seed`) |
 | ✅ | `docs/REPLACE_RUST.md` — карта модулей Rust → Kenga |
 | ✅ | **`more.kenga`**: birth→24 + **`c_seed`/`expr_c`** (Kenga пишет `.c`, `\"`/`\\n` в парсере) |
-| ✅ | **`more.kenga`**: tensor host builtins (`t_matmul` / `t_softmax` / `t_mean` / `t_mse`) |
-| ✅ | **`more.kenga`**: Prophet host builtins (`remember` / `foresee` / `save_mind`) |
-| ✅ | **`more.kenga`**: tape autograd (`ag_matmul` / `ag_backward` / `ag_step`) |
+| ✅ | **`more.kenga`**: tensor на списках (`native_ml.kenga`, не lite `t_*`) |
+| ✅ | **`more.kenga`**: Prophet на списках (`remember` / `foresee` / `save_mind`) |
+| ✅ | **`more.kenga`**: tape на списках (`ag_matmul` / `ag_backward` / `ag_step`) |
 | ✅ | **`more.kenga`**: `t_set` / `save_tensor` / `load_tensor` + `mlp_autograd` on Kenga VM |
 | ✅ | **`more.kenga`**: `load_ppm` / `load_wav` / `t_patch_mean` / `t_linear_grad` |
 | ✅ | **`more.kenga`**: `print` / `sleep_ms` / `learn` / `predict` |
@@ -65,7 +65,7 @@
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ✅ | Emit lite runtime: **`rt_types` / Prophet / tensor / tape / compiler / VM / selftest** — `kenga_lite.c` каркас |
 | ✅ | CI job `lite` без cargo; release **требует** `kenga-lite` (cargo `kenga` ещё legacy в архиве) |
-| ⬜ | VM на Kenga / native из своего codegen → убрать C host |
+| ✅ | more VM: тензор / tape / Prophet на списках Kenga (`native_ml.kenga`), не lite `t_*`/`ag_*`. CRT и ppm/wav I/O остаются |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 
 ## 2. Ядро и тензоры

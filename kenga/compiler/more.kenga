@@ -11,6 +11,10 @@
 //          t_set/save_tensor/load_tensor/sweep/now_ms/memory,
 //          load_ppm/load_wav/t_patch_mean/t_linear_grad,
 //          print/sleep_ms/learn/predict/unroll/remember_next/foresee_n
+// Tensor/tape/Prophet dispatch → native_ml.kenga (Kenga lists).
+// Host left: CRT + load_ppm/load_wav bytes.
+
+import "native_ml.kenga"
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -317,6 +321,7 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
     let slot_bases: list = [];
     let ip: i64 = start_ip;
     let slot_base: i64 = 0;
+    let agbox: list = [[]];
     while ip < len(code) {
         let op: i64 = code[ip]; ip = ip + 1;
         if op == OP_HALT() {
@@ -385,212 +390,211 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         }
         if op == OP_T_FROM() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_from(a[1], b[1]));
+            stack = push(a[0], nt_from(a[1], b[1]));
         }
         if op == OP_T_GET() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_get(a[1], b[1]));
+            stack = push(a[0], nt_get(a[1], b[1]));
         }
         if op == OP_T_MATMUL() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_matmul(a[1], b[1]));
+            stack = push(a[0], nt_matmul(a[1], b[1]));
         }
         if op == OP_T_SHAPE() {
-            let p = list_pop(stack); stack = push(p[0], t_shape(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_shape(p[1]));
         }
         if op == OP_T_ADD() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_add(a[1], b[1]));
+            stack = push(a[0], nt_add(a[1], b[1]));
         }
         if op == OP_TENSOR() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], tensor(a[1], b[1]));
+            stack = push(a[0], nt_tensor(a[1], b[1]));
         }
         if op == OP_T_FILL() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_fill(a[1], b[1]));
+            stack = push(a[0], nt_fill(a[1], b[1]));
         }
         if op == OP_T_SUB() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_sub(a[1], b[1]));
+            stack = push(a[0], nt_sub(a[1], b[1]));
         }
         if op == OP_T_MUL() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_mul(a[1], b[1]));
+            stack = push(a[0], nt_mul(a[1], b[1]));
         }
         if op == OP_T_RESHAPE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_reshape(a[1], b[1]));
+            stack = push(a[0], nt_reshape(a[1], b[1]));
         }
         if op == OP_T_TRANSPOSE() {
-            let p = list_pop(stack); stack = push(p[0], t_transpose(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_transpose(p[1]));
         }
         if op == OP_T_SCALE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_scale(a[1], b[1]));
+            stack = push(a[0], nt_scale(a[1], b[1]));
         }
         if op == OP_T_SUM() {
-            let p = list_pop(stack); stack = push(p[0], t_sum(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_sum(p[1]));
         }
         if op == OP_T_DOT() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_dot(a[1], b[1]));
+            stack = push(a[0], nt_dot(a[1], b[1]));
         }
         if op == OP_T_EXP() {
-            let p = list_pop(stack); stack = push(p[0], t_exp(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_texp(p[1]));
         }
         if op == OP_T_LOG() {
-            let p = list_pop(stack); stack = push(p[0], t_log(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_tlog(p[1]));
         }
         if op == OP_T_SOFTMAX() {
-            let p = list_pop(stack); stack = push(p[0], t_softmax(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_softmax(p[1]));
         }
         if op == OP_T_MEAN() {
-            let p = list_pop(stack); stack = push(p[0], t_mean(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_mean(p[1]));
         }
         if op == OP_T_MSE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], t_mse(a[1], b[1]));
+            stack = push(a[0], nt_mse(a[1], b[1]));
         }
         if op == OP_MEM_CONFIG() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], memory_config(a[1], b[1], c[1]));
+            stack = push(a[0], nt_mind(a[1], b[1], c[1]));
         }
         if op == OP_MEM_REMEMBER() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], remember(a[1], b[1], c[1]));
+            stack = push(a[0], nt_remember(a[1], b[1], c[1]));
         }
         if op == OP_MEM_SURPRISE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], surprise(a[1], b[1]));
+            stack = push(a[0], nt_surprise(a[1], b[1]));
         }
         if op == OP_MEM_FORESEE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], foresee(a[1], b[1]));
+            stack = push(a[0], nt_foresee(a[1], b[1]));
         }
         if op == OP_MEM_CONSOLIDATE() {
-            let p = list_pop(stack); stack = push(p[0], consolidate(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_consolidate(p[1]));
         }
         if op == OP_MEM_STATS() {
-            let p = list_pop(stack); stack = push(p[0], mem_stats(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_mem_stats(p[1]));
         }
         if op == OP_MEM_RECALL() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], recall(a[1], b[1], c[1]));
+            stack = push(a[0], nt_recall(a[1], b[1], c[1]));
         }
         if op == OP_SAVE_MIND() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], save_mind(a[1], b[1]));
+            stack = push(a[0], nt_save_mind(a[1], b[1]));
         }
         if op == OP_LOAD_MIND() {
-            let p = list_pop(stack); stack = push(p[0], load_mind(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_load_mind(p[1]));
         }
         if op == OP_AG_CLEAR() {
-            ag_clear();
+            nt_ag_clear(agbox);
             stack = push(stack, 0);
         }
         if op == OP_AG_PARAM() {
-            let p = list_pop(stack); stack = push(p[0], ag_param(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_param(agbox, p[1]));
         }
         if op == OP_AG_CONST() {
-            let p = list_pop(stack); stack = push(p[0], ag_const(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_const(agbox, p[1]));
         }
         if op == OP_AG_ADD() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_add(a[1], b[1]));
+            stack = push(a[0], nt_ag_add(agbox, a[1], b[1]));
         }
         if op == OP_AG_SUB() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_sub(a[1], b[1]));
+            stack = push(a[0], nt_ag_sub(agbox, a[1], b[1]));
         }
         if op == OP_AG_MUL() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_mul(a[1], b[1]));
+            stack = push(a[0], nt_ag_mul(agbox, a[1], b[1]));
         }
         if op == OP_AG_MATMUL() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_matmul(a[1], b[1]));
+            stack = push(a[0], nt_ag_matmul(agbox, a[1], b[1]));
         }
         if op == OP_AG_SCALE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_scale(a[1], b[1]));
+            stack = push(a[0], nt_ag_scale(agbox, a[1], b[1]));
         }
         if op == OP_AG_RELU() {
-            let p = list_pop(stack); stack = push(p[0], ag_relu(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_relu(agbox, p[1]));
         }
         if op == OP_AG_NEG() {
-            let p = list_pop(stack); stack = push(p[0], ag_neg(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_neg(agbox, p[1]));
         }
         if op == OP_AG_TRANSPOSE() {
-            let p = list_pop(stack); stack = push(p[0], ag_transpose(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_transpose(agbox, p[1]));
         }
         if op == OP_AG_RESHAPE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_reshape(a[1], b[1]));
+            stack = push(a[0], nt_ag_reshape(agbox, a[1], b[1]));
         }
         if op == OP_AG_EXP() {
-            let p = list_pop(stack); stack = push(p[0], ag_exp(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_exp(agbox, p[1]));
         }
         if op == OP_AG_SOFTMAX() {
-            let p = list_pop(stack); stack = push(p[0], ag_softmax(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_softmax(agbox, p[1]));
         }
         if op == OP_AG_MSE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_mse(a[1], b[1]));
+            stack = push(a[0], nt_ag_mse(agbox, a[1], b[1]));
         }
         if op == OP_AG_SUM() {
-            let p = list_pop(stack); stack = push(p[0], ag_sum(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_sum(agbox, p[1]));
         }
         if op == OP_AG_VALUE() {
-            let p = list_pop(stack); stack = push(p[0], ag_value(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_value(agbox, p[1]));
         }
         if op == OP_AG_GRAD() {
-            let p = list_pop(stack); stack = push(p[0], ag_grad(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_grad(agbox, p[1]));
         }
         if op == OP_AG_BACKWARD() {
-            let p = list_pop(stack); ag_backward(p[1]); stack = push(p[0], 0);
+            let p = list_pop(stack); nt_ag_backward(agbox, p[1]); stack = push(p[0], 0);
         }
         if op == OP_AG_STEP() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], ag_step(a[1], b[1]));
+            stack = push(a[0], nt_ag_step(agbox, a[1], b[1]));
         }
         if op == OP_AG_LOG() {
-            let p = list_pop(stack); stack = push(p[0], ag_log(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_ag_log(agbox, p[1]));
         }
         if op == OP_T_SET() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], t_set(a[1], b[1], c[1]));
+            stack = push(a[0], nt_set(a[1], b[1], c[1]));
         }
         if op == OP_SAVE_TENSOR() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], save_tensor(a[1], b[1]));
+            stack = push(a[0], nt_save_tensor(a[1], b[1]));
         }
         if op == OP_LOAD_TENSOR() {
-            let p = list_pop(stack); stack = push(p[0], load_tensor(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_load_tensor(p[1]));
         }
         if op == OP_SWEEP() {
-            sweep();
             stack = push(stack, 0);
         }
         if op == OP_NOW_MS() {
             stack = push(stack, now_ms());
         }
         if op == OP_MEMORY() {
-            stack = push(stack, memory());
+            stack = push(stack, nt_mind(0.12, 16, 8));
         }
         if op == OP_LOAD_PPM() {
-            let p = list_pop(stack); stack = push(p[0], load_ppm(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_wrap_host(load_ppm(p[1])));
         }
         if op == OP_LOAD_WAV() {
-            let p = list_pop(stack); stack = push(p[0], load_wav(p[1]));
+            let p = list_pop(stack); stack = push(p[0], nt_wrap_host(load_wav(p[1])));
         }
         if op == OP_T_PATCH_MEAN() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], t_patch_mean(a[1], b[1], c[1]));
+            stack = push(a[0], nt_patch_mean(a[1], b[1], c[1]));
         }
         if op == OP_T_LINEAR_GRAD() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], t_linear_grad(a[1], b[1], c[1]));
+            stack = push(a[0], nt_linear_grad(a[1], b[1], c[1]));
         }
         if op == OP_PRINT() {
             let p = list_pop(stack); stack = p[0]; print(p[1]);
@@ -600,23 +604,23 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         }
         if op == OP_LEARN() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], learn(a[1], b[1], c[1]));
+            stack = push(a[0], nt_learn(a[1], b[1], c[1]));
         }
         if op == OP_PREDICT() {
             let b = list_pop(stack); let a = list_pop(b[0]);
-            stack = push(a[0], predict(a[1], b[1]));
+            stack = push(a[0], nt_predict(a[1], b[1]));
         }
         if op == OP_UNROLL() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], unroll(a[1], b[1], c[1]));
+            stack = push(a[0], nt_unroll(a[1], b[1], c[1]));
         }
         if op == OP_FORESEE_N() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], foresee_n(a[1], b[1], c[1]));
+            stack = push(a[0], nt_foresee_n(a[1], b[1], c[1]));
         }
         if op == OP_REMEMBER_NEXT() {
             let d = list_pop(stack); let c = list_pop(d[0]); let b = list_pop(c[0]); let a = list_pop(b[0]);
-            stack = push(a[0], remember_next(a[1], b[1], c[1], d[1]));
+            stack = push(a[0], nt_remember_next(a[1], b[1], c[1], d[1]));
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }

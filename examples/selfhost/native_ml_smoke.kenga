@@ -1,0 +1,39 @@
+import "../../kenga/compiler/native_ml.kenga"
+
+fn main() -> i64 {
+    let a = nt_from([2, 3], [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    let b = nt_from([3, 2], [1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+    let c = nt_matmul(a, b);
+    assert(round(nt_get(c, 0)) == 4);
+    assert(round(nt_get(c, 3)) == 11);
+    let sm = nt_softmax(nt_from([2], [0.0, 0.0]));
+    assert(round(nt_get(sm, 0) * 10.0) == 5);
+
+    let box: list = [[]];
+    let w = nt_from([1, 1], [0.0]);
+    let x = nt_from([1, 1], [2.0]);
+    let y = nt_from([1, 1], [4.0]);
+    let i: i64 = 0;
+    while i < 40 {
+        nt_ag_clear(box);
+        let wid = nt_ag_param(box, w);
+        let pred = nt_ag_matmul(box, wid, nt_ag_const(box, x));
+        let loss = nt_ag_mse(box, pred, nt_ag_const(box, y));
+        nt_ag_backward(box, loss);
+        w = nt_ag_step(box, wid, 0.05);
+        i = i + 1;
+    }
+    assert(round(nt_get(nt_matmul(w, x), 0) * 10.0) == 40);
+
+    let m = nt_mind(0.01, 8, 8);
+    assert(nt_remember(m, [10.0, 0.0], 5.0) == 1);
+    let f = nt_foresee(m, [3.0, 4.0]);
+    let p = nt_predict(m, [3.0, 4.0]);
+    assert(nt_surprise(f, [10.0, 0.0]) < nt_surprise(p, [10.0, 0.0]));
+    assert(nt_save_mind(m, "minds/_nt_mind.km") == 1);
+    let m2 = nt_load_mind("minds/_nt_mind.km");
+    assert(len(nt_predict(m2, [3.0, 4.0])) == 2);
+
+    println("native ml ok");
+    return 0;
+}
