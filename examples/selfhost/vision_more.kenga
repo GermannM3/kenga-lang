@@ -1,0 +1,24 @@
+// Vision/audio host builtins on more.kenga VM.
+//   bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
+
+fn main() -> i64 {
+    let img = load_ppm("examples/ml/assets/dot.ppm");
+    let sh = t_shape(img);
+    assert(len(sh) == 3);
+    let m = t_mean(img);
+    assert(len(t_shape(m)) == 1);
+    let p = t_patch_mean(img, 1, 1);
+    assert(len(t_shape(p)) == 3);
+    let wav = load_wav("examples/ml/assets/beep.wav");
+    assert(len(t_shape(wav)) >= 1);
+    let w = t_from([1, 3], [0.0, 0.0, 0.0]);
+    let x = t_reshape(t_mean(img), [3, 1]);
+    let y = t_from([1, 1], [1.5]);
+    let g = t_linear_grad(w, x, y);
+    let l0 = t_mse(t_matmul(w, x), y);
+    w = t_sub(w, t_scale(g, 0.5));
+    let l1 = t_mse(t_matmul(w, x), y);
+    assert(l1 < l0);
+    println("vision more ok");
+    return 0;
+}

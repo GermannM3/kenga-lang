@@ -8,7 +8,8 @@
 //          t_exp/t_log/t_softmax/t_mean/t_mse,
 //          memory_config/remember/foresee/consolidate/save_mind,
 //          ag_clear/ag_param/ag_matmul/ag_mse/ag_backward/ag_step,
-//          t_set/save_tensor/load_tensor/sweep/now_ms/memory
+//          t_set/save_tensor/load_tensor/sweep/now_ms/memory,
+//          load_ppm/load_wav/t_patch_mean/t_linear_grad
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -104,6 +105,10 @@ fn OP_LOAD_TENSOR() -> i64 { return 91; }
 fn OP_SWEEP() -> i64 { return 92; }
 fn OP_NOW_MS() -> i64 { return 93; }
 fn OP_MEMORY() -> i64 { return 94; }
+fn OP_LOAD_PPM() -> i64 { return 95; }
+fn OP_LOAD_WAV() -> i64 { return 96; }
+fn OP_T_PATCH_MEAN() -> i64 { return 97; }
+fn OP_T_LINEAR_GRAD() -> i64 { return 98; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -564,6 +569,20 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         }
         if op == OP_MEMORY() {
             stack = push(stack, memory());
+        }
+        if op == OP_LOAD_PPM() {
+            let p = list_pop(stack); stack = push(p[0], load_ppm(p[1]));
+        }
+        if op == OP_LOAD_WAV() {
+            let p = list_pop(stack); stack = push(p[0], load_wav(p[1]));
+        }
+        if op == OP_T_PATCH_MEAN() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], t_patch_mean(a[1], b[1], c[1]));
+        }
+        if op == OP_T_LINEAR_GRAD() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], t_linear_grad(a[1], b[1], c[1]));
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
@@ -1130,6 +1149,8 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "ag_grad" { uop = OP_AG_GRAD(); }
                                                     if id[0] == "ag_backward" { uop = OP_AG_BACKWARD(); }
                                                     if id[0] == "load_tensor" { uop = OP_LOAD_TENSOR(); }
+                                                    if id[0] == "load_ppm" { uop = OP_LOAD_PPM(); }
+                                                    if id[0] == "load_wav" { uop = OP_LOAD_WAV(); }
                                                     if uop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1142,6 +1163,8 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "remember" { t3 = OP_MEM_REMEMBER(); }
                                                     if id[0] == "recall" { t3 = OP_MEM_RECALL(); }
                                                     if id[0] == "t_set" { t3 = OP_T_SET(); }
+                                                    if id[0] == "t_patch_mean" { t3 = OP_T_PATCH_MEAN(); }
+                                                    if id[0] == "t_linear_grad" { t3 = OP_T_LINEAR_GRAD(); }
                                                     if t3 != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1951,6 +1974,7 @@ fn main() -> i64 {
     assert(run_file("examples/ml/autograd_tape.kenga") == 0);
     assert(run_file("examples/selfhost/tensor_io_more.kenga") == 0);
     assert(run_file("examples/ml/mlp_autograd.kenga") == 0);
+    assert(run_file("examples/selfhost/vision_more.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
