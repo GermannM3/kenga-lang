@@ -22,6 +22,7 @@ scripts\freedom-smoke.cmd
 | `emit/lower_c.kenga` | recursive → C99 (events/struct/f64) | кусок `codegen.rs` |
 | `emit/rt_kval.kenga` | tagged KVal + events + file IO runtime | зародыш runtime host |
 | `emit/rt_kval_mem.kenga` | Prophet world-model на KVal | кусок `memory.rs` в native emit |
+| `emit/rt_kval_tensor.kenga` | dense f64 tensors на KVal | кусок `tensor.rs` в native emit |
 | `emit/rt_cli.kenga` | `main` kenga-lite → `generated/rt_cli.inc.c` | кусок `main.rs` / ручного host |
 | `emit/rt_mem.kenga` | die / xrealloc / xstrdup | кусок runtime host |
 | `emit/rt_host.kenga` | read_file + import flatten | кусок driver.rs |

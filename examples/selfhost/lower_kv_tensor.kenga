@@ -1,0 +1,17 @@
+fn main() -> i64 {
+    let a = t_from([2, 3], [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    let b = t_from([3, 2], [1.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+    let c = t_matmul(a, b);
+    assert(round(t_get(c, 0)) == 4);
+    assert(round(t_get(c, 1)) == 5);
+    assert(round(t_get(c, 2)) == 10);
+    assert(round(t_get(c, 3)) == 11);
+    let sh = t_shape(c);
+    assert(sh[0] == 2);
+    assert(sh[1] == 2);
+    let z = t_fill(tensor(2, 2), 3.0);
+    let w = t_add(z, z);
+    assert(round(t_get(w, 0)) == 6);
+    println("tensor kv ok");
+    return 0;
+}

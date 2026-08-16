@@ -48,6 +48,7 @@
 | ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
 | ✅ | **`lower_kv`**: `now_ms` |
 | ✅ | **`lower_kv`**: Memory `memory_config` / `learn` / `predict` / hybrid `foresee` |
+| ✅ | **`lower_kv`**: Tensor `t_from` / `t_matmul` / `t_add` / `t_shape` |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
 | ✅ | **`bc_src_c`**: `print` / `sleep_ms` / `now_ms` |
