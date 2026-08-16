@@ -30,6 +30,7 @@
 | ✅ | `docs/REPLACE_RUST.md` — карта модулей Rust → Kenga |
 | ✅ | **`more.kenga`**: birth→24 + **`c_seed`/`expr_c`** (Kenga пишет `.c`, `\"`/`\\n` в парсере) |
 | ✅ | **`more.kenga`**: tensor host builtins (`t_matmul` / `t_softmax` / `t_mean` / `t_mse`) |
+| ✅ | **`more.kenga`**: Prophet host builtins (`remember` / `foresee` / `save_mind`) |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |

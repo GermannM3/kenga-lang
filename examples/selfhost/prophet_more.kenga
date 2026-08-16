@@ -1,0 +1,28 @@
+// Prophet Memory on more.kenga VM (host remember / foresee / save_mind).
+//   bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
+
+fn main() -> i64 {
+    let m = memory_config(10, 8, 4);
+    assert(remember(m, [9, 0, 9], 80) == true);
+    assert(remember(m, [1, 1, 1], 5) == false);
+    let st = mem_stats(m);
+    assert(st[0] == 1);
+    consolidate(m);
+    let p = foresee(m, [9, 0, 0]);
+    assert(len(p) == 3);
+    let rec = recall(m, [9, 0, 9], 2);
+    assert(len(rec) >= 1);
+
+    save_mind(m, "minds/_more_roundtrip.km");
+    let m2 = load_mind("minds/_more_roundtrip.km");
+    let st2 = mem_stats(m2);
+    assert(st2[1] >= 1);
+
+    let pred = foresee(m, [1, 2, 3]);
+    let s = surprise(pred, [1, 2, 3]);
+    if s > 0.2 {
+        remember(m, [1, 2, 3], s);
+    }
+    println("prophet more ok");
+    return 0;
+}

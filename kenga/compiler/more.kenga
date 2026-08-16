@@ -5,7 +5,8 @@
 //          on/emit/pump/pending, types/ttl skip, && || % !, typeof/to_str,
 //          t_from/t_get/t_matmul/t_shape/t_add/tensor/t_fill,
 //          t_sub/t_mul/t_reshape/t_transpose/t_scale/t_sum/t_dot,
-//          t_exp/t_log/t_softmax/t_mean/t_mse
+//          t_exp/t_log/t_softmax/t_mean/t_mse,
+//          memory_config/remember/foresee/consolidate/save_mind
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -65,6 +66,15 @@ fn OP_T_LOG() -> i64 { return 55; }
 fn OP_T_SOFTMAX() -> i64 { return 56; }
 fn OP_T_MEAN() -> i64 { return 57; }
 fn OP_T_MSE() -> i64 { return 58; }
+fn OP_MEM_CONFIG() -> i64 { return 59; }
+fn OP_MEM_REMEMBER() -> i64 { return 60; }
+fn OP_MEM_SURPRISE() -> i64 { return 61; }
+fn OP_MEM_FORESEE() -> i64 { return 62; }
+fn OP_MEM_CONSOLIDATE() -> i64 { return 63; }
+fn OP_MEM_STATS() -> i64 { return 64; }
+fn OP_MEM_RECALL() -> i64 { return 65; }
+fn OP_SAVE_MIND() -> i64 { return 66; }
+fn OP_LOAD_MIND() -> i64 { return 67; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -399,6 +409,39 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         if op == OP_T_MSE() {
             let b = list_pop(stack); let a = list_pop(b[0]);
             stack = push(a[0], t_mse(a[1], b[1]));
+        }
+        if op == OP_MEM_CONFIG() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], memory_config(a[1], b[1], c[1]));
+        }
+        if op == OP_MEM_REMEMBER() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], remember(a[1], b[1], c[1]));
+        }
+        if op == OP_MEM_SURPRISE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], surprise(a[1], b[1]));
+        }
+        if op == OP_MEM_FORESEE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], foresee(a[1], b[1]));
+        }
+        if op == OP_MEM_CONSOLIDATE() {
+            let p = list_pop(stack); stack = push(p[0], consolidate(p[1]));
+        }
+        if op == OP_MEM_STATS() {
+            let p = list_pop(stack); stack = push(p[0], mem_stats(p[1]));
+        }
+        if op == OP_MEM_RECALL() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], recall(a[1], b[1], c[1]));
+        }
+        if op == OP_SAVE_MIND() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], save_mind(a[1], b[1]));
+        }
+        if op == OP_LOAD_MIND() {
+            let p = list_pop(stack); stack = push(p[0], load_mind(p[1]));
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
@@ -910,6 +953,9 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "t_reshape" { hop = OP_T_RESHAPE(); }
                                                     if id[0] == "t_scale" { hop = OP_T_SCALE(); }
                                                     if id[0] == "t_mse" { hop = OP_T_MSE(); }
+                                                    if id[0] == "surprise" { hop = OP_MEM_SURPRISE(); }
+                                                    if id[0] == "foresee" { hop = OP_MEM_FORESEE(); }
+                                                    if id[0] == "save_mind" { hop = OP_SAVE_MIND(); }
                                                     if hop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -927,11 +973,31 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "t_softmax" { uop = OP_T_SOFTMAX(); }
                                                     if id[0] == "t_sum" { uop = OP_T_SUM(); }
                                                     if id[0] == "t_mean" { uop = OP_T_MEAN(); }
+                                                    if id[0] == "consolidate" { uop = OP_MEM_CONSOLIDATE(); }
+                                                    if id[0] == "mem_stats" { uop = OP_MEM_STATS(); }
+                                                    if id[0] == "load_mind" { uop = OP_LOAD_MIND(); }
                                                     if uop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
                                                         j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                                         code = push(code, uop);
+                                                        i = j;
+                                                    } else {
+                                                    let t3: i64 = 0;
+                                                    if id[0] == "memory_config" { t3 = OP_MEM_CONFIG(); }
+                                                    if id[0] == "remember" { t3 = OP_MEM_REMEMBER(); }
+                                                    if id[0] == "recall" { t3 = OP_MEM_RECALL(); }
+                                                    if t3 != 0 {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, t3);
                                                         i = j;
                                                     } else {
                                             let argc: i64 = 0;
@@ -959,6 +1025,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                 patches = push(patches, [addr_at, fni]);
                                             }
                                             i = j;
+                                                    }
                                                     }
                                                     }
                                                     }
@@ -1722,6 +1789,8 @@ fn main() -> i64 {
     assert(run_file("kenga/emit/c_seed.kenga") == 0);
     assert(run_file("kenga/emit/expr_c.kenga") == 0);
     assert(run_file("examples/selfhost/tensor_more.kenga") == 0);
+    assert(run_file("examples/selfhost/prophet_more.kenga") == 0);
+    assert(run_file("examples/prophet.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
