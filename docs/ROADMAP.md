@@ -37,6 +37,7 @@
 | ✅ | **`more.kenga`**: `load_ppm` / `load_wav` / `t_patch_mean` / `t_linear_grad` |
 | ✅ | **`more.kenga`**: `print` / `sleep_ms` / `learn` / `predict` |
 | ✅ | **`more.kenga`**: `unroll` / `remember_next` |
+| ✅ | **`more.kenga`**: `foresee_n` |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |

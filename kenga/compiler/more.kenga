@@ -10,7 +10,7 @@
 //          ag_clear/ag_param/ag_matmul/ag_mse/ag_backward/ag_step,
 //          t_set/save_tensor/load_tensor/sweep/now_ms/memory,
 //          load_ppm/load_wav/t_patch_mean/t_linear_grad,
-//          print/sleep_ms/learn/predict/unroll/remember_next
+//          print/sleep_ms/learn/predict/unroll/remember_next/foresee_n
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -116,6 +116,7 @@ fn OP_LEARN() -> i64 { return 101; }
 fn OP_PREDICT() -> i64 { return 102; }
 fn OP_UNROLL() -> i64 { return 103; }
 fn OP_REMEMBER_NEXT() -> i64 { return 104; }
+fn OP_FORESEE_N() -> i64 { return 105; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -608,6 +609,10 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         if op == OP_UNROLL() {
             let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
             stack = push(a[0], unroll(a[1], b[1], c[1]));
+        }
+        if op == OP_FORESEE_N() {
+            let c = list_pop(stack); let b = list_pop(c[0]); let a = list_pop(b[0]);
+            stack = push(a[0], foresee_n(a[1], b[1], c[1]));
         }
         if op == OP_REMEMBER_NEXT() {
             let d = list_pop(stack); let c = list_pop(d[0]); let b = list_pop(c[0]); let a = list_pop(b[0]);
@@ -1198,6 +1203,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "t_linear_grad" { t3 = OP_T_LINEAR_GRAD(); }
                                                     if id[0] == "learn" { t3 = OP_LEARN(); }
                                                     if id[0] == "unroll" { t3 = OP_UNROLL(); }
+                                                    if id[0] == "foresee_n" { t3 = OP_FORESEE_N(); }
                                                     if t3 != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -2040,6 +2046,7 @@ fn main() -> i64 {
     assert(run_file("examples/selfhost/print_more.kenga") == 0);
     assert(run_file("examples/selfhost/learn_more.kenga") == 0);
     assert(run_file("examples/selfhost/unroll_more.kenga") == 0);
+    assert(run_file("examples/selfhost/foresee_n_more.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }

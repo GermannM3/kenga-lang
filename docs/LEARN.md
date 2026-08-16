@@ -42,7 +42,7 @@ kenga run --lite examples/hello.kenga
 - `&&` `||` `!` `%` `typeof` `to_str` (lite, `more`, lowerers, `bc_src_c`)
 - `print` без `\n`, `sleep_ms` (lite, `more`; `lower_c` / `lower_kv` / `bc_src_c`)
 - `learn` / `predict` / `unroll` / `remember_next` на `more` VM (хост — lite builtins)
-- `foresee_n` на lite (`examples/unroll.kenga` без Rust)
+- `foresee_n` на lite и `more` (`examples/unroll.kenga` без Rust)
 - `now_ms` — часы, не заглушка (lite, `more`, `lower_c` / `lower_kv` / `bc_src_c`); комментарии `//` и `/* … */`
 
 ## 3. Списки и struct
@@ -89,7 +89,7 @@ kenga run --lite examples/ml/kenga_mm_lm.kenga
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
 
-`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `print_more.kenga`, `learn_more.kenga`, `unroll_more.kenga`, `examples/prophet.kenga`.
+`more.kenga` на своей VM: `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga`, `print_more.kenga`, `learn_more.kenga`, `unroll_more.kenga`, `foresee_n_more.kenga`, `examples/prophet.kenga`.
 
 `kenga_mm_lm` — картинка + звук → подпись (`kenga vidit … i slyshit ton`). Это сид большой модели, не CLIP.
 
