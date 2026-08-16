@@ -58,6 +58,7 @@
 | ✅ | **`bc_src_c`**: Tensor (`t_from` / `t_matmul` / `t_get` / `t_shape` / `tensor` / `t_fill`, ops 47–52) |
 | ✅ | **`bc_src_c`**: Memory (`memory_config` / `learn` / `predict`, ops 53–55) |
 | ✅ | **`bc_src_c`**: Prophet (`remember` / `unroll` / `save_mind` / `load_mind` / `foresee`, ops 63–71) |
+| ✅ | **`bc_src_c`**: `foresee` = neural + top-3 episode blend (как lite/KVal), не alias `predict` |
 | ✅ | **`bc_src_c`**: tape (`ag_clear` / `ag_param` / `ag_const` / `ag_matmul` / `ag_mse` / `ag_backward` / `ag_step`, ops 56–62) |
 | ✅ | **`bc_src_c`**: полный tape (`ag_add`/`sub`/`mul`/`scale`/`relu`/`neg`/`transpose`/`reshape`/`exp`/`log`/`softmax`/`sum`/`value`/`grad`, ops 72–85) |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |

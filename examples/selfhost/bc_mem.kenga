@@ -1,4 +1,13 @@
 fn main() -> i64 {
+    let fresh = memory_config(0.01, 8, 8);
+    let idn = foresee(fresh, [3.0, 4.0]);
+    assert(round(idn[0]) == 3);
+    assert(round(idn[1]) == 4);
+    assert(remember(fresh, [10.0, 0.0], 5.0) == 1);
+    let blended = foresee(fresh, [3.0, 4.0]);
+    let neural = predict(fresh, [3.0, 4.0]);
+    assert(surprise(blended, [10.0, 0.0]) < surprise(neural, [10.0, 0.0]));
+
     let m = memory_config(0.12, 16, 8);
     learn(m, [1, 2, 3], [2, 3, 4]);
     let p = predict(m, [1, 2, 3]);

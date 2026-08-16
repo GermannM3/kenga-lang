@@ -336,6 +336,26 @@ static V bm_predict_list(BmMind *m, const double *xp, int xn) {
   BmWorld tmp; double hh[BM_H], yy[BM_D]; int n; tmp = m->model; bm_ensure(&tmp, xn > 0 ? xn : 1);
   bm_fwd(&tmp, xp, xn, hh, yy); n = xn > 0 ? xn : tmp.dim; if (n > tmp.dim) n = tmp.dim; return pat_list(yy, n);
 }
+static void bm_blend_ep(const BmMind *m, const double *obs, int on, double *out, int *out_n) {
+  int i, t, dim = on; double wsum = 0.0; double ws[BM_EP]; int idx[BM_EP]; int n = m->nep;
+  if (n == 0) { *out_n = 0; return; }
+  for (i = 0; i < n; i++) { double d = bm_dist(m->ep[i].pattern, m->ep[i].dim, obs, on); ws[i] = 1.0 / (0.05 + d); idx[i] = i; if (m->ep[i].dim > dim) dim = m->ep[i].dim; }
+  if (dim > BM_D) dim = BM_D;
+  for (i = 0; i < n; i++) { int j; for (j = i + 1; j < n; j++) { if (ws[idx[j]] > ws[idx[i]]) { int tmp = idx[i]; idx[i] = idx[j]; idx[j] = tmp; } } }
+  t = n < 3 ? n : 3; for (i = 0; i < dim; i++) out[i] = 0.0;
+  for (i = 0; i < t; i++) { int ei = idx[i], k; wsum += ws[ei]; for (k = 0; k < dim; k++) { double p = k < m->ep[ei].dim ? m->ep[ei].pattern[k] : 0.0; out[k] += ws[ei] * p; } }
+  if (wsum < 1e-9) wsum = 1e-9; for (i = 0; i < dim; i++) out[i] /= wsum; *out_n = dim;
+}
+static V bm_foresee_list(BmMind *m, const double *xp, int xn) {
+  BmWorld tmp; double hh[BM_H], neural[BM_D], core[BM_D], out[BM_D]; int nn, cn, dim, i; double nw, cw;
+  tmp = m->model; bm_ensure(&tmp, xn > 0 ? xn : 1); bm_fwd(&tmp, xp, xn, hh, neural);
+  nn = xn > 0 ? xn : tmp.dim; if (nn > tmp.dim) nn = tmp.dim; bm_blend_ep(m, xp, xn, core, &cn);
+  if (cn == 0) { if (m->model.steps == 0) return pat_list(xp, xn); return pat_list(neural, nn); }
+  dim = nn > cn ? nn : cn; if (xn > dim) dim = xn; if (dim > BM_D) dim = BM_D;
+  nw = m->model.steps > 0 ? 0.6 : 0.15; cw = 1.0 - nw;
+  for (i = 0; i < dim; i++) { double n = i < nn ? neural[i] : 0.0; double c = i < cn ? core[i] : 0.0; double o = i < xn ? xp[i] : 0.0; out[i] = nw * n + cw * c * 0.8 + o * 0.2; }
+  return pat_list(out, dim);
+}
 static void bm_write_f64s(FILE *f, const double *xs, int n) {
   int i; for (i = 0; i < n; i++) { if (i) fputc(' ', f); fprintf(f, "%.17g", xs[i]); } fputc('\n', f);
 }
@@ -685,9 +705,13 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       double xp[BM_D], yp[BM_D]; int xn = vlist_pat(x, xp, BM_D); int yn = vlist_pat(y, yp, BM_D);
       { double loss = bm_train(&m->model, xp, xn, yp, yn, m->lr); bm_ep_push(m, xp, xn, yp, yn); stack[sp++] = Vf(loss); }
     }
-    else if (op == OP_PREDICT || op == OP_FORESEE) {
+    else if (op == OP_PREDICT) {
       V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]); double xp[BM_D]; int xn = vlist_pat(x, xp, BM_D);
       stack[sp++] = bm_predict_list(m, xp, xn);
+    }
+    else if (op == OP_FORESEE) {
+      V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]); double xp[BM_D]; int xn = vlist_pat(x, xp, BM_D);
+      stack[sp++] = bm_foresee_list(m, xp, xn);
     }
     else if (op == OP_REMEMBER) {
       double s = as_f(stack[--sp]); V pat=stack[--sp]; BmMind *m = bm_get(stack[--sp]); double xp[BM_D]; int xn;
