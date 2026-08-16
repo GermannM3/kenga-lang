@@ -29,7 +29,7 @@ scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 scripts\hf-pack.cmd
 ```
 
-Word-LM на CPU lite: L=2, D=16, V=20. Дописывает `<s> kenga zhivet v yazyke .`  
+Word-LM на CPU lite: L=2, D=32, V=20. Дописывает `<s> kenga zhivet v yazyke .`  
 Char-LM / mm-gen: тот же decoder, **CTX=12** (промпт `"kenga vidit "` больше не режется). Веса в `minds/kenga_char_*`. Talk грузит их без повторного обучения.  
 Триграмма пишет обрывки синтаксиса. Ощутимый результат: `scripts\kenga-birth.cmd` — модель дописывает seed с `"fn add"`, кладёт `examples/ml/kenga_born.kenga`, lite выполняет и печатает **24** (`fact(add(2,3)-1)`). Не GGUF.
 
@@ -58,7 +58,7 @@ Char-LM / mm-gen: тот же decoder, **CTX=12** (промпт `"kenga vidit "`
 3. **Decoder GPT-формы** — `kenga_lm.kenga`.
 4. **Char-LM на нашем исходнике** — `kenga_charlm.kenga` + `kenga_char_talk.kenga`.
 5. **Триграмма на list/i64** — `kenga_trigram.kenga`.
-6. **Word-decoder + vis-bias** — `kenga_mm_words.kenga` ← вы здесь (D=16, L=1, CTX=12, 12 токенов; ещё `kenga zhivet v yazyke`).
+6. **Word-decoder + vis-bias** — `kenga_mm_words.kenga` (D=16, L=1, CTX=12). Word decoder: `kenga_lm.kenga` D=32 L=2.
 7. Больше D/L, байтовый/BPE словарь, длинный контекст.
 8. GPU backend. Чужой GGUF — не доказательство.
 9. Большая мультимодальная: git (пример) + Hugging Face `Kenga-ai/kenga-mm`. Сид и упаковка: `docs/HUGGINGFACE.md`.

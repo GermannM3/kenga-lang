@@ -1,18 +1,18 @@
 // Decoder-only transformer on Kenga tensors (same machine as GPT/Grok).
 // This file IS the architecture. Scale is D/L/H/V + data + GPU — not a different language.
 //
-// Today (lite CPU):  D=16 L=2 H=2 V=20  ~6k weights, closed vocab, seconds.
+// Today (lite CPU):  D=32 L=2 H=2 V=20  closed vocab.
 // Half-Grok ballpark: D=4096 L=48 H=32 V=128k  + MoE + 1e12 tokens + GPU.
 // Same attn / residual / FFN / RMS / LM-head. Grow the numbers, not the syntax.
 //
 //   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_lm.kenga
 
 fn V() -> i64 { return 20; }
-fn D() -> i64 { return 16; }
+fn D() -> i64 { return 32; }
 fn T() -> i64 { return 6; }
 fn L() -> i64 { return 2; }
 fn H() -> i64 { return 2; }
-fn FF() -> i64 { return 32; }
+fn FF() -> i64 { return 64; }
 
 fn tok(i: i64) -> str {
     if i == 0 { return "<s>"; }
@@ -235,7 +235,7 @@ fn pad6(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64) -> list {
 
 fn main() -> i64 {
     println("=== kenga decoder (GPT-shaped, lite CPU) ===");
-    println("arch: decoder L=2 D=16 causal-attn FFN RMS residual — GPT blocks, CPU scale");
+    println("arch: decoder L=2 D=32 causal-attn FFN RMS residual — GPT blocks, CPU scale");
     let d: i64 = D();
     let ff: i64 = FF();
     let e = fill_w(V(), d, 7);
