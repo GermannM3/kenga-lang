@@ -328,8 +328,16 @@ fn main() -> i64 {
     s = s + "\n";
     s = s + "static unsigned char *tl_read_bytes(const char *path, size_t *out_len) {\n";
     s = s + "  FILE *f = fopen(path, \"rb\");\n";
+    s = s + "  char alt[512];\n";
     s = s + "  long sz;\n";
     s = s + "  unsigned char *buf;\n";
+    s = s + "  if (!f && path[0] == '.' && path[1] == '.' && (path[2] == '/' || path[2] == '\\\\'))\n";
+    s = s + "    f = fopen(path + 3, \"rb\");\n";
+    s = s + "  if (!f && strlen(path) + 4 < sizeof(alt)) {\n";
+    s = s + "    alt[0] = '.'; alt[1] = '.'; alt[2] = '/';\n";
+    s = s + "    memcpy(alt + 3, path, strlen(path) + 1);\n";
+    s = s + "    f = fopen(alt, \"rb\");\n";
+    s = s + "  }\n";
     s = s + "  if (!f) return NULL;\n";
     s = s + "  if (fseek(f, 0, SEEK_END) != 0) {\n";
     s = s + "    fclose(f);\n";

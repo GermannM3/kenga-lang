@@ -323,8 +323,16 @@ static void tl_print(const Tensor *t) {
 
 static unsigned char *tl_read_bytes(const char *path, size_t *out_len) {
   FILE *f = fopen(path, "rb");
+  char alt[512];
   long sz;
   unsigned char *buf;
+  if (!f && path[0] == '.' && path[1] == '.' && (path[2] == '/' || path[2] == '\\'))
+    f = fopen(path + 3, "rb");
+  if (!f && strlen(path) + 4 < sizeof(alt)) {
+    alt[0] = '.'; alt[1] = '.'; alt[2] = '/';
+    memcpy(alt + 3, path, strlen(path) + 1);
+    f = fopen(alt, "rb");
+  }
   if (!f) return NULL;
   if (fseek(f, 0, SEEK_END) != 0) {
     fclose(f);
