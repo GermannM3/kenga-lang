@@ -260,6 +260,7 @@ fn runtime_c() -> str {
     s = s + "#include <windows.h>\n";
     s = s + "#else\n";
     s = s + "#include <unistd.h>\n";
+    s = s + "#include <sys/time.h>\n";
     s = s + "#endif\n";
     s = s + "static const char *k_i64_to_str(int64_t n) {\n";
     s = s + "  char buf[32]; char *o;\n";
@@ -277,7 +278,16 @@ fn runtime_c() -> str {
     s = s + "#else\n";
     s = s + "  usleep((useconds_t)n * 1000);\n";
     s = s + "#endif\n";
-    s = s + "  return kval_i64(0);\n}\n\n";
+    s = s + "  return kval_i64(0);\n}\n";
+    s = s + "static int64_t k_now_ms(void) {\n";
+    s = s + "#ifdef _WIN32\n";
+    s = s + "  return (int64_t)GetTickCount64();\n";
+    s = s + "#else\n";
+    s = s + "  struct timeval tv;\n";
+    s = s + "  gettimeofday(&tv, 0);\n";
+    s = s + "  return (int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000;\n";
+    s = s + "#endif\n";
+    s = s + "}\n\n";
     return s;
 }
 
@@ -441,6 +451,10 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
             if id[0] == "pending" {
                 assert(s[j] == ")"); j = j + 1;
                 return ["kval_i64(ke_pending())", j, 0, ""];
+            }
+            if id[0] == "now_ms" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["kval_i64(k_now_ms())", j, 0, ""];
             }
             if id[0] == "typeof" {
                 let ar = lower_cmp(s, j, decls);
@@ -1191,6 +1205,8 @@ fn main() -> i64 {
     assert(em_tostr[0] == "kval_str(k_i64_to_str(kval_as_i64(kval_i64(42LL))))");
     let em_sleep = lower_cmp("sleep_ms(0)", 0, []);
     assert(em_sleep[0] == "k_sleep_ms(kval_as_i64(kval_i64(0LL)))");
+    let em_now = lower_cmp("now_ms()", 0, []);
+    assert(em_now[0] == "kval_i64(k_now_ms())");
     let em_print = lower_stmt("print(\"x\");", 0, 1, [], 1);
     assert(em_print[0] == "  kenga_print_val(kval_str(\"x\")); fflush(stdout);\n");
 
@@ -1203,7 +1219,10 @@ fn main() -> i64 {
     let kvpr = resolve_imports("examples/selfhost/lower_kv_print.kenga", 0);
     assert(write_file("bootstrap/generated/lower_kv_print.c", lower_program(kvpr)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print}.c");
+    let kvnow = resolve_imports("examples/selfhost/lower_kv_now.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_kv_now.c", lower_program(kvnow)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now}.c");
     println("lower_kv ok");
     return 0;
 }

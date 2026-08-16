@@ -36,23 +36,16 @@ static int64_t k_now_ms(void) {
 #endif
 }
 
-static void on_0(KVal x);
-static void on_1(KVal x);
-
-static void on_0(KVal x) {
-  (void)(kval_i64(ke_emit(kval_as_str(kval_str("pong")), x)));
-}
-
-static void on_1(KVal x) {
-  kenga_println_val(x);
-}
 
 int main(void) {
-  ke_listen("ping", on_0, 1);
-  ke_listen("pong", on_1, 1);
-  (void)(kval_i64(ke_emit(kval_as_str(kval_str("ping")), kval_i64(7LL))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(ke_pump(kval_as_i64(kval_i64(8LL))))) == kval_as_i64(kval_i64(2LL)))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(ke_pending())) == kval_as_i64(kval_i64(0LL)))));
+  KVal t = kval_i64(0);
+  KVal t2 = kval_i64(0);
+  t = kval_i64(k_now_ms());
+  (void)(k_sleep_ms(kval_as_i64(kval_i64(0LL))));
+  t2 = kval_i64(k_now_ms());
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(t) >= kval_as_i64(kval_i64(0LL)))));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(t2) >= kval_as_i64(t))));
+  kenga_println_val(kval_str("now kv ok"));
   return (int)kval_as_i64(kval_i64(0LL));
   return 0;
 }

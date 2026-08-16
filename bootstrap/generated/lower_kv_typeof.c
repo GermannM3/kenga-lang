@@ -4,6 +4,7 @@
 #include <windows.h>
 #else
 #include <unistd.h>
+#include <sys/time.h>
 #endif
 static const char *k_i64_to_str(int64_t n) {
   char buf[32]; char *o;
@@ -24,6 +25,15 @@ static KVal k_sleep_ms(int64_t n) {
   usleep((useconds_t)n * 1000);
 #endif
   return kval_i64(0);
+}
+static int64_t k_now_ms(void) {
+#ifdef _WIN32
+  return (int64_t)GetTickCount64();
+#else
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000;
+#endif
 }
 
 
