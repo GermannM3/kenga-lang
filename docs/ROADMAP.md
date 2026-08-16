@@ -40,6 +40,7 @@
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
 | ✅ | **`kenga/emit/core_c.kenga`** — while / if / for / list → C99 self-check |
 | ✅ | **`kenga/emit/lower_c.kenga`** — agent / for / lists / **struct** / **elif** / **f64** / import → native C |
+| ✅ | **`lower_c`**: `now_ms` |
 | ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
