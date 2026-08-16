@@ -12,6 +12,7 @@
 //          t_set/save_tensor/load_tensor/sweep/now_ms/memory,
 //          load_ppm/load_wav/t_patch_mean/t_linear_grad,
 //          print/sleep_ms/learn/predict/unroll/remember_next/foresee_n
+//          argc/arg/file_exists/read_line (guest argv skips more path)
 // Tensor/tape/Prophet dispatch → native_ml.kenga (Kenga lists).
 // Host left: CRT. ppm/wav via read_bytes + Kenga parse.
 
@@ -122,6 +123,10 @@ fn OP_PREDICT() -> i64 { return 102; }
 fn OP_UNROLL() -> i64 { return 103; }
 fn OP_REMEMBER_NEXT() -> i64 { return 104; }
 fn OP_FORESEE_N() -> i64 { return 105; }
+fn OP_ARGC() -> i64 { return 106; }
+fn OP_ARG() -> i64 { return 107; }
+fn OP_FILE_EXISTS() -> i64 { return 108; }
+fn OP_READ_LINE() -> i64 { return 109; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -723,6 +728,21 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
             let p = list_pop(stack);
             stack = push(p[0], read_file(p[1]));
         }
+        if op == OP_ARGC() {
+            let n: i64 = argc();
+            if n < 1 { stack = push(stack, 0); } else { stack = push(stack, n - 1); }
+        }
+        if op == OP_ARG() {
+            let p = list_pop(stack);
+            stack = push(p[0], arg(p[1] + 1));
+        }
+        if op == OP_FILE_EXISTS() {
+            let p = list_pop(stack);
+            stack = push(p[0], file_exists(p[1]));
+        }
+        if op == OP_READ_LINE() {
+            stack = push(stack, read_line());
+        }
         if op == OP_PUMP() {
             let pm = list_pop(stack); stack = pm[0];
             let left: i64 = pm[1];
@@ -1131,6 +1151,8 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "sweep" { zop = OP_SWEEP(); }
                                                     if id[0] == "now_ms" { zop = OP_NOW_MS(); }
                                                     if id[0] == "memory" { zop = OP_MEMORY(); }
+                                                    if id[0] == "argc" { zop = OP_ARGC(); }
+                                                    if id[0] == "read_line" { zop = OP_READ_LINE(); }
                                                     if zop != 0 {
                                                         j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                                         code = push(code, zop);
@@ -1192,6 +1214,8 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "load_ppm" { uop = OP_LOAD_PPM(); }
                                                     if id[0] == "load_wav" { uop = OP_LOAD_WAV(); }
                                                     if id[0] == "sleep_ms" { uop = OP_SLEEP_MS(); }
+                                                    if id[0] == "file_exists" { uop = OP_FILE_EXISTS(); }
+                                                    if id[0] == "arg" { uop = OP_ARG(); }
                                                     if uop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -2023,6 +2047,9 @@ fn main() -> i64 {
     assert(run_file("examples/agent.kenga") == 0);
     assert(run_file("examples/selfhost/fact_lite.kenga") == 0);
     assert(run_lite("fn main() { assert(write_file(\"minds/_more_io.txt\", \"hi\") == 1); ord(read_file(\"minds/_more_io.txt\")[0]) }") == 104);
+    assert(run_lite("fn main() { argc() }") == 0);
+    assert(run_lite("fn main() { file_exists(\"kenga/compiler/more.kenga\") }") == 1);
+    assert(run_file("examples/selfhost/argc_more.kenga") == 0);
     assert(run_lite("fn main() { let s = \"a\\nb\"; len(s) }") == 3);
     assert(run_lite("fn main() { 10 % 3 }") == 1);
     assert(run_lite("fn main() { 1 && 0 }") == 0);

@@ -71,10 +71,39 @@ W = {
     "bullet": u("\\u2022"),
 }
 
-src = r'''// Prophet chat on native_ml lists. Host CRT: file_exists / read_line / argc.
-// kenga-lite chat [mind.km] [--script file] -> this file
+src = r'''// Prophet chat on ml_host / native_ml lists. CRT: file_exists / read_line / argc.
+// kenga-lite chat [mind.km] [--script file] -> this file (lite + inject)
 
-import "native_ml.kenga"
+fn parse_f(s: str) -> f64 {
+    let sign: f64 = 1.0;
+    let i: i64 = 0;
+    if len(s) > 0 {
+        if s[0] == "-" { sign = 0.0 - 1.0; i = 1; }
+    }
+    let ip: f64 = 0.0;
+    while i < len(s) {
+        if s[i] == "." { break; }
+        if s[i] == "e" { break; }
+        if s[i] == "E" { break; }
+        ip = ip * 10.0 + (ord(s[i]) - 48) + 0.0;
+        i = i + 1;
+    }
+    let fp: f64 = 0.0;
+    let place: f64 = 0.1;
+    if i < len(s) {
+        if s[i] == "." {
+            i = i + 1;
+            while i < len(s) {
+                if s[i] == "e" { break; }
+                if s[i] == "E" { break; }
+                fp = fp + ((ord(s[i]) - 48) + 0.0) * place;
+                place = place * 0.1;
+                i = i + 1;
+            }
+        }
+    }
+    return sign * (ip + fp);
+}
 
 fn has(hay: str, needle: str) -> i64 {
     let n: i64 = len(needle);
@@ -188,7 +217,7 @@ fn extract_nums(s: str) -> list {
             tok = tok + s[j];
             j = j + 1;
         }
-        if digits == 1 { xs = push(xs, nt_parse_f(tok)); }
+        if digits == 1 { xs = push(xs, parse_f(tok)); }
         if j == i { i = i + 1; } else { i = j; }
     }
     return xs;
@@ -249,16 +278,15 @@ fn print_help() -> i64 {
 fn open_mind(path: str) -> list {
     if file_exists(path) == 0 {
         println("new mind -> will save to " + path);
-        return nt_mind(0.05, 128, 48);
+        return memory_config(0.05, 128, 48);
     }
     let s: str = read_file(path);
-    let p = nt_read_tok(s, 0);
-    if p[0] == "MORE_MIND" {
+    if has(s, "MORE_MIND") == 1 {
         println("loading " + path);
-        return nt_load_mind(path);
+        return load_mind(path);
     }
     println("old format " + path + " -- new mind (MORE_MIND)");
-    return nt_mind(0.05, 128, 48);
+    return memory_config(0.05, 128, 48);
 }
 
 fn phys_x(last: list) -> list {
@@ -272,7 +300,7 @@ fn phys_y(x: list) -> list {
 
 fn train_epoch(m: list, last: list) -> f64 {
     let x = phys_x(last);
-    return nt_learn(m, x, phys_y(x));
+    return learn(m, x, phys_y(x));
 }
 
 fn handle(st: list, line: str) -> i64 {
@@ -337,16 +365,16 @@ fn handle(st: list, line: str) -> i64 {
         return 1;
     }
     if has_any(low, ["status", "{status}", "{kak_dela}", "stats"]) == 1 {
-        let stt = nt_mem_stats(m);
+        let stt = mem_stats(m);
         println("I remember: ep=" + to_str(stt[0]) + " steps=" + to_str(m[6]) + " dim=" + to_str(m[5]) + "x" + to_str(m[3]) + " (lr=" + to_str(m[4]) + ")");
         return 1;
     }
     if has_any(low, ["sleep", "{spi}", "{konsolid}", "{zasni}"]) == 1 {
-        println("sleep: folded " + to_str(nt_consolidate(m)));
+        println("sleep: folded " + to_str(consolidate(m)));
         return 1;
     }
     if has_any(low, ["save", "{sohrani}", "{zapishi}"]) == 1 {
-        if nt_save_mind(m, path) == 1 {
+        if save_mind(m, path) == 1 {
             println("saved " + path);
         } else {
             println("could not save " + path);
@@ -370,7 +398,7 @@ fn handle(st: list, line: str) -> i64 {
             println("  epoch " + to_str(e) + ": loss=" + to_str(loss));
             e = e + 1;
         }
-        println("slept, folded episodes: " + to_str(nt_consolidate(m)));
+        println("slept, folded episodes: " + to_str(consolidate(m)));
         return 1;
     }
     if has_any(low, ["future", "{budush}", "{cherez}", "{chto_budet}", "unroll", "{predskazhi}", "{zavtra}", "{skoro}", "{dalshe}"]) == 1 {
@@ -406,7 +434,7 @@ fn handle(st: list, line: str) -> i64 {
             }
         }
         if steps < 1 { steps = 1; }
-        let traj = nt_foresee_n(m, obs, steps);
+        let traj = foresee_n(m, obs, steps);
         println("if start " + fmt_round(obs) + ", then after " + to_str(steps) + " steps:");
         let i: i64 = 0;
         while i < len(traj) {
@@ -421,9 +449,9 @@ fn handle(st: list, line: str) -> i64 {
             print_help();
             return 1;
         }
-        let pred = nt_predict(m, nums);
-        let fore = nt_foresee(m, nums);
-        let s: f64 = nt_surprise(pred, nums);
+        let pred = predict(m, nums);
+        let fore = foresee(m, nums);
+        let s: f64 = surprise(pred, nums);
         println("{seychas}     " + fmt_round(nums));
         println("expect      " + fmt_round(pred));
         println("hybrid      " + fmt_round(fore));
@@ -440,9 +468,9 @@ fn handle(st: list, line: str) -> i64 {
             print_help();
             return 1;
         }
-        let pred2 = nt_predict(m, nums);
-        let fore2 = nt_foresee(m, nums);
-        let s2: f64 = nt_surprise(pred2, nums);
+        let pred2 = predict(m, nums);
+        let fore2 = foresee(m, nums);
+        let s2: f64 = surprise(pred2, nums);
         println("{seychas}     " + fmt_round(nums));
         println("expect      " + fmt_round(pred2));
         println("hybrid      " + fmt_round(fore2));
@@ -462,8 +490,8 @@ fn handle(st: list, line: str) -> i64 {
         let mid: i64 = nn / 2;
         let a = take(nums, 0, mid);
         let b = take(nums, mid, nn);
-        nt_remember_next(m, a, b, 0.6);
-        let loss: f64 = nt_learn(m, a, b);
+        remember_next(m, a, b, 0.6);
+        let loss: f64 = learn(m, a, b);
         println("remembered " + fmt_round(a) + " {arrow} " + fmt_round(b) + "  (loss=" + to_str(loss) + ")");
         return 1;
     }
@@ -475,8 +503,8 @@ fn handle(st: list, line: str) -> i64 {
         let mid2: i64 = nn / 2;
         let a2 = take(nums, 0, mid2);
         let b2 = take(nums, mid2, nn);
-        nt_remember_next(m, a2, b2, 0.6);
-        let loss2: f64 = nt_learn(m, a2, b2);
+        remember_next(m, a2, b2, 0.6);
+        let loss2: f64 = learn(m, a2, b2);
         println("remembered " + fmt_round(a2) + " {arrow} " + fmt_round(b2) + "  (loss=" + to_str(loss2) + ")");
         return 1;
     }
@@ -485,7 +513,7 @@ fn handle(st: list, line: str) -> i64 {
             print_help();
             return 1;
         }
-        let hits = nt_recall(m, nums, 3);
+        let hits = recall(m, nums, 3);
         println("nearest traces to " + fmt_round(nums) + ":");
         let hi: i64 = 0;
         while hi < len(hits) {

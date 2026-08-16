@@ -62,7 +62,6 @@
 #include "generated/rt_tensor.inc.c"
 #include "generated/rt_tape.inc.c"
 #include "generated/rt_events.inc.c"
-#include "generated/rt_chat.inc.c"
 
 #include "generated/rt_prog.inc.c"
 

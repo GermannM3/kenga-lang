@@ -128,7 +128,11 @@ bootstrap\bin\kenga-lite.exe run kenga\emit\rt_chat.kenga
 if errorlevel 1 exit /b 1
 
 echo === kenga-lite chat native_ml ===
-bootstrap\bin\kenga-lite.exe chat minds\multi.km --script examples\ml\chat_script_lite.txt
+bootstrap\bin\kenga-lite.exe chat minds\agent.km --script examples\ml\chat_script_lite.txt
+if errorlevel 1 exit /b 1
+
+echo === more argc / file_exists ===
+bootstrap\bin\kenga-lite.exe run examples\selfhost\argc_more.kenga
 if errorlevel 1 exit /b 1
 
 echo === kenga/emit/rt_kval_mem.kenga ===

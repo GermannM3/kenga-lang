@@ -94,8 +94,10 @@ jobs:
           ./bootstrap/bin/kenga-lite run examples/hello.kenga
           ./bootstrap/bin/kenga-lite run examples/prophet.kenga
           ./bootstrap/bin/kenga-lite run examples/selfhost/fact_lite.kenga
+          ./bootstrap/bin/kenga-lite run examples/selfhost/argc_more.kenga
           ./bootstrap/bin/kenga-lite run examples/selfhost/foresee_n_lite.kenga
           ./bootstrap/bin/kenga-lite run examples/unroll.kenga
           ./bootstrap/bin/kenga-lite run examples/ml/kenga_net.kenga
           ./bootstrap/bin/kenga-lite run examples/ml/vision_ppm.kenga
           ./bootstrap/bin/kenga-lite run examples/ml/matmul_cl.kenga
+          ./bootstrap/bin/kenga-lite chat minds/agent.km --script examples/ml/chat_script_lite.txt

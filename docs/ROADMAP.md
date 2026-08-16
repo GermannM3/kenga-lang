@@ -16,7 +16,7 @@
 | ✅ | emit-c tagged KVal + chicken-egg |
 | ✅ | README: install без cargo (Releases first) |
 | ✅ | Lite: **Prophet Memory** + **save_mind / load_mind** (`.km` совместим с Rust) |
-| ✅ | Lite: **`kenga-lite chat`** — `kenga/compiler/chat.kenga` + `native_ml`, не C Prophet |
+| ✅ | Lite: **`kenga-lite chat`** — `chat.kenga` + `ml_host`; more: `argc`/`file_exists`/`read_line` |
 | ✅ | Lite: **Tensor core** (`tensor` / `t_from` / matmul / ew / reshape / softmax…) — `examples/ml/tensor_core.kenga` |
 | ✅ | Lite: **`load_ppm` / `load_wav` / `t_mean`** + `learn`/`predict`/`unroll`/`remember_next` — living multimodal без Rust |
 | ✅ | Lite: **`foresee_n`** — `examples/unroll.kenga` без Rust |
