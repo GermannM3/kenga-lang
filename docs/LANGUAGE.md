@@ -102,7 +102,7 @@ World-model: residual MLP `y = x + Δ`.
 Поддерживает: `fn` `let` `while` **`for` / `break` / `continue`** `if`/`else`/`else if`,  
 i64, f64, `round`, `assert`, строки, списки, `println`, `struct`, type annotations (игнор),  
 **Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / …),
-`sweep` no-op, stubs `now_ms`.
+`sweep` no-op, `now_ms` wall clock.
 
 ```bash
 bash bootstrap/build.sh

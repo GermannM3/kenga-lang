@@ -23,7 +23,7 @@
  *     ag_scale / ag_relu / ag_neg / ag_transpose / ag_reshape /
  *     ag_exp / ag_log / ag_softmax / ag_mse / ag_sum / ag_value / ag_grad /
  *     ag_backward / ag_step
- *   stubs: now_ms() → 0 (until clock port)
+ *   now_ms() wall clock; to_str(x)
  *   structs: struct Point { x, y } / Point { x: 1, y: 2 } / p.x / p.x = v
  *
  * Usage:
@@ -37,6 +37,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/time.h>
+#endif
 #ifdef _WIN32
 #include <direct.h>
 #else

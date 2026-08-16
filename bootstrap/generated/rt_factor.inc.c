@@ -633,6 +633,15 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         j++;
         i64a_push(code, OP_TYPEOF);
         i = j;
+      } else if (strcmp(id.name, "to_str") == 0) {
+        free(id.name);
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in to_str");
+        j++;
+        i64a_push(code, OP_TO_STR);
+        i = j;
       } else if (strcmp(id.name, "ag_clear") == 0) {
         free(id.name);
         j++;
