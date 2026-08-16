@@ -610,6 +610,19 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 let pre: str = merge_pre(ar[3], ab[3]);
                 return ["k_ag_mse(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
             }
+            if id[0] == "ag_add" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_ag_add(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_relu" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_relu(" + ar[0] + ")", j, 0, ar[3]];
+            }
             if id[0] == "ag_step" {
                 let ar = lower_cmp(s, j, decls);
                 j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
@@ -1368,6 +1381,14 @@ fn main() -> i64 {
         ai = ai + 1;
     }
     assert(found_ag == 1);
+    let em_relu = lower_cmp("ag_relu(ag_param(t_from([1,1],[0.0])))", 0, []);
+    let found_relu: i64 = 0;
+    let ri: i64 = 0;
+    while ri < len(em_relu[0]) {
+        if starts_with(em_relu[0], ri, "k_ag_relu") == 1 { found_relu = 1; }
+        ri = ri + 1;
+    }
+    assert(found_relu == 1);
     let em_print = lower_stmt("print(\"x\");", 0, 1, [], 1);
     assert(em_print[0] == "  kenga_print_val(kval_str(\"x\")); fflush(stdout);\n");
 
@@ -1392,7 +1413,10 @@ fn main() -> i64 {
     let kvtape = resolve_imports("examples/selfhost/lower_kv_tape.kenga", 0);
     assert(write_file("bootstrap/generated/lower_kv_tape.c", lower_program(kvtape)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape}.c");
+    let kvmlp = resolve_imports("examples/selfhost/lower_kv_mlp.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_kv_mlp.c", lower_program(kvmlp)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape,kv_mlp}.c");
     println("lower_kv ok");
     return 0;
 }

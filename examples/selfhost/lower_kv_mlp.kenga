@@ -1,0 +1,34 @@
+// Tape MLP on KVal: y = relu(W @ x + b), train W and b
+
+fn main() -> i64 {
+    let w = t_from([2, 2], [0.1, 0.0, 0.0, 0.1]);
+    let b = t_from([2, 1], [0.0, 0.0]);
+    let x = t_from([2, 1], [1.0, 1.0]);
+    let y = t_from([2, 1], [1.0, 2.0]);
+
+    let i = 0;
+    while i < 80 {
+        ag_clear();
+        let wid = ag_param(w);
+        let bid = ag_param(b);
+        let xid = ag_const(x);
+        let yid = ag_const(y);
+        let h = ag_add(ag_matmul(wid, xid), bid);
+        let pred = ag_relu(h);
+        let loss = ag_mse(pred, yid);
+        ag_backward(loss);
+        w = ag_step(wid, 0.2);
+        b = ag_step(bid, 0.2);
+        i = i + 1;
+    }
+
+    let pred = t_add(t_matmul(w, x), b);
+    let p0 = round(t_get(pred, 0) * 10.0);
+    let p1 = round(t_get(pred, 1) * 10.0);
+    assert(p0 > 7);
+    assert(p0 < 13);
+    assert(p1 > 17);
+    assert(p1 < 23);
+    println("mlp kv ok");
+    return 0;
+}

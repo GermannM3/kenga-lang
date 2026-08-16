@@ -1,6 +1,6 @@
 // Emit reverse-mode tape on tagged KVal (no Rust, no lite VM).
 // Writes bootstrap/generated/rt_kval_tape.inc.c -- include after rt_kval_tensor.inc.c.
-// Subset: ag_clear / ag_param / ag_const / ag_matmul / ag_mse / ag_backward / ag_step.
+// Subset: ag_clear / ag_param / ag_const / ag_matmul / ag_add / ag_relu / ag_mse / ag_backward / ag_step.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval_tape.kenga
 
 fn main() -> i64 {
@@ -9,7 +9,7 @@ fn main() -> i64 {
     s = s + "/* requires rt_kval_tensor.inc.c (KvTensor, kt_obj, kt_alloc, k_t_matmul) */\n";
     s = s + "#ifndef KENGA_RT_KVAL_TAPE_INC\n#define KENGA_RT_KVAL_TAPE_INC\n\n";
     s = s + "#define KVAG_MAX_NODES 4096\n\n";
-    s = s + "enum { KVAG_LEAF = 0, KVAG_MATMUL, KVAG_MSE };\n\n";
+    s = s + "enum { KVAG_LEAF = 0, KVAG_MATMUL, KVAG_MSE, KVAG_ADD, KVAG_RELU };\n\n";
     s = s + "typedef struct {\n";
     s = s + "  int is_scalar;\n";
     s = s + "  int64_t th;\n";
@@ -83,6 +83,31 @@ fn main() -> i64 {
     s = s + "  h = kt_alloc(shape, rank, 0);\n";
     s = s + "  o = kt_obj(h);\n";
     s = s + "  for (i = 0; i < n; i++) o->data[i] = ad[i] - bd[i];\n";
+    s = s + "  return h;\n";
+    s = s + "}\n\n";
+    s = s + "static int64_t kt_ew_add(int64_t ha, int64_t hb) {\n";
+    s = s + "  KvTensor *a = kt_obj(ha), *b = kt_obj(hb);\n";
+    s = s + "  int i, n, rank, shape[8];\n";
+    s = s + "  double *ad, *bd;\n";
+    s = s + "  int64_t h;\n";
+    s = s + "  KvTensor *o;\n";
+    s = s + "  if (a->n != b->n) k_die(\"tensor size mismatch\");\n";
+    s = s + "  rank = a->rank;\n";
+    s = s + "  n = a->n;\n";
+    s = s + "  for (i = 0; i < rank; i++) shape[i] = a->shape[i];\n";
+    s = s + "  ad = a->data;\n";
+    s = s + "  bd = b->data;\n";
+    s = s + "  h = kt_alloc(shape, rank, 0);\n";
+    s = s + "  o = kt_obj(h);\n";
+    s = s + "  for (i = 0; i < n; i++) o->data[i] = ad[i] + bd[i];\n";
+    s = s + "  return h;\n";
+    s = s + "}\n\n";
+    s = s + "static int64_t kt_relu(int64_t ha) {\n";
+    s = s + "  int64_t h = kt_clone(ha);\n";
+    s = s + "  KvTensor *o = kt_obj(h);\n";
+    s = s + "  int i;\n";
+    s = s + "  for (i = 0; i < o->n; i++)\n";
+    s = s + "    if (o->data[i] < 0.0) o->data[i] = 0.0;\n";
     s = s + "  return h;\n";
     s = s + "}\n\n";
     s = s + "static int64_t kt_matmul_ids(int64_t ha, int64_t hb) {\n";
@@ -163,6 +188,30 @@ fn main() -> i64 {
     s = s + "  n.requires_grad = np->requires_grad || nt->requires_grad;\n";
     s = s + "  return kvag_push(n);\n";
     s = s + "}\n\n";
+    s = s + "static int64_t kvag_add(int64_t a, int64_t b) {\n";
+    s = s + "  KvAgNode *na = kvag_node(a), *nb = kvag_node(b);\n";
+    s = s + "  KvAgNode n;\n";
+    s = s + "  memset(&n, 0, sizeof(n));\n";
+    s = s + "  if (na->is_scalar || nb->is_scalar) k_die(\"ag_add expects tensors\");\n";
+    s = s + "  n.th = kt_ew_add(na->th, nb->th);\n";
+    s = s + "  n.op = KVAG_ADD;\n";
+    s = s + "  n.pa = (int)a;\n";
+    s = s + "  n.pb = (int)b;\n";
+    s = s + "  n.requires_grad = na->requires_grad || nb->requires_grad;\n";
+    s = s + "  return kvag_push(n);\n";
+    s = s + "}\n\n";
+    s = s + "static int64_t kvag_relu(int64_t a) {\n";
+    s = s + "  KvAgNode *na = kvag_node(a);\n";
+    s = s + "  KvAgNode n;\n";
+    s = s + "  memset(&n, 0, sizeof(n));\n";
+    s = s + "  if (na->is_scalar) k_die(\"ag_relu expects tensors\");\n";
+    s = s + "  n.th = kt_relu(na->th);\n";
+    s = s + "  n.op = KVAG_RELU;\n";
+    s = s + "  n.pa = (int)a;\n";
+    s = s + "  n.pb = -1;\n";
+    s = s + "  n.requires_grad = na->requires_grad;\n";
+    s = s + "  return kvag_push(n);\n";
+    s = s + "}\n\n";
     s = s + "static void kvag_backward(int64_t loss_id) {\n";
     s = s + "  int i;\n";
     s = s + "  if (loss_id < 0 || loss_id >= (int64_t)g_kvag.n) k_die(\"ag_backward: bad loss id\");\n";
@@ -212,6 +261,25 @@ fn main() -> i64 {
     s = s + "      kvag_accum_tensor(t, gt);\n";
     s = s + "      break;\n";
     s = s + "    }\n";
+    s = s + "    case KVAG_ADD:\n";
+    s = s + "      if (node->grad_is_scalar) k_die(\"ag add grad\");\n";
+    s = s + "      kvag_accum_tensor(&g_kvag.nodes[node->pa], node->gth);\n";
+    s = s + "      kvag_accum_tensor(&g_kvag.nodes[node->pb], node->gth);\n";
+    s = s + "      break;\n";
+    s = s + "    case KVAG_RELU: {\n";
+    s = s + "      KvAgNode *a = &g_kvag.nodes[node->pa];\n";
+    s = s + "      if (node->grad_is_scalar) k_die(\"ag relu grad\");\n";
+    s = s + "      {\n";
+    s = s + "        KvTensor *av = kt_obj(a->th);\n";
+    s = s + "        int64_t h = kt_clone(node->gth);\n";
+    s = s + "        KvTensor *o = kt_obj(h);\n";
+    s = s + "        int j;\n";
+    s = s + "        for (j = 0; j < o->n; j++)\n";
+    s = s + "          if (av->data[j] <= 0.0) o->data[j] = 0.0;\n";
+    s = s + "        kvag_accum_tensor(a, h);\n";
+    s = s + "      }\n";
+    s = s + "      break;\n";
+    s = s + "    }\n";
     s = s + "    default:\n";
     s = s + "      k_die(\"ag_backward: unknown op\");\n";
     s = s + "    }\n";
@@ -243,6 +311,12 @@ fn main() -> i64 {
     s = s + "}\n\n";
     s = s + "static KVal k_ag_mse(KVal a, KVal b) {\n";
     s = s + "  return kval_i64(kvag_mse(kval_as_i64(a), kval_as_i64(b)));\n";
+    s = s + "}\n\n";
+    s = s + "static KVal k_ag_add(KVal a, KVal b) {\n";
+    s = s + "  return kval_i64(kvag_add(kval_as_i64(a), kval_as_i64(b)));\n";
+    s = s + "}\n\n";
+    s = s + "static KVal k_ag_relu(KVal a) {\n";
+    s = s + "  return kval_i64(kvag_relu(kval_as_i64(a)));\n";
     s = s + "}\n\n";
     s = s + "static KVal k_ag_backward(KVal loss) {\n";
     s = s + "  kvag_backward(kval_as_i64(loss));\n";
