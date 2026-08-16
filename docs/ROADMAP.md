@@ -56,6 +56,7 @@
 | ✅ | **`bc_src_c`**: `print` / `sleep_ms` / `now_ms` |
 | ✅ | **`bc_src_c`**: Tensor (`t_from` / `t_matmul` / `t_get` / `t_shape` / `tensor` / `t_fill`, ops 47–52) |
 | ✅ | **`bc_src_c`**: Memory (`memory_config` / `learn` / `predict`, ops 53–55) |
+| ✅ | **`bc_src_c`**: tape (`ag_clear` / `ag_param` / `ag_const` / `ag_matmul` / `ag_mse` / `ag_backward` / `ag_step`, ops 56–62) |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ✅ | Emit lite runtime: **`rt_types` / Prophet / tensor / tape / compiler / VM / selftest** — `kenga_lite.c` каркас |
 | ✅ | CI job `lite` без cargo; release **требует** `kenga-lite` (cargo `kenga` ещё legacy в архиве) |

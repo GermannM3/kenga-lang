@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62 };
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
@@ -106,11 +106,11 @@ static int64_t llen(int64_t id) {
 }
 
 typedef struct { int rank; int shape[8]; int n; double *data; } TObj;
-static TObj gT[64];
-static int gTn = 0;
+static TObj *gT = NULL;
+static int gTn = 0, gTcap = 0;
 static int64_t talloc(const int *shape, int rank, int zero) {
   int n = 1, i;
-  if (gTn >= 64) { fprintf(stderr, "tensor heap full\n"); exit(1); }
+  if (gTn >= gTcap) { int nc = gTcap ? gTcap * 2 : 64; TObj *nd = (TObj*)realloc(gT, (size_t)nc * sizeof(TObj)); if (!nd) { fprintf(stderr, "oom\n"); exit(1); } gT = nd; gTcap = nc; }
   if (rank < 0 || rank > 8) { fprintf(stderr, "bad tensor rank\n"); exit(1); }
   for (i = 0; i < rank; i++) {
     if (shape[i] < 0) { fprintf(stderr, "negative tensor dim\n"); exit(1); }
@@ -127,6 +127,73 @@ static int64_t talloc(const int *shape, int rank, int zero) {
 static TObj *tobj(V v) {
   if (v.tag != 5 || v.i < 0 || v.i >= gTn) { fprintf(stderr, "expected tensor\n"); exit(1); }
   return &gT[v.i];
+}
+static TObj *tid(int64_t h) {
+  if (h < 0 || h >= gTn) { fprintf(stderr, "bad tensor\n"); exit(1); }
+  return &gT[h];
+}
+static int64_t tclone(int64_t h) {
+  TObj *t = tid(h); int shape[8], rank = t->rank, n = t->n, i; double *src = t->data; int64_t o;
+  for (i = 0; i < rank; i++) shape[i] = t->shape[i];
+  o = talloc(shape, rank, 0); if (n > 0) memcpy(gT[o].data, src, (size_t)n * sizeof(double)); return o;
+}
+static int64_t ttranspose(int64_t ha) {
+  TObj *a = tid(ha); int r, c, i, j, shape[2]; double *ad; int64_t h;
+  if (a->rank != 2) { fprintf(stderr, "transpose expects rank-2\n"); exit(1); }
+  r = a->shape[0]; c = a->shape[1]; ad = a->data; shape[0] = c; shape[1] = r; h = talloc(shape, 2, 1);
+  for (i = 0; i < r; i++) for (j = 0; j < c; j++) gT[h].data[j * r + i] = ad[i * c + j]; return h;
+}
+static int64_t tscale(int64_t ha, double s) {
+  int64_t h = tclone(ha); int i; for (i = 0; i < gT[h].n; i++) gT[h].data[i] *= s; return h;
+}
+static int64_t tew_sub(int64_t ha, int64_t hb) {
+  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; double *ad = a->data, *bd = b->data; int64_t h;
+  if (a->n != b->n) { fprintf(stderr, "tensor size mismatch\n"); exit(1); }
+  for (i = 0; i < rank; i++) shape[i] = a->shape[i]; h = talloc(shape, rank, 0);
+  for (i = 0; i < n; i++) gT[h].data[i] = ad[i] - bd[i]; return h;
+}
+static int64_t tmatmul_ids(int64_t ha, int64_t hb) {
+  TObj *ta = tid(ha), *tb = tid(hb); int m, k, k2, n, i, j, p, shape[2]; double *ad, *bd; int64_t h;
+  if (ta->rank != 2 || tb->rank != 2) { fprintf(stderr, "t_matmul expects rank-2\n"); exit(1); }
+  m = ta->shape[0]; k = ta->shape[1]; k2 = tb->shape[0]; n = tb->shape[1];
+  if (k != k2) { fprintf(stderr, "t_matmul inner dim mismatch\n"); exit(1); }
+  ad = ta->data; bd = tb->data; shape[0] = m; shape[1] = n; h = talloc(shape, 2, 1);
+  for (i = 0; i < m; i++) for (j = 0; j < n; j++) { double acc = 0.0; for (p = 0; p < k; p++) acc += ad[i*k+p]*bd[p*n+j]; gT[h].data[i*n+j] = acc; }
+  return h;
+}
+enum { BAG_LEAF = 0, BAG_MATMUL, BAG_MSE };
+typedef struct { int is_scalar, has_grad, grad_is_scalar, op, pa, pb, requires_grad; int64_t th, gth; double scalar, gscalar; } BagNode;
+static BagNode gBag[1024]; static int gBagn = 0;
+static BagNode *bag_node(int64_t id) { if (id < 0 || id >= gBagn) { fprintf(stderr, "ag: bad node id\n"); exit(1); } return &gBag[id]; }
+static int64_t bag_push(BagNode n) { if (gBagn >= 1024) { fprintf(stderr, "ag: tape full\n"); exit(1); } gBag[gBagn] = n; return (int64_t)gBagn++; }
+static void bag_accum(BagNode *n, int64_t add_th) {
+  int i; if (!n->has_grad) { n->has_grad = 1; n->grad_is_scalar = 0; n->gth = tclone(add_th); return; }
+  if (n->grad_is_scalar) { fprintf(stderr, "ag: grad type mismatch\n"); exit(1); }
+  { TObj *g = tid(n->gth), *add = tid(add_th); if (g->n != add->n) { fprintf(stderr, "ag: grad len mismatch\n"); exit(1); } for (i = 0; i < g->n; i++) g->data[i] += add->data[i]; }
+}
+static int64_t bag_leaf(int64_t th, int requires_grad) {
+  BagNode n; memset(&n, 0, sizeof(n)); n.th = tclone(th); n.op = BAG_LEAF; n.requires_grad = requires_grad; n.pa = n.pb = -1; return bag_push(n);
+}
+static void bag_backward(int64_t loss_id) {
+  int i; if (loss_id < 0 || loss_id >= gBagn) { fprintf(stderr, "ag_backward: bad loss id\n"); exit(1); }
+  for (i = 0; i < gBagn; i++) gBag[i].has_grad = 0;
+  { BagNode *loss = &gBag[loss_id]; if (!loss->is_scalar) { fprintf(stderr, "ag_backward: loss must be scalar\n"); exit(1); } loss->has_grad = 1; loss->grad_is_scalar = 1; loss->gscalar = 1.0; }
+  for (i = (int)loss_id; i >= 0; i--) {
+    BagNode *node = &gBag[i]; if (!node->has_grad) continue;
+    if (node->op == BAG_LEAF) continue;
+    if (node->op == BAG_MATMUL) {
+      BagNode *a = &gBag[node->pa], *b = &gBag[node->pb];
+      bag_accum(a, tmatmul_ids(node->gth, ttranspose(b->th)));
+      bag_accum(b, tmatmul_ids(ttranspose(a->th), node->gth)); continue;
+    }
+    if (node->op == BAG_MSE) {
+      BagNode *p = &gBag[node->pa], *t = &gBag[node->pb];
+      double g = node->grad_is_scalar ? node->gscalar : 1.0; int64_t err = tew_sub(p->th, t->th);
+      double scale = 2.0 * g / (gT[err].n > 0 ? (double)gT[err].n : 1.0);
+      bag_accum(p, tscale(err, scale)); bag_accum(t, tscale(err, -scale)); continue;
+    }
+    fprintf(stderr, "ag_backward: unknown op\n"); exit(1);
+  }
 }
 
 #define BM_D 32
@@ -491,17 +558,9 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       stack[sp++] = Vf(t->data[ix]);
     }
     else if (op == OP_T_MATMUL) {
-      TObj *tb = tobj(stack[--sp]); TObj *ta = tobj(stack[--sp]);
-      int m, k, k2, n, i, j, p, shape[2]; int64_t h; TObj *o;
-      if (ta->rank != 2 || tb->rank != 2) { fprintf(stderr, "t_matmul expects rank-2\n"); exit(1); }
-      m = ta->shape[0]; k = ta->shape[1]; k2 = tb->shape[0]; n = tb->shape[1];
-      if (k != k2) { fprintf(stderr, "t_matmul inner dim mismatch\n"); exit(1); }
-      shape[0] = m; shape[1] = n; h = talloc(shape, 2, 1); o = &gT[h];
-      for (i = 0; i < m; i++) for (j = 0; j < n; j++) {
-        double acc = 0.0; for (p = 0; p < k; p++) acc += ta->data[i * k + p] * tb->data[p * n + j];
-        o->data[i * n + j] = acc;
-      }
-      stack[sp++] = Vt(h);
+      V vb=stack[--sp]; V va=stack[--sp];
+      if (va.tag!=5||vb.tag!=5) { fprintf(stderr, "t_matmul expects tensors\n"); exit(1); }
+      stack[sp++] = Vt(tmatmul_ids(va.i, vb.i));
     }
     else if (op == OP_T_SHAPE) {
       TObj *t = tobj(stack[--sp]); int64_t lid = lnew(); int i;
@@ -536,6 +595,40 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       int xn = vlist_pat(x, xp, BM_D); int n; tmp = m->model; bm_ensure(&tmp, xn > 0 ? xn : 1);
       bm_fwd(&tmp, xp, xn, hh, yy); n = xn > 0 ? xn : tmp.dim; if (n > tmp.dim) n = tmp.dim;
       stack[sp++] = pat_list(yy, n);
+    }
+    else if (op == OP_AG_CLEAR) { gBagn = 0; stack[sp++] = Vi(0); }
+    else if (op == OP_AG_PARAM) {
+      V t=stack[--sp]; if (t.tag!=5) { fprintf(stderr, "ag_param expects tensor\n"); exit(1); }
+      stack[sp++] = Vi(bag_leaf(t.i, 1));
+    }
+    else if (op == OP_AG_CONST) {
+      V t=stack[--sp];
+      if (t.tag==5) stack[sp++] = Vi(bag_leaf(t.i, 0));
+      else if (t.tag==0||t.tag==1) {
+        BagNode n; memset(&n, 0, sizeof(n)); n.is_scalar = 1; n.scalar = as_f(t); n.op = BAG_LEAF; n.pa = n.pb = -1; stack[sp++] = Vi(bag_push(n));
+      } else { fprintf(stderr, "ag_const expects tensor or number\n"); exit(1); }
+    }
+    else if (op == OP_AG_MATMUL) {
+      int64_t b=as_i(stack[--sp]), a=as_i(stack[--sp]); BagNode *na=bag_node(a), *nb=bag_node(b); BagNode n;
+      memset(&n, 0, sizeof(n)); if (na->is_scalar||nb->is_scalar) { fprintf(stderr, "ag_matmul expects tensors\n"); exit(1); }
+      n.th = tmatmul_ids(na->th, nb->th); n.op = BAG_MATMUL; n.pa = (int)a; n.pb = (int)b;
+      n.requires_grad = na->requires_grad || nb->requires_grad; stack[sp++] = Vi(bag_push(n));
+    }
+    else if (op == OP_AG_MSE) {
+      int64_t t=as_i(stack[--sp]), p=as_i(stack[--sp]); BagNode *np=bag_node(p), *nt=bag_node(t); BagNode n;
+      TObj *a, *b; double acc = 0.0; int i, nn;
+      memset(&n, 0, sizeof(n)); if (np->is_scalar||nt->is_scalar) { fprintf(stderr, "ag_mse expects tensors\n"); exit(1); }
+      a = tid(np->th); b = tid(nt->th); if (a->n != b->n) { fprintf(stderr, "ag_mse size mismatch\n"); exit(1); }
+      nn = a->n > 0 ? a->n : 1; for (i = 0; i < a->n; i++) { double d = a->data[i] - b->data[i]; acc += d * d; }
+      n.is_scalar = 1; n.scalar = acc / (double)nn; n.op = BAG_MSE; n.pa = (int)p; n.pb = (int)t;
+      n.requires_grad = np->requires_grad || nt->requires_grad; stack[sp++] = Vi(bag_push(n));
+    }
+    else if (op == OP_AG_BACKWARD) { bag_backward(as_i(stack[--sp])); stack[sp++] = Vi(0); }
+    else if (op == OP_AG_STEP) {
+      double lr = as_f(stack[--sp]); BagNode *n = bag_node(as_i(stack[--sp]));
+      if (!n->has_grad) { fprintf(stderr, "ag_step: missing grad\n"); exit(1); }
+      if (n->is_scalar || n->grad_is_scalar) { fprintf(stderr, "ag_step expects tensor param\n"); exit(1); }
+      stack[sp++] = Vt(tew_sub(n->th, tscale(n->gth, lr)));
     }
     else if (op == OP_HALT) { return 0; }
     else { fprintf(stderr, "bad op %lld\n", (long long)op); exit(1); }

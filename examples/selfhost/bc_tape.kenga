@@ -1,0 +1,18 @@
+fn main() -> i64 {
+    let w = t_from([1, 1], [0.0]);
+    let x = t_from([1, 1], [2.0]);
+    let y = t_from([1, 1], [4.0]);
+    let i = 0;
+    while i < 40 {
+        ag_clear();
+        let wid = ag_param(w);
+        let pred = ag_matmul(wid, ag_const(x));
+        let loss = ag_mse(pred, ag_const(y));
+        ag_backward(loss);
+        w = ag_step(wid, 0.05);
+        i = i + 1;
+    }
+    assert(round(t_get(t_matmul(w, x), 0) * 10.0) == 40);
+    println("tape bc ok");
+    return 0;
+}
