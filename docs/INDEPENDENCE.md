@@ -45,6 +45,7 @@ bootstrap\bin\kenga-lite.exe run kenga\emit\rt_parse.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_loop.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_prog.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_scan.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_expr.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 ```
 

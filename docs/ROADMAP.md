@@ -36,7 +36,7 @@
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
 | ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
-| 🟡 | Emit lite runtime: **`rt_cli` … `rt_scan`**; `emit_factor` / `compile_lite` / VM ещё руками |
+| 🟡 | Emit lite runtime: **`rt_cli` … `rt_expr`**; `emit_factor` / `emit_stmt` / `compile_lite` / VM ещё руками |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 

@@ -31,6 +31,7 @@ scripts\freedom-smoke.cmd
 | `emit/rt_loop.kenga` | break/continue + CALL patches | кусок compiler.rs |
 | `emit/rt_prog.kenga` | program_free | кусок runtime host |
 | `emit/rt_scan.kenga` | type annot / slice / braces | кусок parser.rs |
+| `emit/rt_expr.kenga` | * / + - compare / `{ }` | кусок compiler.rs |
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.
