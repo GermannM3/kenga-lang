@@ -17,4 +17,8 @@ echo === talk: caption from saved weights ===
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_talk.kenga
 if errorlevel 1 exit /b 1
 
-echo OK: PPM+WAV → text from our weights
+echo === decoder: next-char from the same scenes ===
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
+if errorlevel 1 exit /b 1
+
+echo OK: PPM+WAV → text (linear + decoder) from our weights

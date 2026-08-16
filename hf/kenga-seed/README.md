@@ -20,9 +20,9 @@ When the large model is ready, it lands here (same org, bigger weights) and on g
 
 | Piece | File |
 |---|---|
-| Vision+audio → text | `examples/ml/kenga_mm_lm.kenga` — PPM RGB + WAV energy → caption |
+| Vision+audio → text | `kenga_mm_lm.kenga` (linear) + `kenga_mm_gen.kenga` (decoder, next-char k/z/s) |
 | Text decoder | `examples/ml/kenga_charlm.kenga` / `kenga_dec.kenga` |
-| Birth (writes runnable Kenga) | `examples/ml/kenga_birth.kenga` → `kenga_born.kenga` → **24** |
+| Birth (writes runnable Kenga) | lite or native C (`bc-run`) → `kenga_born.kenga` → **24** |
 | Living world-model | `examples/ml/living_multimodal.kenga` → `minds/multi.km` |
 
 Captions on the three demo frames:

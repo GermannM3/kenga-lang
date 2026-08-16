@@ -92,6 +92,10 @@ if exist "%VCVARS%" (
   if errorlevel 1 exit /b 1
   bootstrap\generated\bc_from_io.exe
   if errorlevel 1 exit /b 1
+  cl /nologo /O2 /TC bootstrap\generated\bc_from_birth.c /Fe:bootstrap\generated\bc_from_birth.exe /Fo:bootstrap\generated\bc_from_birth.obj
+  if errorlevel 1 exit /b 1
+  bootstrap\generated\bc_from_birth.exe
+  if errorlevel 1 exit /b 1
 ) else (
   where gcc >nul 2>&1 && (
     gcc -O2 -std=c99 bootstrap\bin\expr_from_kenga.c -o bootstrap\bin\expr_from_kenga.exe
@@ -127,6 +131,10 @@ if exist "%VCVARS%" (
     gcc -O2 -std=c99 bootstrap\generated\bc_from_io.c -o bootstrap\generated\bc_from_io.exe
     if errorlevel 1 exit /b 1
     bootstrap\generated\bc_from_io.exe
+    if errorlevel 1 exit /b 1
+    gcc -O2 -std=c99 bootstrap\generated\bc_from_birth.c -o bootstrap\generated\bc_from_birth.exe
+    if errorlevel 1 exit /b 1
+    bootstrap\generated\bc_from_birth.exe
     if errorlevel 1 exit /b 1
   )
 )

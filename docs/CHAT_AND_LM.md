@@ -15,8 +15,8 @@
 | **Decoder GPT-формы** | ✅ `examples/ml/kenga_lm.kenga` — attn + FFN + RMS, next-token |
 | **Char-LM на нашем `.kenga`** | ✅ `examples/ml/kenga_charlm.kenga` + `kenga_char_talk.kenga` |
 | **Триграмма на нашем `.kenga`** | ✅ `examples/ml/kenga_trigram.kenga` — list/i64, `fn add(a: i64` |
-| **Birth → run** | ✅ `scripts\kenga-birth.cmd` → `kenga_born.kenga` → **24** |
-| **Vision+audio → text** | ✅ `kenga_mm_lm` + `kenga_mm_talk` — train / load weights |
+| **Birth → run** | ✅ lite и **native C** (`bc-run` / `bc_from_birth.c`) → **24** |
+| **Vision+audio → text** | ✅ linear `kenga_mm_lm` + decoder `kenga_mm_gen` (next-char k/z/s) |
 | Hugging Face | ⬜ большая модель → `Kenga-ai/kenga-mm`; сид: `docs/HUGGINGFACE.md` |
 | Половина Grok / GPU | ⬜ те же блоки × D/L/V + корпус + GPU; см. `docs/KENGA_LM.md` |
 
@@ -26,6 +26,8 @@ bootstrap\bin\kenga-lite.exe run examples\ml\tiny_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
 scripts\kenga-birth.cmd
+scripts\bc-run.cmd examples\ml\kenga_birth.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
 kenga chat --lite minds\multi.km
 ```
 

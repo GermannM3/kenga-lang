@@ -10,7 +10,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 | Word-LM / tape / tensor / Prophet | ✅ | ❌ |
 | Компилятор на Kenga | ✅ **`kenga/compiler/more.kenga`** (for / elif / struct / import / events) | ❌ |
 | Emit на Kenga | ✅ **`lower_c`** + **`lower_kv`/`rt_kval`** | ❌ gcc/cl |
-| Native из `.kenga` | ✅ agent / struct / float + **str/ord/lex_frag** (KVal) | ❌ |
+| Native из `.kenga` | ✅ agent / net / **birth** (`bc_from_birth.c` → пишет `kenga_born.kenga`) | ❌ |
 | Каталог замены Rust | ✅ **`kenga/`** + `docs/REPLACE_RUST.md` | — |
 | Полный CLI `src/` | 🟡 legacy | — |
 
@@ -19,7 +19,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 1. Lite host (C) — living без Rust.  
 2. **`kenga/compiler`** вытесняет `src/compiler.rs` + кусок VM.  
 3. **`lower_c` / `lower_kv`** вытесняют `codegen.rs`.  
-4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM. Сетка: **`kenga_net.kenga`**. Модель языка: **`kenga_charlm.kenga`** / **`kenga_trigram.kenga`**. Запуск одного файла с корня репо: **`scripts\bc-run.cmd`**.  
+4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM. Сетка: **`kenga_net.kenga`**. Birth: **`kenga_birth.kenga`** → native C пишет программу. Запуск одного файла: **`scripts\bc-run.cmd`**.  
 5. Emit полного lite runtime (`rt_kval` → host) → ручной `kenga_lite.c` уходит.  
 6. Releases без cargo; `src/` → archive.  
 7. VM на Kenga → C уходит.
@@ -31,7 +31,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 ```bat
 bootstrap\build.cmd
 scripts\freedom-smoke.cmd
-scripts\bc-run.cmd examples\selfhost\fact_lite.kenga
+scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval.kenga

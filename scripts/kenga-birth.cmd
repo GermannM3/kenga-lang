@@ -17,4 +17,6 @@ bootstrap\bin\kenga-lite.exe run examples\ml\kenga_born.kenga
 if errorlevel 1 exit /b 1
 
 echo.
+echo.
+echo native C (same birth, no lite VM): scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 echo OK: Kenga wrote a program and ran it

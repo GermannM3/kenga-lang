@@ -1700,6 +1700,9 @@ fn main() -> i64 {
     let r19 = compile_src(resolve_imports("examples/ml/kenga_net.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_net.c", write_c_driver(r19[0], r19[1], r19[2], r19[3])) == true);
 
+    let r20 = compile_src(resolve_imports("examples/ml/kenga_birth.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_birth.c", write_c_driver(r20[0], r20[1], r20[2], r20[3])) == true);
+
     let raw: str = read_file("bootstrap/generated/_bc_path.txt");
     let one: str = trim_path(raw);
     if len(one) > 0 {
@@ -1708,7 +1711,7 @@ fn main() -> i64 {
         println("wrote bc_one_out.c for " + one);
     }
 
-    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net");
+    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net/birth");
     println("bc_src_c ok");
     return 0;
 }

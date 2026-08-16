@@ -17,7 +17,9 @@ bootstrap\build.cmd
 kenga run --lite examples\agent.kenga
 kenga run --lite examples\selfhost\struct_lite.kenga
 scripts\kenga-birth.cmd
+scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 kenga run --lite examples\ml\kenga_mm_lm.kenga
+kenga run --lite examples\ml\kenga_mm_gen.kenga
 scripts\freedom-smoke.cmd
 ```
 
@@ -41,7 +43,7 @@ kenga chat --lite minds/agent.km
 
 | Да | Нет |
 |---|---|
-| Свой язык + VM + birth→24 + PPM+WAV→текст | Не LLM-чат из коробки и не чужой GGUF |
+| Свой язык + VM + birth→24 (и native C) + decoder видит кадр | Не LLM-чат из коробки и не чужой GGUF |
 | Living memory + MLP world-model | Не замена PyTorch/JAX |
 | Агентный event loop | Не production CUDA stack |
 | Self-host ladder + **Kenga→C** (`lower_c`) | Полный self-host (без C host) ещё не закрыт |

@@ -326,3 +326,113 @@ fn generate(prompt: str, alpha: str, e: Tensor, wq: list, wk: list, wv: list, wo
     }
     return out;
 }
+
+fn vis_tlen(ids: list) -> i64 {
+    if len(ids) == 0 { return 1; }
+    return len(ids);
+}
+
+fn embed_or_vis(e: Tensor, ids: list, d: i64) -> Tensor {
+    if len(ids) == 0 {
+        return t_from([1, d], zeros(d));
+    }
+    return embed_seq(e, ids, d);
+}
+
+fn forward_vis(ids: list, e: Tensor, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor) -> Tensor {
+    let tlen: i64 = vis_tlen(ids);
+    let d: i64 = D();
+    let x = embed_or_vis(e, ids, d);
+    let li: i64 = 0;
+    while li < L() {
+        x = block(x, wq[li], wk[li], wv[li], wo[li], wf1[li], wf2[li], tlen, d);
+        li = li + 1;
+    }
+    return t_softmax(t_add(t_matmul(wlm, last_row(x, tlen, d)), t_matmul(whead, fuse)));
+}
+
+fn train_last_vis(e: Tensor, wlm: Tensor, ids: list, target: i64, lr: f64, vv: i64, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list) -> list {
+    let d: i64 = D();
+    let tlen: i64 = vis_tlen(ids);
+    let x = embed_or_vis(e, ids, d);
+    let li: i64 = 0;
+    while li < L() {
+        x = block(x, wq[li], wk[li], wv[li], wo[li], wf1[li], wf2[li], tlen, d);
+        li = li + 1;
+    }
+    let h = last_row(x, tlen, d);
+    let probs = t_softmax(t_add(t_matmul(wlm, h), t_matmul(whead, fuse)));
+    let last: i64 = 0;
+    let has_tok: i64 = 0;
+    if len(ids) > 0 {
+        last = ids[len(ids) - 1];
+        has_tok = 1;
+    }
+    let j: i64 = 0;
+    while j < vv {
+        let g = t_get(probs, j);
+        if j == target { g = g - 1.0; }
+        let k: i64 = 0;
+        while k < d {
+            let w = t_get(wlm, j * d + k);
+            t_set(wlm, j * d + k, w - lr * g * t_get(h, k));
+            if has_tok == 1 {
+                let eh = t_get(e, last * d + k);
+                t_set(e, last * d + k, eh - lr * 0.25 * g * t_get(wlm, j * d + k));
+            }
+            k = k + 1;
+        }
+        let f: i64 = 0;
+        while f < 6 {
+            t_set(whead, j * 6 + f, t_get(whead, j * 6 + f) - lr * g * t_get(fuse, f));
+            f = f + 1;
+        }
+        j = j + 1;
+    }
+    return [e, wlm, whead];
+}
+
+fn train_whead_only(whead: Tensor, ids: list, target: i64, lr: f64, vv: i64, fuse: Tensor, e: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor) -> Tensor {
+    let probs = forward_vis(ids, e, fuse, whead, wq, wk, wv, wo, wf1, wf2, wlm);
+    let j: i64 = 0;
+    while j < vv {
+        let g = t_get(probs, j);
+        if j == target { g = g - 1.0; }
+        let f: i64 = 0;
+        while f < 6 {
+            t_set(whead, j * 6 + f, t_get(whead, j * 6 + f) - lr * g * t_get(fuse, f));
+            f = f + 1;
+        }
+        j = j + 1;
+    }
+    return whead;
+}
+
+fn generate_vis(prompt: str, alpha: str, e: Tensor, fuse: Tensor, whead: Tensor, wq: list, wk: list, wv: list, wo: list, wf1: list, wf2: list, wlm: Tensor, steps: i64) -> str {
+    let vv: i64 = len(alpha);
+    let ctxn: i64 = CTX();
+    let ctx = encode(prompt, alpha);
+    let out: str = prompt;
+    let step: i64 = 0;
+    let last: i64 = 0 - 1;
+    let prev2: i64 = 0 - 1;
+    let same: i64 = 0;
+    while step < steps {
+        ctx = clip_ctx(ctx, ctxn);
+        let probs = forward_vis(ctx, e, fuse, whead, wq, wk, wv, wo, wf1, wf2, wlm);
+        let nxt = argmax(probs, vv);
+        if nxt == last {
+            same = same + 1;
+            if same >= 2 { nxt = argmax_skip(probs, vv, nxt); }
+        } else {
+            same = 0;
+        }
+        if nxt == prev2 { nxt = argmax_skip(probs, vv, nxt); }
+        prev2 = last;
+        last = nxt;
+        out = out + alpha[nxt];
+        ctx = push(ctx, nxt);
+        step = step + 1;
+    }
+    return out;
+}

@@ -1,0 +1,40 @@
+// Load decoder + visual logit head, generate captions. No training.
+// Run after kenga_mm_gen.kenga:
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen_talk.kenga
+
+import "kenga_dec.kenga";
+
+fn fuse_col(img_path: str, wav_path: str) -> Tensor {
+    let img = t_mean(load_ppm(img_path));
+    let wav = load_wav(wav_path);
+    let am = t_mean(wav);
+    let energy = t_mean(t_mul(wav, wav));
+    return t_from([6, 1], [t_get(img, 0), t_get(img, 1), t_get(img, 2), am, energy, energy * 2.0]);
+}
+
+fn scene_col(i: i64) -> Tensor {
+    if i == 0 { return fuse_col("examples/ml/assets/frame0.ppm", "examples/ml/assets/tone0.wav"); }
+    if i == 1 { return fuse_col("examples/ml/assets/frame1.ppm", "examples/ml/assets/tone1.wav"); }
+    return fuse_col("examples/ml/assets/frame2.ppm", "examples/ml/assets/tone2.wav");
+}
+
+fn main() -> i64 {
+    println("=== kenga mm-gen-talk (decoder captions from saved weights) ===");
+    let alpha: str = read_file("minds/kenga_mm_alpha.txt");
+    let e = load_tensor("minds/kenga_mm_e.kt");
+    let wlm = load_tensor("minds/kenga_mm_wlm.kt");
+    let whead = load_tensor("minds/kenga_mm_whead.kt");
+    let att = frozen_attn(D(), FF());
+    let prompt: str = "kenga vidit ";
+    let g0 = generate_vis(prompt, alpha, e, scene_col(0), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 10);
+    let g1 = generate_vis(prompt, alpha, e, scene_col(1), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 10);
+    let g2 = generate_vis(prompt, alpha, e, scene_col(2), whead, att[0], att[1], att[2], att[3], att[4], att[5], wlm, 10);
+    println(g0);
+    println(g1);
+    println(g2);
+    assert(len(g0) > 12);
+    assert(len(g1) > 12);
+    assert(len(g2) > 12);
+    println("kenga mm-gen-talk ok");
+    return 0;
+}

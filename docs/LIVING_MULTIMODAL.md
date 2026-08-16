@@ -51,4 +51,5 @@ Fusion-smoke: `beep.wav` + `dot.ppm` (`examples/ml/fusion.kenga`).
 
 ## Текст из кадра и звука
 
-`examples/ml/kenga_mm_lm.kenga` — тот же PPM+WAV, но выход не world-model, а подпись. Сид большой мультимодальной LM; карточка и упаковка: `docs/HUGGINGFACE.md`.
+`examples/ml/kenga_mm_lm.kenga` — linear head, три готовые подписи.  
+`examples/ml/kenga_mm_gen.kenga` — тот же decoder, что char-LM: vis-bias на логитах, после `"kenga vidit "` ставит k / z / s. Карточка: `docs/HUGGINGFACE.md`.

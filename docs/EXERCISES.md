@@ -57,4 +57,10 @@ Lite: `examples/selfhost/struct_lite.kenga`.
 
 `examples/ml/kenga_mm_lm.kenga` — три подписи про цвет кадра и тон. Прогони, сверь три строки.
 
+## E11. Decoder видит кадр
+
+`examples/ml/kenga_mm_gen.kenga` — после `"kenga vidit "` модель ставит **k / z / s** (krasnyj / zelenyj / sinij). Это тот же decoder, что char-LM, плюс vis-bias на логитах.
+
+Бонус: `scripts\bc-run.cmd examples\ml\kenga_birth.kenga` — birth без lite VM, потом `kenga-lite run examples\ml\kenga_born.kenga` → 24.
+
 Дальше: `docs/KENGA_LM.md` · `docs/HUGGINGFACE.md` · `docs/ROADMAP.md`.

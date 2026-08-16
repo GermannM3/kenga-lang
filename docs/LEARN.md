@@ -120,12 +120,15 @@ scripts\freedom-smoke.cmd
 
 ```bat
 scripts\kenga-birth.cmd
+scripts\bc-run.cmd examples\ml\kenga_birth.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_lm.kenga
+bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_gen.kenga
 scripts\kenga-mm.cmd
 ```
 
-Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, lite запускает — на экране **24**.  
+Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).  
+`kenga_mm_gen` — decoder, не 3-классовый softmax: после `"kenga vidit "` следующий символ k / z / s по кадру.  
 Шкала: `docs/KENGA_LM.md`. Куда потом большую: `docs/HUGGINGFACE.md`.
 
 ## 9. Упражнения

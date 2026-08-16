@@ -78,7 +78,7 @@ Rust ещё держит GPU / production-scale path. **Python не нужен.*
 | Residual MLP + тензорный SGD | Не замена PyTorch |
 | Lite без Rust (`bootstrap/` + **`kenga/`** compiler/emit) | GPU; legacy `src/` пока в Releases |
 | PPM/WAV → tensor bridges | Не pretrained CLIP/Whisper |
-| Своя LM: birth → **24**, PPM+WAV → caption | Не Grok и не чужой GGUF |
+| Своя LM: birth → **24** (и native C), decoder видит кадр | Не Grok и не чужой GGUF |
 | Сид под HF: `hf/kenga-seed/` | Большая модель ещё не залита |
 | Kenga→C99 (`lower_c`: agent/struct/float) | — |
 
@@ -214,8 +214,8 @@ fn main() {
 | emit-c / build (i64/f64/list/str) | ✅ |
 | Tape-autograd (`ag_*`) | ✅ |
 | Decoder / char-LM / trigram на нашем `.kenga` | ✅ |
-| Birth: модель пишет программу → run → 24 | ✅ |
-| PPM+WAV → caption (`kenga_mm_lm.kenga`) | ✅ |
+| Birth: модель пишет программу → run → 24 (lite и native C) | ✅ |
+| PPM+WAV → caption + decoder next-char k/z/s | ✅ |
 | Self-host Kenga-lite → bytecode VM | ✅ |
 | **`lower_c`**: Kenga → native C (agent/for/lists/struct/elif/float) | ✅ |
 | **`lower_kv` + `rt_kval`**: tagged KVal (str/ord/lex_frag/agent) | ✅ |

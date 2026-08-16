@@ -34,7 +34,7 @@
 | ✅ | **`kenga/emit/lower_c.kenga`** — agent / for / lists / **struct** / **elif** / **f64** / import → native C |
 | ✅ | **`kenga/emit/rt_kval.kenga` + `lower_kv.kenga`** — tagged KVal runtime + str/ord/hetero lists/events → `bootstrap/generated/` |
 | ✅ | **`lex_frag` / `parse_frag`** — куски lexer/parser компилятора → native C |
-| ✅ | **`bc_src_c`** — parse → bytecode → C VM (lite + agent + import + str + **file I/O** + **V-lists/f64**); **`kenga_net.kenga`** — своя XOR-MLP без tensor host; **`scripts\bc-run.cmd`** |
+| ✅ | **`bc_src_c`** — parse → bytecode → C VM; **`kenga_net`**, **`kenga_birth`** (native пишет программу); **`scripts\bc-run.cmd`** |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ⬜ | Emit полный lite runtime → убрать ручной `kenga_lite.c` |
 | ⬜ | VM на Kenga / native из своего codegen → убрать C host |
@@ -67,6 +67,7 @@
 | ✅ | **`kenga_trigram.kenga`** — char-триграмма на list/i64, корпус наш |
 | ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
 | ✅ | **`kenga_mm_lm.kenga`** / **`kenga_mm_talk.kenga`** — PPM+WAV → caption |
+| ✅ | **`kenga_mm_gen.kenga`** — тот же decoder, vis-bias на логитах, next-char k/z/s |
 | ✅ | Карточка HF: `hf/kenga-seed/` + `scripts\hf-pack.cmd` |
 | ⬜ | Larger generative LM (vocab/D/L + GPU); лестница в `docs/KENGA_LM.md` |
 | ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |

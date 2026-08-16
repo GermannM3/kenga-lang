@@ -35,6 +35,7 @@ minds/word_lm_*.kt
 minds/kenga_lm_*.kt
 minds/kenga_char_*
 minds/kenga_mm_*.kt
+minds/kenga_mm_alpha.txt
 bootstrap/minds/
 
 # === Dev clutter ===
