@@ -118,7 +118,7 @@ scripts\freedom-smoke.cmd
 ```
 
 - `lower_c` — i64/struct/float/agent, `typeof`/`to_str`, `print`/`sleep_ms`/`now_ms` → `bootstrap/bin/lower_*.c`  
-- `lower_kv` — tagged KVal + `now_ms` + Memory + Tensor (`t_from`/`t_matmul`/`t_add`) → `bootstrap/generated/`  
+- `lower_kv` — tagged KVal + `now_ms` + Memory + Tensor + tape (`ag_matmul`/`ag_step`) → `bootstrap/generated/`  
 - `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, `print`/`sleep_ms`/`now_ms`, birth/net/agent)  
 - `rt_*` — Kenga пишет весь lite host (типы, Prophet, tensor, tape, compiler, VM, selftest). `kenga_lite.c` — `#include`.
 

@@ -258,6 +258,7 @@ fn runtime_c() -> str {
     s = s + "#include \"rt_kval.inc.c\"\n";
     s = s + "#include \"rt_kval_mem.inc.c\"\n";
     s = s + "#include \"rt_kval_tensor.inc.c\"\n";
+    s = s + "#include \"rt_kval_tape.inc.c\"\n";
     s = s + "#ifdef _WIN32\n";
     s = s + "#include <windows.h>\n";
     s = s + "#else\n";
@@ -573,6 +574,49 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
                 let pre: str = merge_pre(ar[3], ab[3]);
                 return ["k_t_matmul(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_clear" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_clear()", j, 0, ""];
+            }
+            if id[0] == "ag_param" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_param(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_const" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_const(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_backward" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_backward(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_matmul" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_ag_matmul(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_mse" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_ag_mse(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_step" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_ag_step(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
             }
             let args: str = "";
             let pre: str = "";
@@ -1316,6 +1360,14 @@ fn main() -> i64 {
         ti = ti + 1;
     }
     assert(found_tfrom == 1);
+    let em_ag = lower_cmp("ag_clear()", 0, []);
+    let found_ag: i64 = 0;
+    let ai: i64 = 0;
+    while ai < len(em_ag[0]) {
+        if starts_with(em_ag[0], ai, "k_ag_clear") == 1 { found_ag = 1; }
+        ai = ai + 1;
+    }
+    assert(found_ag == 1);
     let em_print = lower_stmt("print(\"x\");", 0, 1, [], 1);
     assert(em_print[0] == "  kenga_print_val(kval_str(\"x\")); fflush(stdout);\n");
 
@@ -1337,7 +1389,10 @@ fn main() -> i64 {
     let kvten = resolve_imports("examples/selfhost/lower_kv_tensor.kenga", 0);
     assert(write_file("bootstrap/generated/lower_kv_tensor.c", lower_program(kvten)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor}.c");
+    let kvtape = resolve_imports("examples/selfhost/lower_kv_tape.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_kv_tape.c", lower_program(kvtape)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape}.c");
     println("lower_kv ok");
     return 0;
 }

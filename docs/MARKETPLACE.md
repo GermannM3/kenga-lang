@@ -2,7 +2,7 @@
 
 Publisher id in `editors/vscode/package.json`: **`Kenga-ai`**.  
 На маркетплейсе **3.13.0** (подсветка + иконка `.kenga`).  
-Язык в git уже дальше: `more.kenga` гоняет Prophet/tape/ppm-wav/`learn`/`unroll`/living multimodal, `lower_kv` эмитит Memory и Tensor, `lower_c`/`bc_src_c` — `typeof`/`print`/`sleep_ms`/`now_ms`.  
+Язык в git уже дальше: `more.kenga` гоняет Prophet/tape/ppm-wav/`learn`/`unroll`/living multimodal, `lower_kv` эмитит Memory/Tensor/tape, `lower_c`/`bc_src_c` — `typeof`/`print`/`sleep_ms`/`now_ms`.  
 Грамматика расширения эти слова уже знает — **версию VSIX не поднимаем**, пока не меняется editor. Следующий `.vsix`, когда накопится в `editors/vscode`.
 
 ## Ручная заливка (без Azure / без vsce login)

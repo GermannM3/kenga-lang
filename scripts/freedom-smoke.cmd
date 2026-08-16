@@ -135,6 +135,10 @@ echo === kenga/emit/rt_kval_tensor.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval_tensor.kenga
 if errorlevel 1 exit /b 1
 
+echo === kenga/emit/rt_kval_tape.kenga ===
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_kval_tape.kenga
+if errorlevel 1 exit /b 1
+
 echo === kenga/emit/lower_kv.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 if errorlevel 1 exit /b 1

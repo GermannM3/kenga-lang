@@ -2,6 +2,7 @@
 #include "rt_kval.inc.c"
 #include "rt_kval_mem.inc.c"
 #include "rt_kval_tensor.inc.c"
+#include "rt_kval_tape.inc.c"
 #ifdef _WIN32
 #include <windows.h>
 #else

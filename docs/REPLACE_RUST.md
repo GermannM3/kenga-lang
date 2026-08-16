@@ -10,7 +10,7 @@
 | `compiler.rs` / `bytecode.rs` | 🟢 растёт | `more.kenga` + `rt_factor`/`rt_stmt`/`rt_compile` пишут lite compiler |
 | `vm.rs` (ядро) | 🟢 растёт | VM в `more.kenga` + **`rt_vm.kenga`** пишет C VM lite |
 | `tensor.rs` | ✅ на lite | `kenga/emit/rt_tensor.kenga` → `generated/rt_tensor.inc.c` |
-| `autograd.rs` | ✅ на lite | `kenga/emit/rt_tape.kenga` |
+| `autograd.rs` | ✅ на lite + KVal emit | `rt_tape.kenga` / `rt_kval_tape.kenga` |
 | `memory.rs` | ✅ на lite | `kenga/emit/rt_prophet.kenga` |
 | `talk.rs` (chat) | ✅ на lite | `kenga/emit/rt_chat.kenga` |
 | `codegen.rs` (emit-c) | 🟢 растёт | `lower_c` + **`lower_kv`/`rt_kval`** (KVal path к `more`) |

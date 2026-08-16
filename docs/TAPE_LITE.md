@@ -1,6 +1,7 @@
 # Tape autograd на kenga-lite (без Rust)
 
-С **3.6** reverse-mode tape пишет `kenga/emit/rt_tape.kenga` → `bootstrap/generated/rt_tape.inc.c`.
+С **3.6** reverse-mode tape пишет `kenga/emit/rt_tape.kenga` → `bootstrap/generated/rt_tape.inc.c`.  
+Native emit (KVal): `kenga/emit/rt_kval_tape.kenga` → `ag_clear` / `ag_matmul` / `ag_mse` / `ag_backward` / `ag_step`.
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\autograd_tape.kenga
