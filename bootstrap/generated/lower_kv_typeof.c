@@ -13,23 +13,12 @@ static const char *k_f64_to_str(double n) {
   memcpy(o, buf, strlen(buf) + 1); return o;
 }
 
-static void on_0(KVal x);
-static void on_1(KVal x);
-
-static void on_0(KVal x) {
-  (void)(kval_i64(ke_emit(kval_as_str(kval_str("pong")), x)));
-}
-
-static void on_1(KVal x) {
-  kenga_println_val(x);
-}
 
 int main(void) {
-  ke_listen("ping", on_0, 1);
-  ke_listen("pong", on_1, 1);
-  (void)(kval_i64(ke_emit(kval_as_str(kval_str("ping")), kval_i64(7LL))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(ke_pump(kval_as_i64(kval_i64(8LL))))) == kval_as_i64(kval_i64(2LL)))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(ke_pending())) == kval_as_i64(kval_i64(0LL)))));
+  k_assert(kval_as_i64(kval_i64(kval_eq(kval_str("i64"), kval_str("i64")))));
+  k_assert(kval_as_i64(kval_i64(kval_eq(kval_str("str"), kval_str("str")))));
+  k_assert(kval_as_i64(kval_i64(kval_eq(kval_str(kstr_concat(kval_as_str(kval_str("n=")), kval_as_str(kval_str(k_i64_to_str(kval_as_i64(kval_i64(42LL))))))), kval_str("n=42")))));
+  kenga_println_val(kval_str("lower kv typeof ok"));
   return (int)kval_as_i64(kval_i64(0LL));
   return 0;
 }
