@@ -2,7 +2,8 @@
 // Run: bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 // Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, import,
 //          XOR, birth→24, c_seed/expr_c (Kenga writes .c) via run_file.
-//          on/emit/pump/pending, types/ttl skip, && || % !, typeof/to_str
+//          on/emit/pump/pending, types/ttl skip, && || % !, typeof/to_str,
+//          t_from/t_get/t_matmul/t_shape/t_add/tensor/t_fill
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -43,6 +44,13 @@ fn OP_OR() -> i64 { return 36; }
 fn OP_NOT() -> i64 { return 37; }
 fn OP_TYPEOF() -> i64 { return 38; }
 fn OP_TO_STR() -> i64 { return 39; }
+fn OP_T_FROM() -> i64 { return 40; }
+fn OP_T_GET() -> i64 { return 41; }
+fn OP_T_MATMUL() -> i64 { return 42; }
+fn OP_T_SHAPE() -> i64 { return 43; }
+fn OP_T_ADD() -> i64 { return 44; }
+fn OP_TENSOR() -> i64 { return 45; }
+fn OP_T_FILL() -> i64 { return 46; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -308,6 +316,33 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
                     }
                 }
             }
+        }
+        if op == OP_T_FROM() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_from(a[1], b[1]));
+        }
+        if op == OP_T_GET() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_get(a[1], b[1]));
+        }
+        if op == OP_T_MATMUL() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_matmul(a[1], b[1]));
+        }
+        if op == OP_T_SHAPE() {
+            let p = list_pop(stack); stack = push(p[0], t_shape(p[1]));
+        }
+        if op == OP_T_ADD() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_add(a[1], b[1]));
+        }
+        if op == OP_TENSOR() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], tensor(a[1], b[1]));
+        }
+        if op == OP_T_FILL() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_fill(a[1], b[1]));
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
@@ -745,6 +780,73 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                         code = push(code, OP_READ_FILE());
                                                         i = j;
                                                     } else {
+                                                    if id[0] == "t_from" {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_T_FROM());
+                                                        i = j;
+                                                    } else {
+                                                    if id[0] == "t_get" {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_T_GET());
+                                                        i = j;
+                                                    } else {
+                                                    if id[0] == "t_matmul" {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_T_MATMUL());
+                                                        i = j;
+                                                    } else {
+                                                    if id[0] == "t_shape" {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_T_SHAPE());
+                                                        i = j;
+                                                    } else {
+                                                    if id[0] == "t_add" {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_T_ADD());
+                                                        i = j;
+                                                    } else {
+                                                    if id[0] == "tensor" {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_TENSOR());
+                                                        i = j;
+                                                    } else {
+                                                    if id[0] == "t_fill" {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, OP_T_FILL());
+                                                        i = j;
+                                                    } else {
                                             let argc: i64 = 0;
                                             if s[j] != ")" {
                                                 while true {
@@ -770,6 +872,13 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                 patches = push(patches, [addr_at, fni]);
                                             }
                                             i = j;
+                                                    }
+                                                    }
+                                                    }
+                                                    }
+                                                    }
+                                                    }
+                                                    }
                                                     }
                                                     }
                                                     }
@@ -1523,6 +1632,7 @@ fn main() -> i64 {
     assert(run_file("examples/ml/kenga_born.kenga") == 0);
     assert(run_file("kenga/emit/c_seed.kenga") == 0);
     assert(run_file("kenga/emit/expr_c.kenga") == 0);
+    assert(run_file("examples/selfhost/tensor_more.kenga") == 0);
     println("kenga-more ok");
     return 0;
 }
