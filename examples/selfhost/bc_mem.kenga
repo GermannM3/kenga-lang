@@ -3,6 +3,25 @@ fn main() -> i64 {
     learn(m, [1, 2, 3], [2, 3, 4]);
     let p = predict(m, [1, 2, 3]);
     assert(len(p) == 3);
+    let f = foresee(m, [1, 2, 3]);
+    assert(len(f) == 3);
+    assert(remember(m, [9, 0, 9], 80) == 1);
+    assert(remember(m, [1, 1, 1], 0.01) == 0);
+    remember_next(m, [1, 2, 3], [2, 3, 4], 55);
+    let traj = unroll(m, [1, 2, 3], 2);
+    assert(len(traj) == 2);
+    let folded = consolidate(m);
+    assert(folded > 0);
+    let st = mem_stats(m);
+    assert(st[0] > 0);
+    let err = surprise([1.0, 0.0], [0.0, 1.0]);
+    assert(round(err * 10.0) > 0);
+    let p_saved = predict(m, [1, 2, 3]);
+    assert(save_mind(m, "bc_mind.km") == 1);
+    let m2 = load_mind("bc_mind.km");
+    let p2 = predict(m2, [1, 2, 3]);
+    assert(len(p2) == 3);
+    assert(round(p2[0] * 100.0) == round(p_saved[0] * 100.0));
     println("mem bc ok");
     return 0;
 }

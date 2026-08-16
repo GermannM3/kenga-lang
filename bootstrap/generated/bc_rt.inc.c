@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71 };
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
@@ -198,8 +198,10 @@ static void bag_backward(int64_t loss_id) {
 
 #define BM_D 32
 #define BM_H 32
+#define BM_EP 32
 typedef struct { int dim, hidden; double w1[BM_H*BM_D], b1[BM_H], w2[BM_D*BM_H], b2[BM_D]; double w1l[BM_H*BM_D], b1l[BM_H], w2l[BM_D*BM_H], b2l[BM_D]; uint64_t steps; } BmWorld;
-typedef struct { BmWorld model; double threshold, lr; } BmMind;
+typedef struct { double pattern[BM_D]; double target[BM_D]; int dim, target_dim, has_target; double surprise; } BmEp;
+typedef struct { BmWorld model; double threshold, lr; BmEp ep[BM_EP]; int nep, ep_head, ep_cap; } BmMind;
 static BmMind gM[16]; static int gMn = 0;
 static double bm_xavier(int fan_in, int fan_out, int i) {
   double sc = sqrt(6.0 / (double)(fan_in + fan_out)); int64_t t = (int64_t)i * 1103515245LL + 12345LL;
@@ -247,6 +249,28 @@ static V pat_list(const double *p, int n) {
 static BmMind *bm_get(V v) {
   if (v.tag != 4 || v.i < 0 || v.i >= gMn) { fprintf(stderr, "expected memory\n"); exit(1); }
   return &gM[v.i];
+}
+static int bm_ep_push(BmMind *m, const double *x, int xn, const double *y, int yn) {
+  int i, slot; if (xn < 0) xn = 0; if (yn < 0) yn = 0; if (xn > BM_D) xn = BM_D; if (yn > BM_D) yn = BM_D;
+  if (m->ep_cap < 1) m->ep_cap = BM_EP; if (m->ep_cap > BM_EP) m->ep_cap = BM_EP;
+  if (m->nep < m->ep_cap) { slot = m->nep; m->nep++; } else { slot = m->ep_head; m->ep_head++; if (m->ep_head >= m->ep_cap) m->ep_head = 0; }
+  memset(&m->ep[slot], 0, sizeof(m->ep[slot])); m->ep[slot].dim = xn; for (i = 0; i < xn; i++) m->ep[slot].pattern[i] = x[i];
+  m->ep[slot].has_target = yn > 0 ? 1 : 0; m->ep[slot].target_dim = yn; for (i = 0; i < yn; i++) m->ep[slot].target[i] = y[i]; return slot;
+}
+static double bm_dist(const double *a, int an, const double *b, int bn) {
+  int n = an > bn ? an : bn, i; double sum = 0.0; if (n < 1) n = 1;
+  for (i = 0; i < n; i++) { double d = (i < an ? a[i] : 0.0) - (i < bn ? b[i] : 0.0); sum += d * d; }
+  return sqrt(sum / (double)n);
+}
+static V bm_predict_list(BmMind *m, const double *xp, int xn) {
+  BmWorld tmp; double hh[BM_H], yy[BM_D]; int n; tmp = m->model; bm_ensure(&tmp, xn > 0 ? xn : 1);
+  bm_fwd(&tmp, xp, xn, hh, yy); n = xn > 0 ? xn : tmp.dim; if (n > tmp.dim) n = tmp.dim; return pat_list(yy, n);
+}
+static void bm_write_f64s(FILE *f, const double *xs, int n) {
+  int i; for (i = 0; i < n; i++) { if (i) fputc(' ', f); fprintf(f, "%.17g", xs[i]); } fputc('\n', f);
+}
+static int bm_read_f64s(FILE *f, double *out, int n) {
+  int i; for (i = 0; i < n; i++) if (fscanf(f, "%lf", &out[i]) != 1) return -1; return 0;
 }
 
 #define EVQ_CAP 256
@@ -580,21 +604,98 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
     }
     else if (op == OP_MEM_CONFIG) {
       int64_t hidden = as_i(stack[--sp]); int64_t ep_cap = as_i(stack[--sp]); double thr = as_f(stack[--sp]);
-      int h; if (gMn >= 16) { fprintf(stderr, "memory heap full\n"); exit(1); }
+      int h, cap; if (gMn >= 16) { fprintf(stderr, "memory heap full\n"); exit(1); }
       memset(&gM[gMn], 0, sizeof(gM[gMn])); gM[gMn].threshold = thr; gM[gMn].lr = 0.08;
       h = (int)hidden; if (h < 1) h = 8; if (h > BM_H) h = BM_H;
-      (void)ep_cap; bm_init(&gM[gMn].model, 1, h); stack[sp++] = Vm((int64_t)gMn++);
+      cap = (int)ep_cap; if (cap < 1) cap = 1; if (cap > BM_EP) cap = BM_EP; gM[gMn].ep_cap = cap;
+      bm_init(&gM[gMn].model, 1, h); stack[sp++] = Vm((int64_t)gMn++);
     }
     else if (op == OP_LEARN) {
       V y=stack[--sp]; V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]);
       double xp[BM_D], yp[BM_D]; int xn = vlist_pat(x, xp, BM_D); int yn = vlist_pat(y, yp, BM_D);
-      stack[sp++] = Vf(bm_train(&m->model, xp, xn, yp, yn, m->lr));
+      { double loss = bm_train(&m->model, xp, xn, yp, yn, m->lr); bm_ep_push(m, xp, xn, yp, yn); stack[sp++] = Vf(loss); }
     }
-    else if (op == OP_PREDICT) {
-      V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]); BmWorld tmp; double xp[BM_D], hh[BM_H], yy[BM_D];
-      int xn = vlist_pat(x, xp, BM_D); int n; tmp = m->model; bm_ensure(&tmp, xn > 0 ? xn : 1);
-      bm_fwd(&tmp, xp, xn, hh, yy); n = xn > 0 ? xn : tmp.dim; if (n > tmp.dim) n = tmp.dim;
-      stack[sp++] = pat_list(yy, n);
+    else if (op == OP_PREDICT || op == OP_FORESEE) {
+      V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]); double xp[BM_D]; int xn = vlist_pat(x, xp, BM_D);
+      stack[sp++] = bm_predict_list(m, xp, xn);
+    }
+    else if (op == OP_REMEMBER) {
+      double s = as_f(stack[--sp]); V pat=stack[--sp]; BmMind *m = bm_get(stack[--sp]); double xp[BM_D]; int xn;
+      if (s < m->threshold) stack[sp++] = Vi(0);
+      else { xn = vlist_pat(pat, xp, BM_D); m->ep[bm_ep_push(m, xp, xn, NULL, 0)].surprise = s; stack[sp++] = Vi(1); }
+    }
+    else if (op == OP_REMEMBER_NEXT) {
+      double s = as_f(stack[--sp]); V b=stack[--sp]; V a=stack[--sp]; BmMind *m = bm_get(stack[--sp]);
+      double xp[BM_D], yp[BM_D]; int xn, yn;
+      if (s < m->threshold) stack[sp++] = Vi(0);
+      else { xn = vlist_pat(a, xp, BM_D); yn = vlist_pat(b, yp, BM_D); m->ep[bm_ep_push(m, xp, xn, yp, yn)].surprise = s; stack[sp++] = Vi(1); }
+    }
+    else if (op == OP_UNROLL) {
+      int steps = (int)as_i(stack[--sp]); V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]);
+      double cur[BM_D]; int cn = vlist_pat(x, cur, BM_D), i; int64_t out = lnew();
+      if (steps < 1) steps = 1; if (steps > 64) steps = 64;
+      for (i = 0; i < steps; i++) { V nxt = bm_predict_list(m, cur, cn); lpush(out, nxt); cn = vlist_pat(nxt, cur, BM_D); }
+      stack[sp++] = Vl(out);
+    }
+    else if (op == OP_SURPRISE) {
+      V b=stack[--sp]; V a=stack[--sp]; double pa[BM_D], pb[BM_D]; int an = vlist_pat(a, pa, BM_D); int bn = vlist_pat(b, pb, BM_D);
+      stack[sp++] = Vf(bm_dist(pa, an, pb, bn));
+    }
+    else if (op == OP_CONSOLIDATE) {
+      BmMind *m = bm_get(stack[--sp]); int i, n = 0;
+      for (i = 0; i < m->nep; i++) { if (!m->ep[i].has_target) continue; bm_train(&m->model, m->ep[i].pattern, m->ep[i].dim, m->ep[i].target, m->ep[i].target_dim, m->lr); n++; }
+      stack[sp++] = Vi((int64_t)n);
+    }
+    else if (op == OP_MEM_STATS) {
+      BmMind *m = bm_get(stack[--sp]); int64_t id = lnew();
+      lpush(id, Vi((int64_t)m->nep)); lpush(id, Vi((int64_t)m->model.steps)); lpush(id, Vf(m->threshold)); stack[sp++] = Vl(id);
+    }
+    else if (op == OP_SAVE_MIND) {
+      V path=stack[--sp]; BmMind *m = bm_get(stack[--sp]); FILE *f; int d, h, i;
+      if (path.tag != 3) { fprintf(stderr, "save_mind: path must be str\n"); exit(1); }
+      f = fopen(as_str(path), "wb"); if (!f) { stack[sp++] = Vi(0); }
+      else {
+        d = m->model.dim; h = m->model.hidden;
+        fprintf(f, "KENGA_MIND 1\nthreshold %.17g\nep_cap %d\ncore_cap %d\nlr %.17g\nmodel %d %d %llu\n", m->threshold, m->ep_cap, h, m->lr, d, h, (unsigned long long)m->model.steps);
+        bm_write_f64s(f, m->model.w1, h*d); bm_write_f64s(f, m->model.b1, h); bm_write_f64s(f, m->model.w2, d*h); bm_write_f64s(f, m->model.b2, d);
+        bm_write_f64s(f, m->model.w1l, h*d); bm_write_f64s(f, m->model.b1l, h); bm_write_f64s(f, m->model.w2l, d*h); bm_write_f64s(f, m->model.b2l, d);
+        fprintf(f, "core 0\nepisodic %d\n", m->nep);
+        for (i = 0; i < m->nep; i++) {
+          int has_t = m->ep[i].has_target ? 1 : 0; int tlen = has_t ? (m->ep[i].target_dim > 0 ? m->ep[i].target_dim : m->ep[i].dim) : 0;
+          fprintf(f, "%.17g 0 %d %d %d\n", m->ep[i].surprise, m->ep[i].dim, has_t, tlen);
+          bm_write_f64s(f, m->ep[i].pattern, m->ep[i].dim); if (has_t) bm_write_f64s(f, m->ep[i].target, tlen);
+        }
+        fclose(f); stack[sp++] = Vi(1);
+      }
+    }
+    else if (op == OP_LOAD_MIND) {
+      V path=stack[--sp]; FILE *f; BmMind m; char line[256]; int d, h, i, core_n, ep_n; unsigned long long steps;
+      if (path.tag != 3) { fprintf(stderr, "load_mind: path must be str\n"); exit(1); }
+      if (gMn >= 16) { fprintf(stderr, "memory heap full\n"); exit(1); }
+      memset(&m, 0, sizeof(m)); f = fopen(as_str(path), "rb"); if (!f) { fprintf(stderr, "load_mind: cannot open\n"); exit(1); }
+      if (!fgets(line, sizeof(line), f) || strncmp(line, "KENGA_MIND 1", 12) != 0) { fclose(f); fprintf(stderr, "load_mind: bad header\n"); exit(1); }
+      if (!fgets(line, sizeof(line), f) || sscanf(line, "threshold %lf", &m.threshold) != 1) { fclose(f); fprintf(stderr, "load_mind: threshold\n"); exit(1); }
+      if (!fgets(line, sizeof(line), f) || sscanf(line, "ep_cap %d", &m.ep_cap) != 1) { fclose(f); fprintf(stderr, "load_mind: ep_cap\n"); exit(1); }
+      if (!fgets(line, sizeof(line), f)) { fclose(f); fprintf(stderr, "load_mind: core_cap\n"); exit(1); }
+      if (!fgets(line, sizeof(line), f) || sscanf(line, "lr %lf", &m.lr) != 1) { fclose(f); fprintf(stderr, "load_mind: lr\n"); exit(1); }
+      if (!fgets(line, sizeof(line), f) || sscanf(line, "model %d %d %llu", &d, &h, &steps) != 3) { fclose(f); fprintf(stderr, "load_mind: model\n"); exit(1); }
+      if (d < 1 || d > BM_D || h < 1 || h > BM_H) { fclose(f); fprintf(stderr, "load_mind: dims\n"); exit(1); }
+      if (m.ep_cap < 1 || m.ep_cap > BM_EP) m.ep_cap = BM_EP;
+      m.model.dim = d; m.model.hidden = h; m.model.steps = (uint64_t)steps;
+      if (bm_read_f64s(f, m.model.w1, h*d) || bm_read_f64s(f, m.model.b1, h) || bm_read_f64s(f, m.model.w2, d*h) || bm_read_f64s(f, m.model.b2, d)) { fclose(f); fprintf(stderr, "load_mind: weights\n"); exit(1); }
+      if (bm_read_f64s(f, m.model.w1l, h*d) || bm_read_f64s(f, m.model.b1l, h) || bm_read_f64s(f, m.model.w2l, d*h) || bm_read_f64s(f, m.model.b2l, d)) { fclose(f); fprintf(stderr, "load_mind: locks\n"); exit(1); }
+      if (fscanf(f, " core %d", &core_n) != 1) { fclose(f); fprintf(stderr, "load_mind: core\n"); exit(1); }
+      for (i = 0; i < core_n; i++) { double dummy[BM_D]; int plen; unsigned long long rep; double imp; if (fscanf(f, "%lf %llu %d", &imp, &rep, &plen) != 3 || plen < 1 || plen > BM_D || bm_read_f64s(f, dummy, plen)) { fclose(f); fprintf(stderr, "load_mind: core pat\n"); exit(1); } }
+      if (fscanf(f, " episodic %d", &ep_n) != 1 || ep_n < 0 || ep_n > BM_EP) { fclose(f); fprintf(stderr, "load_mind: episodic\n"); exit(1); }
+      m.nep = ep_n;
+      for (i = 0; i < ep_n; i++) {
+        unsigned long long ts; int plen, has_t, tlen;
+        if (fscanf(f, "%lf %llu %d %d %d", &m.ep[i].surprise, &ts, &plen, &has_t, &tlen) != 5) { fclose(f); fprintf(stderr, "load_mind: ep meta\n"); exit(1); }
+        m.ep[i].has_target = has_t ? 1 : 0; m.ep[i].dim = plen;
+        if (plen < 1 || plen > BM_D || bm_read_f64s(f, m.ep[i].pattern, plen)) { fclose(f); fprintf(stderr, "load_mind: ep pat\n"); exit(1); }
+        if (has_t) { m.ep[i].target_dim = tlen; if (tlen < 1 || tlen > BM_D || bm_read_f64s(f, m.ep[i].target, tlen)) { fclose(f); fprintf(stderr, "load_mind: ep tgt\n"); exit(1); } }
+      }
+      fclose(f); gM[gMn] = m; stack[sp++] = Vm((int64_t)gMn++);
     }
     else if (op == OP_AG_CLEAR) { gBagn = 0; stack[sp++] = Vi(0); }
     else if (op == OP_AG_PARAM) {
