@@ -3,7 +3,9 @@
 // Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, import,
 //          XOR, birth→24, c_seed/expr_c (Kenga writes .c) via run_file.
 //          on/emit/pump/pending, types/ttl skip, && || % !, typeof/to_str,
-//          t_from/t_get/t_matmul/t_shape/t_add/tensor/t_fill
+//          t_from/t_get/t_matmul/t_shape/t_add/tensor/t_fill,
+//          t_sub/t_mul/t_reshape/t_transpose/t_scale/t_sum/t_dot,
+//          t_exp/t_log/t_softmax/t_mean/t_mse
 
 fn OP_CONST() -> i64 { return 1; }
 fn OP_LOAD() -> i64 { return 2; }
@@ -51,6 +53,18 @@ fn OP_T_SHAPE() -> i64 { return 43; }
 fn OP_T_ADD() -> i64 { return 44; }
 fn OP_TENSOR() -> i64 { return 45; }
 fn OP_T_FILL() -> i64 { return 46; }
+fn OP_T_SUB() -> i64 { return 47; }
+fn OP_T_MUL() -> i64 { return 48; }
+fn OP_T_RESHAPE() -> i64 { return 49; }
+fn OP_T_TRANSPOSE() -> i64 { return 50; }
+fn OP_T_SCALE() -> i64 { return 51; }
+fn OP_T_SUM() -> i64 { return 52; }
+fn OP_T_DOT() -> i64 { return 53; }
+fn OP_T_EXP() -> i64 { return 54; }
+fn OP_T_LOG() -> i64 { return 55; }
+fn OP_T_SOFTMAX() -> i64 { return 56; }
+fn OP_T_MEAN() -> i64 { return 57; }
+fn OP_T_MSE() -> i64 { return 58; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -343,6 +357,48 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
         if op == OP_T_FILL() {
             let b = list_pop(stack); let a = list_pop(b[0]);
             stack = push(a[0], t_fill(a[1], b[1]));
+        }
+        if op == OP_T_SUB() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_sub(a[1], b[1]));
+        }
+        if op == OP_T_MUL() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_mul(a[1], b[1]));
+        }
+        if op == OP_T_RESHAPE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_reshape(a[1], b[1]));
+        }
+        if op == OP_T_TRANSPOSE() {
+            let p = list_pop(stack); stack = push(p[0], t_transpose(p[1]));
+        }
+        if op == OP_T_SCALE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_scale(a[1], b[1]));
+        }
+        if op == OP_T_SUM() {
+            let p = list_pop(stack); stack = push(p[0], t_sum(p[1]));
+        }
+        if op == OP_T_DOT() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_dot(a[1], b[1]));
+        }
+        if op == OP_T_EXP() {
+            let p = list_pop(stack); stack = push(p[0], t_exp(p[1]));
+        }
+        if op == OP_T_LOG() {
+            let p = list_pop(stack); stack = push(p[0], t_log(p[1]));
+        }
+        if op == OP_T_SOFTMAX() {
+            let p = list_pop(stack); stack = push(p[0], t_softmax(p[1]));
+        }
+        if op == OP_T_MEAN() {
+            let p = list_pop(stack); stack = push(p[0], t_mean(p[1]));
+        }
+        if op == OP_T_MSE() {
+            let b = list_pop(stack); let a = list_pop(b[0]);
+            stack = push(a[0], t_mse(a[1], b[1]));
         }
         if op == OP_LT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]<b[1]{r=1;} stack=push(a[0],r); }
         if op == OP_GT() { let b=list_pop(stack); let a=list_pop(b[0]); let r:i64=0; if a[1]>b[1]{r=1;} stack=push(a[0],r); }
@@ -847,6 +903,37 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                         code = push(code, OP_T_FILL());
                                                         i = j;
                                                     } else {
+                                                    let hop: i64 = 0;
+                                                    if id[0] == "t_sub" { hop = OP_T_SUB(); }
+                                                    if id[0] == "t_mul" { hop = OP_T_MUL(); }
+                                                    if id[0] == "t_dot" { hop = OP_T_DOT(); }
+                                                    if id[0] == "t_reshape" { hop = OP_T_RESHAPE(); }
+                                                    if id[0] == "t_scale" { hop = OP_T_SCALE(); }
+                                                    if id[0] == "t_mse" { hop = OP_T_MSE(); }
+                                                    if hop != 0 {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ","); j = j + 1;
+                                                        ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, hop);
+                                                        i = j;
+                                                    } else {
+                                                    let uop: i64 = 0;
+                                                    if id[0] == "t_transpose" { uop = OP_T_TRANSPOSE(); }
+                                                    if id[0] == "t_exp" { uop = OP_T_EXP(); }
+                                                    if id[0] == "t_log" { uop = OP_T_LOG(); }
+                                                    if id[0] == "t_softmax" { uop = OP_T_SOFTMAX(); }
+                                                    if id[0] == "t_sum" { uop = OP_T_SUM(); }
+                                                    if id[0] == "t_mean" { uop = OP_T_MEAN(); }
+                                                    if uop != 0 {
+                                                        let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                        code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                        code = push(code, uop);
+                                                        i = j;
+                                                    } else {
                                             let argc: i64 = 0;
                                             if s[j] != ")" {
                                                 while true {
@@ -872,6 +959,8 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                 patches = push(patches, [addr_at, fni]);
                                             }
                                             i = j;
+                                                    }
+                                                    }
                                                     }
                                                     }
                                                     }

@@ -1,4 +1,4 @@
-// Tensor subset on more.kenga VM (host t_from / t_get / t_matmul).
+// Tensor subset on more.kenga VM (host builtins, no list matmul).
 //   bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 
 fn main() -> i64 {
@@ -16,6 +16,41 @@ fn main() -> i64 {
     let z = t_fill(tensor(2, 2), 3.0);
     let w = t_add(z, z);
     assert(round(t_get(w, 0)) == 6);
+
+    let p = t_from([2], [5.0, 5.0]);
+    let q = t_from([2], [1.0, 2.0]);
+    let d = t_sub(p, q);
+    assert(round(t_get(d, 0)) == 4);
+    assert(round(t_get(d, 1)) == 3);
+    let m = t_mul(p, q);
+    assert(round(t_get(m, 0)) == 5);
+    assert(round(t_get(m, 1)) == 10);
+    let sc = t_scale(q, 2.0);
+    assert(round(t_get(sc, 1)) == 4);
+    assert(round(t_sum(q)) == 3);
+    assert(round(t_dot(q, q)) == 5);
+    assert(round(t_mean(p)) == 5);
+    assert(round(t_mse(p, p)) == 0);
+    assert(round(t_mse(t_from([2], [1.0, 3.0]), t_from([2], [1.0, 1.0]))) == 2);
+
+    let r = t_reshape(t_from([4], [1.0, 2.0, 3.0, 4.0]), [2, 2]);
+    assert(t_shape(r)[0] == 2);
+    assert(t_shape(r)[1] == 2);
+    let tr = t_transpose(r);
+    assert(round(t_get(tr, 0)) == 1);
+    assert(round(t_get(tr, 1)) == 3);
+    assert(round(t_get(tr, 2)) == 2);
+    assert(round(t_get(tr, 3)) == 4);
+
+    let e = t_exp(t_from([2], [0.0, 0.0]));
+    assert(round(t_get(e, 0)) == 1);
+    let lg = t_log(t_from([2], [1.0, 2.718281828]));
+    assert(round(t_get(lg, 0) * 100.0) == 0);
+    assert(round(t_get(lg, 1)) == 1);
+    let sm = t_softmax(t_from([2], [0.0, 0.0]));
+    assert(round(t_get(sm, 0) * 10.0) == 5);
+    assert(round(t_get(sm, 1) * 10.0) == 5);
+
     println("tensor more ok");
     return 0;
 }
