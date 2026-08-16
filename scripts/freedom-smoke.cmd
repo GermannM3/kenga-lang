@@ -185,7 +185,7 @@ if exist "%VCVARS%" (
     if errorlevel 1 exit /b 1
   )
   pushd bootstrap\generated
-  for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag bc_vm_seed bc_while_sum bc_from_src bc_from_for bc_from_fn bc_from_lists bc_from_for_list bc_from_break bc_from_for_lite bc_from_lists_lite bc_from_elif bc_from_elif_lite bc_from_float_lite bc_from_struct_lite bc_from_agent bc_from_import bc_from_arith bc_from_fact_lite bc_from_str bc_from_net) do (
+  for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag lower_kv_tensor lower_kv_tape lower_kv_mlp lower_kv_ce bc_vm_seed bc_while_sum bc_from_src bc_from_for bc_from_fn bc_from_lists bc_from_for_list bc_from_break bc_from_for_lite bc_from_lists_lite bc_from_elif bc_from_elif_lite bc_from_float_lite bc_from_struct_lite bc_from_agent bc_from_import bc_from_arith bc_from_fact_lite bc_from_str bc_from_net) do (
     cl /nologo /O2 /TC %%f.c /Fe:%%f.exe /Fo:%%f.obj
     if errorlevel 1 exit /b 1
     %%f.exe
@@ -225,7 +225,7 @@ if exist "%VCVARS%" (
       if errorlevel 1 exit /b 1
     )
     pushd bootstrap\generated
-    for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag bc_vm_seed bc_while_sum bc_from_src bc_from_for bc_from_fn bc_from_lists bc_from_for_list bc_from_break bc_from_for_lite bc_from_lists_lite bc_from_elif bc_from_elif_lite bc_from_float_lite bc_from_struct_lite bc_from_agent bc_from_import bc_from_arith bc_from_fact_lite bc_from_str bc_from_net) do (
+    for %%f in (lower_str_kv lower_events_kv lower_agent_kv lower_lex_frag lower_parse_frag lower_kv_tensor lower_kv_tape lower_kv_mlp lower_kv_ce bc_vm_seed bc_while_sum bc_from_src bc_from_for bc_from_fn bc_from_lists bc_from_for_list bc_from_break bc_from_for_lite bc_from_lists_lite bc_from_elif bc_from_elif_lite bc_from_float_lite bc_from_struct_lite bc_from_agent bc_from_import bc_from_arith bc_from_fact_lite bc_from_str bc_from_net) do (
       gcc -O2 -std=c99 %%f.c -o %%f.exe
       if errorlevel 1 exit /b 1
       %%f.exe

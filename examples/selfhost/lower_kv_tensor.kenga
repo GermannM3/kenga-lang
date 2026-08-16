@@ -12,6 +12,15 @@ fn main() -> i64 {
     let z = t_fill(tensor(2, 2), 3.0);
     let w = t_add(z, z);
     assert(round(t_get(w, 0)) == 6);
+    t_set(z, 0, 9.0);
+    assert(round(t_get(z, 0)) == 9);
+    let d = t_sub(w, z);
+    assert(round(t_get(d, 0)) == -3);
+    let sm = t_softmax(t_from([2], [0.0, 0.0]));
+    assert(round(t_get(sm, 0) * 10.0) == 5);
+    let img = t_from([2, 2, 1], [1.0, 1.0, 3.0, 3.0]);
+    let m = t_mean(img);
+    assert(round(t_get(m, 0)) == 2);
     println("tensor kv ok");
     return 0;
 }

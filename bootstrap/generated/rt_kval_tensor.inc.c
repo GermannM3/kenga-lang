@@ -141,10 +141,13 @@ static KVal k_t_add(KVal a, KVal b) {
   double *ad, *bd;
   int64_t h;
   KvTensor *o;
-  if (ta->n != tb->n) k_die("tensor size mismatch");
+  if (ta->rank != tb->rank || ta->n != tb->n) k_die("tensor size mismatch");
   rank = ta->rank;
   n = ta->n;
-  for (i = 0; i < rank; i++) shape[i] = ta->shape[i];
+  for (i = 0; i < rank; i++) {
+    if (ta->shape[i] != tb->shape[i]) k_die("tensor shape mismatch");
+    shape[i] = ta->shape[i];
+  }
   ad = ta->data;
   bd = tb->data;
   h = kt_alloc(shape, rank, 0);
@@ -152,6 +155,276 @@ static KVal k_t_add(KVal a, KVal b) {
   for (i = 0; i < n; i++) o->data[i] = ad[i] + bd[i];
   return kval_tensor(h);
 }
+
+static KVal k_t_ew(KVal a, KVal b, int op) {
+  KvTensor *ta = kt_get(a), *tb = kt_get(b);
+  int i, n, rank, shape[8];
+  int64_t h;
+  KvTensor *o;
+  if (ta->rank != tb->rank || ta->n != tb->n) k_die("tensor size mismatch");
+  rank = ta->rank; n = ta->n;
+  for (i = 0; i < rank; i++) {
+    if (ta->shape[i] != tb->shape[i]) k_die("tensor shape mismatch");
+    shape[i] = ta->shape[i];
+  }
+  h = kt_alloc(shape, rank, 0);
+  o = kt_obj(h);
+  for (i = 0; i < n; i++) {
+    double x = ta->data[i], y = tb->data[i];
+    if (op == 1) o->data[i] = x - y;
+    else o->data[i] = x * y;
+  }
+  return kval_tensor(h);
+}
+static KVal k_t_sub(KVal a, KVal b) { return k_t_ew(a, b, 1); }
+static KVal k_t_mul(KVal a, KVal b) { return k_t_ew(a, b, 2); }
+
+static KVal k_t_set(KVal t, KVal i, KVal v) {
+  KvTensor *o = kt_get(t);
+  int64_t idx = kval_as_i64(i);
+  if (idx < 0 || idx >= (int64_t)o->n) k_die("t_set out of range");
+  o->data[idx] = kval_as_f64(v);
+  return t;
+}
+
+static KVal k_t_transpose(KVal a) {
+  KvTensor *ta = kt_get(a);
+  int r, c, i, j, shape[2];
+  int64_t h; KvTensor *o;
+  if (ta->rank != 2) k_die("t_transpose expects rank-2");
+  r = ta->shape[0]; c = ta->shape[1];
+  shape[0] = c; shape[1] = r;
+  h = kt_alloc(shape, 2, 1); o = kt_obj(h);
+  for (i = 0; i < r; i++)
+    for (j = 0; j < c; j++) o->data[j * r + i] = ta->data[i * c + j];
+  return kval_tensor(h);
+}
+
+static KVal k_t_reshape(KVal t, KVal sh) {
+  KvTensor *o = kt_get(t);
+  int64_t dims[8]; int ishape[8]; int rank, n, i; int64_t h; KvTensor *r;
+  rank = kval_list_to_i64s(sh, dims, 8);
+  for (i = 0; i < rank; i++) ishape[i] = (int)dims[i];
+  n = kt_product(ishape, rank);
+  if (n != o->n) k_die("t_reshape size mismatch");
+  h = kt_alloc(ishape, rank, 0); r = kt_obj(h);
+  if (n > 0) memcpy(r->data, o->data, (size_t)n * sizeof(double));
+  return kval_tensor(h);
+}
+
+static KVal k_t_scale(KVal t, KVal s) {
+  KvTensor *o = kt_get(t); double x = kval_as_f64(s);
+  int64_t h = kt_alloc(o->shape, o->rank, 0); KvTensor *r = kt_obj(h);
+  int i; for (i = 0; i < o->n; i++) r->data[i] = o->data[i] * x;
+  return kval_tensor(h);
+}
+
+static KVal k_t_sum(KVal t) {
+  KvTensor *o = kt_get(t); double acc = 0.0; int i;
+  for (i = 0; i < o->n; i++) acc += o->data[i];
+  return kval_f64(acc);
+}
+
+static KVal k_t_dot(KVal a, KVal b) {
+  KvTensor *ta = kt_get(a), *tb = kt_get(b); double acc = 0.0; int i;
+  if (ta->n != tb->n) k_die("t_dot length mismatch");
+  for (i = 0; i < ta->n; i++) acc += ta->data[i] * tb->data[i];
+  return kval_f64(acc);
+}
+
+static KVal k_t_exp(KVal t) {
+  KvTensor *o = kt_get(t);
+  int64_t h = kt_alloc(o->shape, o->rank, 0); KvTensor *r = kt_obj(h);
+  int i; for (i = 0; i < o->n; i++) r->data[i] = exp(o->data[i]);
+  return kval_tensor(h);
+}
+
+static KVal k_t_log(KVal t) {
+  KvTensor *o = kt_get(t);
+  int64_t h = kt_alloc(o->shape, o->rank, 0); KvTensor *r = kt_obj(h);
+  int i; for (i = 0; i < o->n; i++) {
+    double x = o->data[i]; if (x < 1e-12) x = 1e-12; r->data[i] = log(x);
+  }
+  return kval_tensor(h);
+}
+
+static KVal k_t_softmax(KVal t) {
+  KvTensor *o = kt_get(t);
+  int64_t h = kt_alloc(o->shape, o->rank, 0); KvTensor *r = kt_obj(h);
+  double mx = -1e300, sum = 0.0; int i;
+  if (o->n < 1) return kval_tensor(h);
+  for (i = 0; i < o->n; i++) r->data[i] = o->data[i];
+  for (i = 0; i < r->n; i++) if (r->data[i] > mx) mx = r->data[i];
+  for (i = 0; i < r->n; i++) { r->data[i] = exp(r->data[i] - mx); sum += r->data[i]; }
+  if (sum < 1e-300) sum = 1e-300;
+  for (i = 0; i < r->n; i++) r->data[i] /= sum;
+  return kval_tensor(h);
+}
+
+static KVal k_t_mse(KVal a, KVal b) {
+  KvTensor *ta = kt_get(a), *tb = kt_get(b); double acc = 0.0; int i, n;
+  if (ta->n != tb->n) k_die("t_mse size mismatch");
+  n = ta->n > 0 ? ta->n : 1;
+  for (i = 0; i < ta->n; i++) { double d = ta->data[i] - tb->data[i]; acc += d * d; }
+  return kval_f64(acc / (double)n);
+}
+
+static KVal k_t_mean(KVal t) {
+  KvTensor *a = kt_get(t);
+  if (a->rank == 3) {
+    int hh = a->shape[0], w = a->shape[1], c = a->shape[2];
+    double nn = (double)(hh * w); int shape[1]; int64_t oh; KvTensor *o;
+    int y, x, ch; shape[0] = c; oh = kt_alloc(shape, 1, 1); o = kt_obj(oh);
+    for (y = 0; y < hh; y++) for (x = 0; x < w; x++) for (ch = 0; ch < c; ch++)
+      o->data[ch] += a->data[(y * w + x) * c + ch];
+    for (ch = 0; ch < c; ch++) o->data[ch] /= nn > 0.0 ? nn : 1.0;
+    return kval_tensor(oh);
+  }
+  if (a->rank == 2) {
+    double acc = 0.0; int i, shape[1]; int64_t oh;
+    shape[0] = 1; for (i = 0; i < a->n; i++) acc += a->data[i];
+    oh = kt_alloc(shape, 1, 0); kt_obj(oh)->data[0] = acc / (a->n > 0 ? (double)a->n : 1.0);
+    return kval_tensor(oh);
+  }
+  { double acc = 0.0; int i; for (i = 0; i < a->n; i++) acc += a->data[i];
+    return kval_f64(acc / (a->n > 0 ? (double)a->n : 1.0)); }
+}
+
+static int k_save_tensor(KVal t, const char *path) {
+  KvTensor *o = kt_get(t); FILE *f = fopen(path, "wb"); int i;
+  if (!f) return 0;
+  fprintf(f, "KENGA_TENSOR 1\n%d\n", o->rank);
+  for (i = 0; i < o->rank; i++) { if (i) fputc(' ', f); fprintf(f, "%d", o->shape[i]); }
+  fputc('\n', f);
+  for (i = 0; i < o->n; i++) { if (i) fputc(' ', f); fprintf(f, "%.17g", o->data[i]); }
+  fputc('\n', f); fclose(f); return 1;
+}
+
+static KVal k_load_tensor(const char *path) {
+  FILE *f = fopen(path, "rb"); char magic[32]; int ver = 0, rank = 0, i, shape[8], n;
+  int64_t h; KvTensor *t;
+  if (!f) k_die("load_tensor: cannot open");
+  if (fscanf(f, "%31s %d", magic, &ver) != 2 || strcmp(magic, "KENGA_TENSOR") != 0 || ver != 1) {
+    fclose(f); k_die("load_tensor: bad header"); }
+  if (fscanf(f, "%d", &rank) != 1 || rank < 0 || rank > 8) { fclose(f); k_die("load_tensor: bad rank"); }
+  for (i = 0; i < rank; i++) if (fscanf(f, "%d", &shape[i]) != 1) { fclose(f); k_die("load_tensor: bad shape"); }
+  n = kt_product(shape, rank); h = kt_alloc(shape, rank, 0); t = kt_obj(h);
+  for (i = 0; i < n; i++) if (fscanf(f, "%lf", &t->data[i]) != 1) { fclose(f); k_die("load_tensor: bad data"); }
+  fclose(f); return kval_tensor(h);
+}
+
+static unsigned char *kt_read_bytes(const char *path, size_t *out_len) {
+  FILE *f = fopen(path, "rb"); char alt[512]; long sz; unsigned char *buf;
+  if (!f && path[0] == '.' && path[1] == '.' && (path[2] == '/' || path[2] == '\\')) f = fopen(path + 3, "rb");
+  if (!f && strlen(path) + 4 < sizeof(alt)) {
+    alt[0] = '.'; alt[1] = '.'; alt[2] = '/'; memcpy(alt + 3, path, strlen(path) + 1); f = fopen(alt, "rb"); }
+  if (!f) return NULL;
+  if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
+  sz = ftell(f); if (sz < 0) { fclose(f); return NULL; } rewind(f);
+  buf = (unsigned char *)malloc((size_t)sz + 1); if (!buf) { fclose(f); return NULL; }
+  if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) { free(buf); fclose(f); return NULL; }
+  fclose(f); if (out_len) *out_len = (size_t)sz; return buf;
+}
+
+static void kt_skip_ws(const unsigned char *b, size_t n, size_t *i) {
+  for (;;) {
+    while (*i < n && (b[*i] == ' ' || b[*i] == '\t' || b[*i] == '\r' || b[*i] == '\n')) (*i)++;
+    if (*i < n && b[*i] == '#') { while (*i < n && b[*i] != '\n') (*i)++; continue; }
+    break;
+  }
+}
+static int kt_read_token(const unsigned char *b, size_t n, size_t *i, char *out, size_t outcap) {
+  size_t start, len; kt_skip_ws(b, n, i); start = *i;
+  while (*i < n && b[*i] != ' ' && b[*i] != '\t' && b[*i] != '\r' && b[*i] != '\n' && b[*i] != '#') (*i)++;
+  if (start == *i) return 0; len = *i - start; if (len + 1 > outcap) len = outcap - 1;
+  memcpy(out, b + start, len); out[len] = 0; return 1;
+}
+
+static KVal k_load_ppm(const char *path) {
+  size_t n = 0, i = 0; unsigned char *b = kt_read_bytes(path, &n);
+  char tok[64]; int w, h, maxv, need, p, shape[3]; int64_t th; KvTensor *t;
+  if (!b) k_die("load_ppm: cannot read file");
+  if (!kt_read_token(b, n, &i, tok, sizeof(tok)) || strcmp(tok, "P6") != 0) { free(b); k_die("load_ppm: only P6"); }
+  if (!kt_read_token(b, n, &i, tok, sizeof(tok))) { free(b); k_die("load_ppm: bad width"); }
+  w = atoi(tok);
+  if (!kt_read_token(b, n, &i, tok, sizeof(tok))) { free(b); k_die("load_ppm: bad height"); }
+  h = atoi(tok);
+  if (!kt_read_token(b, n, &i, tok, sizeof(tok))) { free(b); k_die("load_ppm: bad maxval"); }
+  maxv = atoi(tok);
+  if (w < 1 || h < 1 || maxv < 1) { free(b); k_die("load_ppm: bad header nums"); }
+  if (i < n && (b[i] == ' ' || b[i] == '\t' || b[i] == '\r' || b[i] == '\n')) i++;
+  need = w * h * 3; if (n < i + (size_t)need) { free(b); k_die("load_ppm: truncated"); }
+  shape[0] = h; shape[1] = w; shape[2] = 3; th = kt_alloc(shape, 3, 0); t = kt_obj(th);
+  for (p = 0; p < need; p++) t->data[p] = (double)b[i + (size_t)p] / (double)maxv;
+  free(b); return kval_tensor(th);
+}
+
+static uint32_t kt_u32le(const unsigned char *p) {
+  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+static uint16_t kt_u16le(const unsigned char *p) {
+  return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+static KVal k_load_wav(const char *path) {
+  size_t n = 0, pos = 12; unsigned char *b = kt_read_bytes(path, &n);
+  uint16_t channels = 1, bits = 16; size_t data_off = 0, data_len = 0;
+  int samples, si, shape[1]; int64_t th; KvTensor *t;
+  if (!b) k_die("load_wav: cannot read file");
+  if (n < 44 || memcmp(b, "RIFF", 4) != 0 || memcmp(b + 8, "WAVE", 4) != 0) { free(b); k_die("load_wav: not WAVE"); }
+  while (pos + 8 <= n) {
+    unsigned char *id = b + pos; uint32_t size = kt_u32le(b + pos + 4); size_t chunk = pos + 8;
+    if (memcmp(id, "fmt ", 4) == 0) {
+      if (size < 16 || chunk + 16 > n) { free(b); k_die("load_wav: bad fmt"); }
+      if (kt_u16le(b + chunk) != 1) { free(b); k_die("load_wav: only PCM"); }
+      channels = kt_u16le(b + chunk + 2); bits = kt_u16le(b + chunk + 14);
+    } else if (memcmp(id, "data", 4) == 0) { data_off = chunk; data_len = size; break; }
+    pos = chunk + size + (size % 2);
+  }
+  if (data_off == 0 || bits != 16) { free(b); k_die("load_wav: need 16-bit PCM"); }
+  if (data_off + data_len > n) { free(b); k_die("load_wav: truncated"); }
+  { int step = channels < 1 ? 1 : (int)channels;
+    samples = (int)(data_len / 2 / (size_t)step); if (samples < 1) samples = 0;
+    if (samples > TL_ELEMS_MAX) { free(b); k_die("load_wav: too many samples"); }
+    shape[0] = samples; th = kt_alloc(shape, 1, 0); t = kt_obj(th);
+    for (si = 0; si < samples; si++) {
+      size_t off = data_off + (size_t)si * (size_t)step * 2;
+      int16_t sample = (int16_t)kt_u16le(b + off);
+      t->data[si] = (double)sample / 32768.0;
+    }
+  }
+  free(b); return kval_tensor(th);
+}
+
+static KVal k_t_matmul(KVal a, KVal b);
+static KVal k_t_linear_grad(KVal w, KVal x, KVal y) {
+  KVal pred = k_t_matmul(w, x);
+  KVal err = k_t_sub(pred, y);
+  return k_t_matmul(err, k_t_transpose(x));
+}
+
+static KVal k_t_patch_mean(KVal t, KVal ghh, KVal gww) {
+  KvTensor *a = kt_get(t); int gh = (int)kval_as_i64(ghh), gw = (int)kval_as_i64(gww);
+  int h, w, c, ph, pw, gy, gx, ch, y, x, oshape[3]; int64_t oh; KvTensor *o;
+  if (gh <= 0 || gw <= 0) k_die("t_patch_mean grid must be > 0");
+  if (a->rank != 3) k_die("t_patch_mean expects Tensor [h,w,c]");
+  h = a->shape[0]; w = a->shape[1]; c = a->shape[2]; ph = h / gh; pw = w / gw;
+  if (ph == 0 || pw == 0) k_die("t_patch_mean: image smaller than grid");
+  oshape[0] = gh; oshape[1] = gw; oshape[2] = c; oh = kt_alloc(oshape, 3, 1); o = kt_obj(oh);
+  for (gy = 0; gy < gh; gy++) for (gx = 0; gx < gw; gx++) for (ch = 0; ch < c; ch++) {
+    double acc = 0.0, nn = 0.0;
+    for (y = gy * ph; y < (gy + 1) * ph; y++) for (x = gx * pw; x < (gx + 1) * pw; x++) {
+      acc += a->data[(y * w + x) * c + ch]; nn += 1.0;
+    }
+    o->data[(gy * gw + gx) * c + ch] = acc / (nn > 0.0 ? nn : 1.0);
+  }
+  return kval_tensor(oh);
+}
+
+static KVal k_save_tensor_v(KVal t, KVal path) { return kval_i64(k_save_tensor(t, kval_as_str(path))); }
+static KVal k_load_tensor_v(KVal path) { return k_load_tensor(kval_as_str(path)); }
+static KVal k_load_ppm_v(KVal path) { return k_load_ppm(kval_as_str(path)); }
+static KVal k_load_wav_v(KVal path) { return k_load_wav(kval_as_str(path)); }
 
 static KVal k_t_matmul(KVal a, KVal b) {
   KvTensor *ta = kt_get(a), *tb = kt_get(b);

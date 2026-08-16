@@ -122,7 +122,7 @@ kenga run --lite examples/selfhost/for_lite.kenga
 ## emit-c / build
 
 `lower_c` → C99: i64, f64, list, struct, for/if, events, `println`/`print`, `round`, `typeof`/`to_str`, `&&` `||` `!` `%`, `sleep_ms`, `now_ms`.  
-`lower_kv` → tagged KVal C, тот же диалект + str/ord + `now_ms` + Memory + Tensor + tape (`ag_matmul`/`ag_add`/`ag_relu`/`ag_backward`/`ag_step`).  
+`lower_kv` → tagged KVal C, тот же диалект + str/ord + `now_ms` + Memory + Tensor/tape как lite (включая CE: `ag_softmax`/`ag_log`/`ag_neg`/`ag_sum`).  
 `bc_src_c` → bytecode C VM: то же плюс birth/net/agent + `now_ms`.
 
 ## Примеры по темам

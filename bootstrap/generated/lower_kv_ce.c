@@ -49,28 +49,24 @@ static int64_t k_now_ms(void) {
 
 int main(void) {
   KVal w = kval_i64(0);
-  KVal b = kval_i64(0);
   KVal x = kval_i64(0);
   KVal y = kval_i64(0);
-  KVal i = kval_i64(0);
+  KVal step = kval_i64(0);
   KVal wid = kval_i64(0);
-  KVal bid = kval_i64(0);
-  KVal xid = kval_i64(0);
-  KVal yid = kval_i64(0);
-  KVal h = kval_i64(0);
-  KVal pred = kval_i64(0);
+  KVal logits = kval_i64(0);
+  KVal probs = kval_i64(0);
   KVal loss = kval_i64(0);
-  KVal p0 = kval_i64(0);
-  KVal p1 = kval_i64(0);
+  KVal p = kval_i64(0);
+  KVal w2 = kval_i64(0);
   {
   int64_t _lk22 = klist_new();
   klist_push_val(_lk22, kval_i64(2LL));
   klist_push_val(_lk22, kval_i64(2LL));
   int64_t _lk30 = klist_new();
+  klist_push_val(_lk30, kval_f64(0.2));
   klist_push_val(_lk30, kval_f64(0.1));
   klist_push_val(_lk30, kval_f64(0.0));
-  klist_push_val(_lk30, kval_f64(0.0));
-  klist_push_val(_lk30, kval_f64(0.1));
+  klist_push_val(_lk30, kval_f64(0.3));
     w = k_t_from(kval_list(_lk22), kval_list(_lk30));
   }
   {
@@ -78,51 +74,36 @@ int main(void) {
   klist_push_val(_lk72, kval_i64(2LL));
   klist_push_val(_lk72, kval_i64(1LL));
   int64_t _lk80 = klist_new();
+  klist_push_val(_lk80, kval_f64(1.0));
   klist_push_val(_lk80, kval_f64(0.0));
-  klist_push_val(_lk80, kval_f64(0.0));
-    b = k_t_from(kval_list(_lk72), kval_list(_lk80));
+    x = k_t_from(kval_list(_lk72), kval_list(_lk80));
   }
   {
   int64_t _lk112 = klist_new();
   klist_push_val(_lk112, kval_i64(2LL));
   klist_push_val(_lk112, kval_i64(1LL));
   int64_t _lk120 = klist_new();
+  klist_push_val(_lk120, kval_f64(0.0));
   klist_push_val(_lk120, kval_f64(1.0));
-  klist_push_val(_lk120, kval_f64(1.0));
-    x = k_t_from(kval_list(_lk112), kval_list(_lk120));
+    y = k_t_from(kval_list(_lk112), kval_list(_lk120));
   }
-  {
-  int64_t _lk152 = klist_new();
-  klist_push_val(_lk152, kval_i64(2LL));
-  klist_push_val(_lk152, kval_i64(1LL));
-  int64_t _lk160 = klist_new();
-  klist_push_val(_lk160, kval_f64(1.0));
-  klist_push_val(_lk160, kval_f64(2.0));
-    y = k_t_from(kval_list(_lk152), kval_list(_lk160));
-  }
-  i = kval_i64(0LL);
-  while (kval_as_i64(kval_i64(kval_as_i64(i) < kval_as_i64(kval_i64(80LL))))) {
+  step = kval_i64(0LL);
+  while (kval_as_i64(kval_i64(kval_as_i64(step) < kval_as_i64(kval_i64(20LL))))) {
     (void)(k_ag_clear());
     wid = k_ag_param(w);
-    bid = k_ag_param(b);
-    xid = k_ag_const(x);
-    yid = k_ag_const(y);
-    h = k_ag_add(k_ag_matmul(wid, xid), bid);
-    pred = k_ag_relu(h);
-    loss = k_ag_mse(pred, yid);
+    logits = k_ag_matmul(wid, k_ag_const(x));
+    probs = k_ag_softmax(logits);
+    loss = k_ag_neg(k_ag_sum(k_ag_mul(k_ag_const(y), k_ag_log(probs))));
     (void)(k_ag_backward(loss));
-    w = k_ag_step(wid, kval_f64(0.2));
-    b = k_ag_step(bid, kval_f64(0.2));
-    i = kval_i64(kval_as_i64(i) + kval_as_i64(kval_i64(1LL)));
+    w = k_ag_step(wid, kval_f64(0.5));
+    step = kval_i64(kval_as_i64(step) + kval_as_i64(kval_i64(1LL)));
   }
-  pred = k_t_add(k_t_matmul(w, x), b);
-  p0 = kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(k_t_get(pred, kval_i64(0LL))) * kval_as_f64(kval_f64(10.0))))));
-  p1 = kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(k_t_get(pred, kval_i64(1LL))) * kval_as_f64(kval_f64(10.0))))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(p0) > kval_as_i64(kval_i64(7LL)))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(p0) < kval_as_i64(kval_i64(13LL)))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(p1) > kval_as_i64(kval_i64(17LL)))));
-  k_assert(kval_as_i64(kval_i64(kval_as_i64(p1) < kval_as_i64(kval_i64(23LL)))));
-  kenga_println_val(kval_str("mlp kv ok"));
+  p = k_t_softmax(k_t_matmul(w, x));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(k_t_get(p, kval_i64(1LL))) * kval_as_f64(kval_f64(100.0))))))) > kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(k_t_get(p, kval_i64(0LL))) * kval_as_f64(kval_f64(100.0))))))))));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(k_save_tensor_v(w, kval_str("kv_ce_w.kt"))) == kval_as_i64(kval_i64(1LL)))));
+  w2 = k_load_tensor_v(kval_str("kv_ce_w.kt"));
+  k_assert(kval_as_i64(kval_i64(kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(k_t_get(w2, kval_i64(0LL))) * kval_as_f64(kval_f64(10.0))))))) == kval_as_i64(kval_i64(k_round(kval_as_f64(kval_f64(kval_as_f64(k_t_get(w, kval_i64(0LL))) * kval_as_f64(kval_f64(10.0))))))))));
+  kenga_println_val(kval_str("ce kv ok"));
   return (int)kval_as_i64(kval_i64(0LL));
   return 0;
 }

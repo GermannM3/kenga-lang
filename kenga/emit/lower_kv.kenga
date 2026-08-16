@@ -582,6 +582,137 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 let pre: str = merge_pre(ar[3], ab[3]);
                 return ["k_t_matmul(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
             }
+            if id[0] == "t_sub" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_t_sub(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "t_mul" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_t_mul(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "t_set" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ai = lower_cmp(s, j, decls);
+                j = skip(s, ai[1]); assert(s[j] == ","); j = j + 1;
+                let av = lower_cmp(s, j, decls);
+                j = skip(s, av[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(merge_pre(ar[3], ai[3]), av[3]);
+                return ["k_t_set(" + ar[0] + ", " + ai[0] + ", " + av[0] + ")", j, 0, pre];
+            }
+            if id[0] == "t_transpose" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_t_transpose(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "t_reshape" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ash = lower_cmp(s, j, decls);
+                j = skip(s, ash[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ash[3]);
+                return ["k_t_reshape(" + ar[0] + ", " + ash[0] + ")", j, 0, pre];
+            }
+            if id[0] == "t_scale" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let av = lower_cmp(s, j, decls);
+                j = skip(s, av[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], av[3]);
+                return ["k_t_scale(" + ar[0] + ", " + av[0] + ")", j, 0, pre];
+            }
+            if id[0] == "t_sum" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_t_sum(" + ar[0] + ")", j, 3, ar[3]];
+            }
+            if id[0] == "t_dot" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_t_dot(" + ar[0] + ", " + ab[0] + ")", j, 3, pre];
+            }
+            if id[0] == "t_exp" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_t_exp(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "t_log" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_t_log(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "t_softmax" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_t_softmax(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "t_mse" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_t_mse(" + ar[0] + ", " + ab[0] + ")", j, 3, pre];
+            }
+            if id[0] == "t_mean" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_t_mean(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "t_linear_grad" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ax = lower_cmp(s, j, decls);
+                j = skip(s, ax[1]); assert(s[j] == ","); j = j + 1;
+                let ay = lower_cmp(s, j, decls);
+                j = skip(s, ay[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(merge_pre(ar[3], ax[3]), ay[3]);
+                return ["k_t_linear_grad(" + ar[0] + ", " + ax[0] + ", " + ay[0] + ")", j, 0, pre];
+            }
+            if id[0] == "t_patch_mean" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ag = lower_cmp(s, j, decls);
+                j = skip(s, ag[1]); assert(s[j] == ","); j = j + 1;
+                let aw = lower_cmp(s, j, decls);
+                j = skip(s, aw[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(merge_pre(ar[3], ag[3]), aw[3]);
+                return ["k_t_patch_mean(" + ar[0] + ", " + ag[0] + ", " + aw[0] + ")", j, 0, pre];
+            }
+            if id[0] == "save_tensor" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ap = lower_cmp(s, j, decls);
+                j = skip(s, ap[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ap[3]);
+                return ["k_save_tensor_v(" + ar[0] + ", " + ap[0] + ")", j, 0, pre];
+            }
+            if id[0] == "load_tensor" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_load_tensor_v(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "load_ppm" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_load_ppm_v(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "load_wav" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_load_wav_v(" + ar[0] + ")", j, 0, ar[3]];
+            }
             if id[0] == "ag_clear" {
                 assert(s[j] == ")"); j = j + 1;
                 return ["k_ag_clear()", j, 0, ""];
@@ -637,6 +768,78 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
                 let pre: str = merge_pre(ar[3], ab[3]);
                 return ["k_ag_step(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_sub" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_ag_sub(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_mul" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_ag_mul(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_scale" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ab = lower_cmp(s, j, decls);
+                j = skip(s, ab[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ab[3]);
+                return ["k_ag_scale(" + ar[0] + ", " + ab[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_neg" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_neg(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_transpose" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_transpose(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_reshape" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ","); j = j + 1;
+                let ash = lower_cmp(s, j, decls);
+                j = skip(s, ash[1]); assert(s[j] == ")"); j = j + 1;
+                let pre: str = merge_pre(ar[3], ash[3]);
+                return ["k_ag_reshape(" + ar[0] + ", " + ash[0] + ")", j, 0, pre];
+            }
+            if id[0] == "ag_exp" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_exp(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_log" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_log(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_softmax" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_softmax(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_sum" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_sum(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_value" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_value(" + ar[0] + ")", j, 0, ar[3]];
+            }
+            if id[0] == "ag_grad" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_ag_grad(" + ar[0] + ")", j, 0, ar[3]];
             }
             let args: str = "";
             let pre: str = "";
@@ -788,11 +991,15 @@ fn lower_rel(s: str, i: i64, decls: list) -> list {
     if starts_with(s, i, "<=") == 1 {
         r = lower_sum(s, i + 2, decls);
         pre = merge_pre(pre, r[3]);
+        if kind == 3 { return ["kval_i64(kval_as_f64(" + out + ") <= kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
+        if r[2] == 3 { return ["kval_i64(kval_as_f64(" + out + ") <= kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
         return ["kval_i64(kval_as_i64(" + out + ") <= kval_as_i64(" + r[0] + "))", r[1], 0, pre];
     }
     if starts_with(s, i, ">=") == 1 {
         r = lower_sum(s, i + 2, decls);
         pre = merge_pre(pre, r[3]);
+        if kind == 3 { return ["kval_i64(kval_as_f64(" + out + ") >= kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
+        if r[2] == 3 { return ["kval_i64(kval_as_f64(" + out + ") >= kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
         return ["kval_i64(kval_as_i64(" + out + ") >= kval_as_i64(" + r[0] + "))", r[1], 0, pre];
     }
     if starts_with(s, i, "==") == 1 {
@@ -817,11 +1024,15 @@ fn lower_rel(s: str, i: i64, decls: list) -> list {
     if s[i] == "<" {
         r = lower_sum(s, i + 1, decls);
         pre = merge_pre(pre, r[3]);
+        if kind == 3 { return ["kval_i64(kval_as_f64(" + out + ") < kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
+        if r[2] == 3 { return ["kval_i64(kval_as_f64(" + out + ") < kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
         return ["kval_i64(kval_as_i64(" + out + ") < kval_as_i64(" + r[0] + "))", r[1], 0, pre];
     }
     if s[i] == ">" {
         r = lower_sum(s, i + 1, decls);
         pre = merge_pre(pre, r[3]);
+        if kind == 3 { return ["kval_i64(kval_as_f64(" + out + ") > kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
+        if r[2] == 3 { return ["kval_i64(kval_as_f64(" + out + ") > kval_as_f64(" + r[0] + "))", r[1], 0, pre]; }
         return ["kval_i64(kval_as_i64(" + out + ") > kval_as_i64(" + r[0] + "))", r[1], 0, pre];
     }
     return [out, i, kind, pre];
@@ -1423,7 +1634,10 @@ fn main() -> i64 {
     let kvmlp = resolve_imports("examples/selfhost/lower_kv_mlp.kenga", 0);
     assert(write_file("bootstrap/generated/lower_kv_mlp.c", lower_program(kvmlp)) == true);
 
-    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape,kv_mlp}.c");
+    let kvce = resolve_imports("examples/selfhost/lower_kv_ce.kenga", 0);
+    assert(write_file("bootstrap/generated/lower_kv_ce.c", lower_program(kvce)) == true);
+
+    println("wrote bootstrap/generated/lower_{str_kv,events_kv,agent_kv,lex_frag,parse_frag,kv_logic,kv_typeof,kv_print,kv_now,kv_mem,kv_tensor,kv_tape,kv_mlp,kv_ce}.c");
     println("lower_kv ok");
     return 0;
 }

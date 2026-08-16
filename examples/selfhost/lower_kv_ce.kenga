@@ -1,0 +1,25 @@
+// Native KVal CE tape: softmax + log + mul + sum + neg. No lite VM.
+
+fn main() -> i64 {
+    let w = t_from([2, 2], [0.2, 0.1, 0.0, 0.3]);
+    let x = t_from([2, 1], [1.0, 0.0]);
+    let y = t_from([2, 1], [0.0, 1.0]);
+    let step: i64 = 0;
+    while step < 20 {
+        ag_clear();
+        let wid = ag_param(w);
+        let logits = ag_matmul(wid, ag_const(x));
+        let probs = ag_softmax(logits);
+        let loss = ag_neg(ag_sum(ag_mul(ag_const(y), ag_log(probs))));
+        ag_backward(loss);
+        w = ag_step(wid, 0.5);
+        step = step + 1;
+    }
+    let p = t_softmax(t_matmul(w, x));
+    assert(round(t_get(p, 1) * 100.0) > round(t_get(p, 0) * 100.0));
+    assert(save_tensor(w, "kv_ce_w.kt") == 1);
+    let w2 = load_tensor("kv_ce_w.kt");
+    assert(round(t_get(w2, 0) * 10.0) == round(t_get(w, 0) * 10.0));
+    println("ce kv ok");
+    return 0;
+}
