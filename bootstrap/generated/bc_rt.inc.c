@@ -8,12 +8,13 @@
 #include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55 };
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
 static V Vl(int64_t x) { V v; v.tag=2; v.i=x; v.f=0; return v; }
 static V Vs(int64_t x) { V v; v.tag=3; v.i=x; v.f=0; return v; }
+static V Vm(int64_t x) { V v; v.tag=4; v.i=x; v.f=0; return v; }
 static V Vt(int64_t x) { V v; v.tag=5; v.i=x; v.f=0; return v; }
 static double as_f(V v) { return v.tag==1 ? v.f : (double)v.i; }
 static int64_t as_i(V v) { return v.tag==1 ? (int64_t)llround(v.f) : v.i; }
@@ -68,6 +69,7 @@ static void vprint(V v) {
   if (v.tag==1) printf("%g", v.f);
   else if (v.tag==3) printf("%s", as_str(v));
   else if (v.tag==2) printf("[list:%lld]", (long long)v.i);
+  else if (v.tag==4) printf("[mem:%lld]", (long long)v.i);
   else if (v.tag==5) printf("[tensor:%lld]", (long long)v.i);
   else printf("%lld", (long long)v.i);
 }
@@ -125,6 +127,59 @@ static int64_t talloc(const int *shape, int rank, int zero) {
 static TObj *tobj(V v) {
   if (v.tag != 5 || v.i < 0 || v.i >= gTn) { fprintf(stderr, "expected tensor\n"); exit(1); }
   return &gT[v.i];
+}
+
+#define BM_D 32
+#define BM_H 32
+typedef struct { int dim, hidden; double w1[BM_H*BM_D], b1[BM_H], w2[BM_D*BM_H], b2[BM_D]; double w1l[BM_H*BM_D], b1l[BM_H], w2l[BM_D*BM_H], b2l[BM_D]; uint64_t steps; } BmWorld;
+typedef struct { BmWorld model; double threshold, lr; } BmMind;
+static BmMind gM[16]; static int gMn = 0;
+static double bm_xavier(int fan_in, int fan_out, int i) {
+  double sc = sqrt(6.0 / (double)(fan_in + fan_out)); int64_t t = (int64_t)i * 1103515245LL + 12345LL;
+  if (t < 0) t = -t; return (((double)(t % 10000LL) / 10000.0) * 2.0 - 1.0) * sc;
+}
+static void bm_init(BmWorld *m, int dim, int hidden) {
+  int i, d, h; if (dim < 1) dim = 1; if (dim > BM_D) dim = BM_D; if (hidden < 1) hidden = 1; if (hidden > BM_H) hidden = BM_H;
+  memset(m, 0, sizeof(*m)); m->dim = dim; m->hidden = hidden; d = dim; h = hidden;
+  for (i = 0; i < h * d; i++) m->w1[i] = bm_xavier(d, h, i);
+  for (i = 0; i < d * h; i++) m->w2[i] = bm_xavier(h, d, i + 17) * 0.25;
+}
+static void bm_ensure(BmWorld *m, int dim) {
+  BmWorld old; int od, h, r, c; if (dim < 1) dim = 1; if (dim > BM_D) dim = BM_D; if (dim <= m->dim) return;
+  old = *m; od = old.dim; h = old.hidden; bm_init(m, dim, h);
+  for (r = 0; r < h; r++) { for (c = 0; c < od; c++) { m->w1[r*m->dim+c]=old.w1[r*od+c]; m->w1l[r*m->dim+c]=old.w1l[r*od+c]; } m->b1[r]=old.b1[r]; m->b1l[r]=old.b1l[r]; }
+  for (r = 0; r < od; r++) { for (c = 0; c < h; c++) { m->w2[r*h+c]=old.w2[r*h+c]; m->w2l[r*h+c]=old.w2l[r*h+c]; } m->b2[r]=old.b2[r]; m->b2l[r]=old.b2l[r]; }
+  m->steps = old.steps;
+}
+static void bm_fwd(const BmWorld *m, const double *x, int xn, double *h_out, double *y_out) {
+  int d = m->dim, h = m->hidden, r, c;
+  for (r = 0; r < h; r++) { double acc = m->b1[r]; for (c = 0; c < d; c++) acc += m->w1[r*d+c] * (c < xn ? x[c] : 0.0); h_out[r] = tanh(acc); }
+  for (r = 0; r < d; r++) { double delta = m->b2[r]; for (c = 0; c < h; c++) delta += m->w2[r*h+c] * h_out[c]; y_out[r] = (r < xn ? x[r] : 0.0) + delta; }
+}
+static double bm_train(BmWorld *m, const double *x, int xn, const double *tgt, int tn, double lr) {
+  int need = xn > tn ? xn : tn; double hh[BM_H], yy[BM_D], dy[BM_D], dh[BM_H]; int d, h, r, c, i; double loss = 0.0;
+  if (need < 1) need = 1; bm_ensure(m, need); d = m->dim; h = m->hidden; bm_fwd(m, x, xn, hh, yy);
+  for (i = 0; i < d; i++) { double t = i < tn ? tgt[i] : 0.0; double err = t - yy[i]; loss += err * err; dy[i] = err; }
+  loss /= (double)d;
+  for (c = 0; c < h; c++) { double acc = 0.0; for (r = 0; r < d; r++) acc += m->w2[r*h+c] * dy[r]; dh[c] = acc * (1.0 - hh[c]*hh[c]); }
+  for (r = 0; r < d; r++) { for (c = 0; c < h; c++) { int idx = r*h+c; double g = dy[r]*hh[c]; double eff = lr/(1.0+m->w2l[idx]); m->w2[idx]+=eff*g; m->w2l[idx]+=0.02*fabs(g); }
+    { double eff = lr/(1.0+m->b2l[r]); m->b2[r]+=eff*dy[r]; m->b2l[r]+=0.02*fabs(dy[r]); } }
+  for (r = 0; r < h; r++) { for (c = 0; c < d; c++) { int idx = r*d+c; double xv = c < xn ? x[c] : 0.0; double g = dh[r]*xv; double eff = lr/(1.0+m->w1l[idx]); m->w1[idx]+=eff*g; m->w1l[idx]+=0.02*fabs(g); }
+    { double eff = lr/(1.0+m->b1l[r]); m->b1[r]+=eff*dh[r]; m->b1l[r]+=0.02*fabs(dh[r]); } }
+  m->steps++; return loss;
+}
+static int vlist_pat(V v, double *out, int maxn) {
+  int i, n; if (v.tag==0 || v.tag==1) { if (maxn<1) { fprintf(stderr, "pattern too long\n"); exit(1); } out[0]=as_f(v); return 1; }
+  if (v.tag!=2) { fprintf(stderr, "expected list\n"); exit(1); }
+  n = (int)llen(v.i); if (n > maxn) { fprintf(stderr, "pattern too long\n"); exit(1); }
+  for (i = 0; i < n; i++) out[i] = as_f(lget(v.i, i)); return n;
+}
+static V pat_list(const double *p, int n) {
+  int64_t id = lnew(); int i; if (n < 0) n = 0; for (i = 0; i < n; i++) lpush(id, Vf(p[i])); return Vl(id);
+}
+static BmMind *bm_get(V v) {
+  if (v.tag != 4 || v.i < 0 || v.i >= gMn) { fprintf(stderr, "expected memory\n"); exit(1); }
+  return &gM[v.i];
 }
 
 #define EVQ_CAP 256
@@ -231,6 +286,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       if (v.tag==1) tn="f64";
       else if (v.tag==2) tn="list";
       else if (v.tag==3) tn="str";
+      else if (v.tag==4) tn="memory";
       else if (v.tag==5) tn="tensor";
       stack[sp++]=Vs(s_new(tn));
     }
@@ -462,6 +518,24 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       double x = as_f(stack[--sp]); V tv = stack[--sp]; TObj *t = tobj(tv); int i;
       for (i = 0; i < t->n; i++) t->data[i] = x;
       stack[sp++] = tv;
+    }
+    else if (op == OP_MEM_CONFIG) {
+      int64_t hidden = as_i(stack[--sp]); int64_t ep_cap = as_i(stack[--sp]); double thr = as_f(stack[--sp]);
+      int h; if (gMn >= 16) { fprintf(stderr, "memory heap full\n"); exit(1); }
+      memset(&gM[gMn], 0, sizeof(gM[gMn])); gM[gMn].threshold = thr; gM[gMn].lr = 0.08;
+      h = (int)hidden; if (h < 1) h = 8; if (h > BM_H) h = BM_H;
+      (void)ep_cap; bm_init(&gM[gMn].model, 1, h); stack[sp++] = Vm((int64_t)gMn++);
+    }
+    else if (op == OP_LEARN) {
+      V y=stack[--sp]; V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]);
+      double xp[BM_D], yp[BM_D]; int xn = vlist_pat(x, xp, BM_D); int yn = vlist_pat(y, yp, BM_D);
+      stack[sp++] = Vf(bm_train(&m->model, xp, xn, yp, yn, m->lr));
+    }
+    else if (op == OP_PREDICT) {
+      V x=stack[--sp]; BmMind *m = bm_get(stack[--sp]); BmWorld tmp; double xp[BM_D], hh[BM_H], yy[BM_D];
+      int xn = vlist_pat(x, xp, BM_D); int n; tmp = m->model; bm_ensure(&tmp, xn > 0 ? xn : 1);
+      bm_fwd(&tmp, xp, xn, hh, yy); n = xn > 0 ? xn : tmp.dim; if (n > tmp.dim) n = tmp.dim;
+      stack[sp++] = pat_list(yy, n);
     }
     else if (op == OP_HALT) { return 0; }
     else { fprintf(stderr, "bad op %lld\n", (long long)op); exit(1); }

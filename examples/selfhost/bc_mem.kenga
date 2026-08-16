@@ -1,0 +1,8 @@
+fn main() -> i64 {
+    let m = memory_config(0.12, 16, 8);
+    learn(m, [1, 2, 3], [2, 3, 4]);
+    let p = predict(m, [1, 2, 3]);
+    assert(len(p) == 3);
+    println("mem bc ok");
+    return 0;
+}
