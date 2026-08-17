@@ -107,18 +107,6 @@ echo === kenga/emit/rt_types.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_types.kenga
 if errorlevel 1 exit /b 1
 
-echo === kenga/emit/rt_prophet.kenga ===
-bootstrap\bin\kenga-lite.exe run kenga\emit\rt_prophet.kenga
-if errorlevel 1 exit /b 1
-
-echo === kenga/emit/rt_tensor.kenga ===
-bootstrap\bin\kenga-lite.exe run kenga\emit\rt_tensor.kenga
-if errorlevel 1 exit /b 1
-
-echo === kenga/emit/rt_tape.kenga ===
-bootstrap\bin\kenga-lite.exe run kenga\emit\rt_tape.kenga
-if errorlevel 1 exit /b 1
-
 echo === kenga/emit/rt_events.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_events.kenga
 if errorlevel 1 exit /b 1

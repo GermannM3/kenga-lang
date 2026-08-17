@@ -225,10 +225,6 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(s[0] ? (unsigned char)s[0] : 0));
       continue;
     }
-    if (op == OP_SWEEP) {
-      vala_push(&stack, V_i64(0));
-      continue;
-    }
     if (op == OP_NOW_MS) {
 #ifdef _WIN32
       vala_push(&stack, V_i64((int64_t)GetTickCount64()));
@@ -445,8 +441,6 @@ static int64_t vm_exec(Program *prog) {
       else if (v.tag == TAG_STR) tn = "str";
       else if (v.tag == TAG_LIST) tn = "list";
       else if (v.tag == TAG_STRUCT) tn = "struct";
-      else if (v.tag == TAG_MEMORY) tn = "Memory";
-      else if (v.tag == TAG_TENSOR) tn = "Tensor";
       vala_push(&stack, V_str(intern_str(tn)));
       continue;
     }

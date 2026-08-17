@@ -230,10 +230,6 @@ fn main() -> i64 {
     s = s + "      vala_push(&stack, V_i64(s[0] ? (unsigned char)s[0] : 0));\n";
     s = s + "      continue;\n";
     s = s + "    }\n";
-    s = s + "    if (op == OP_SWEEP) {\n";
-    s = s + "      vala_push(&stack, V_i64(0));\n";
-    s = s + "      continue;\n";
-    s = s + "    }\n";
     s = s + "    if (op == OP_NOW_MS) {\n";
     s = s + "#ifdef _WIN32\n";
     s = s + "      vala_push(&stack, V_i64((int64_t)GetTickCount64()));\n";
@@ -450,8 +446,6 @@ fn main() -> i64 {
     s = s + "      else if (v.tag == TAG_STR) tn = \"str\";\n";
     s = s + "      else if (v.tag == TAG_LIST) tn = \"list\";\n";
     s = s + "      else if (v.tag == TAG_STRUCT) tn = \"struct\";\n";
-    s = s + "      else if (v.tag == TAG_MEMORY) tn = \"Memory\";\n";
-    s = s + "      else if (v.tag == TAG_TENSOR) tn = \"Tensor\";\n";
     s = s + "      vala_push(&stack, V_str(intern_str(tn)));\n";
     s = s + "      continue;\n";
     s = s + "    }\n";

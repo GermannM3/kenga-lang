@@ -45,10 +45,6 @@ static void print_val_raw(Value v, StrA *strs, ListHeap *lists, StructHeap *stru
       printf("%lld", (long long)o->fields.data[i]);
     }
     putchar('}');
-  } else if (v.tag == TAG_MEMORY) {
-    printf("Memory");
-  } else if (v.tag == TAG_TENSOR) {
-    printf("Tensor");
   } else {
     die("bad value tag");
   }
