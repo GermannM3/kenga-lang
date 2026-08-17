@@ -179,7 +179,8 @@ fn main() -> i64 {
     s = s + "      } /* known struct literal */\n";
     s = s + "    } else if (j < n && s[j] == '(') {\n";
     s = s + "      /* builtins: len(xs), push(xs, v) */\n";
-    s = s + "      if (lite_ml_name(id.name) && lite_fn_defined(fnames, id.name)) {\n";
+    s = s + "      if (lite_ml_name(id.name)) {\n";
+    s = s + "        if (!lite_fn_defined(fnames, id.name)) die(\"ML via native_ml (need ml_host)\");\n";
     s = s + "        j++;\n";
     s = s + "        int argc = 0;\n";
     s = s + "        j = skip(s, j, n);\n";

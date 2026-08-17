@@ -51,11 +51,9 @@ fn main() -> i64 {
     s = s + "    }\n";
     s = s + "    putchar('}');\n";
     s = s + "  } else if (v.tag == TAG_MEMORY) {\n";
-    s = s + "    ProphetMem *m = pl_get(v.payload);\n";
-    s = s + "    printf(\"Memory(ep=%d, core=%d, steps=%llu, dim=%dx%d, thr=%.2f)\", m->nep, m->ncore,\n";
-    s = s + "           (unsigned long long)m->model.steps, m->model.dim, m->model.hidden, m->threshold);\n";
+    s = s + "    printf(\"Memory\");\n";
     s = s + "  } else if (v.tag == TAG_TENSOR) {\n";
-    s = s + "    tl_print(tl_get(v.payload));\n";
+    s = s + "    printf(\"Tensor\");\n";
     s = s + "  } else {\n";
     s = s + "    die(\"bad value tag\");\n";
     s = s + "  }\n";

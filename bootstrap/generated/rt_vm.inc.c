@@ -48,6 +48,23 @@ static char *k_to_str(Value v, StrA *strs, ListHeap *lists) {
   return xstrdup("?");
 }
 
+static unsigned char *k_read_bytes(const char *path, size_t *out_len) {
+  FILE *f = fopen(path, "rb");
+  long sz;
+  unsigned char *buf;
+  if (!f) return NULL;
+  if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
+  sz = ftell(f);
+  if (sz < 0) { fclose(f); return NULL; }
+  rewind(f);
+  buf = (unsigned char *)malloc((size_t)sz + 1);
+  if (!buf) { fclose(f); return NULL; }
+  if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) { free(buf); fclose(f); return NULL; }
+  fclose(f);
+  if (out_len) *out_len = (size_t)sz;
+  return buf;
+}
+
 static int64_t vm_exec(Program *prog) {
   ValA stack = {0};
   ValA slots = {0};
@@ -571,7 +588,7 @@ static int64_t vm_exec(Program *prog) {
       if (vp.tag != TAG_STR) die("read_bytes: path must be str");
       if (vp.payload < 0 || (size_t)vp.payload >= strs->len) die("bad str");
       path = strs->data[vp.payload];
-      b = tl_read_bytes(path, &n);
+      b = k_read_bytes(path, &n);
       if (!b) die("read_bytes: cannot read file");
       h = (int64_t)lists.len;
       listh_push(&lists, empty);

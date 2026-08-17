@@ -44,11 +44,34 @@ static char *join_path(const char *dir, const char *rel) {
 
 static char *load_with_imports(const char *path, int depth);
 static const char *find_kenga_file(const char *fwd, const char *bwd) {
-  FILE *tf = fopen(fwd, "rb");
+  static char keep[8][512];
+  static int ki = 0;
+  FILE *tf;
+  char up[512];
+  const char *hit = NULL;
+  tf = fopen(fwd, "rb");
   if (tf) { fclose(tf); return fwd; }
   tf = fopen(bwd, "rb");
   if (tf) { fclose(tf); return bwd; }
-  return NULL;
+  if (strlen(fwd) + 4 < sizeof(up)) {
+    snprintf(up, sizeof(up), "../%s", fwd);
+    tf = fopen(up, "rb");
+    if (tf) { fclose(tf); hit = up; }
+  }
+  if (!hit && strlen(bwd) + 4 < sizeof(up)) {
+    snprintf(up, sizeof(up), "..\\%s", bwd);
+    tf = fopen(up, "rb");
+    if (tf) { fclose(tf); hit = up; }
+  }
+  if (!hit) return NULL;
+  {
+    int slot = ki++ & 7;
+    size_t n = strlen(hit);
+    if (n > 511) n = 511;
+    memcpy(keep[slot], hit, n);
+    keep[slot][n] = 0;
+    return keep[slot];
+  }
 }
 static const char *find_ml_host(void) {
   return find_kenga_file("kenga/compiler/ml_host.kenga", "kenga\\compiler\\ml_host.kenga");

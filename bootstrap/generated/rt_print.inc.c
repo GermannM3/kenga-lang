@@ -46,11 +46,9 @@ static void print_val_raw(Value v, StrA *strs, ListHeap *lists, StructHeap *stru
     }
     putchar('}');
   } else if (v.tag == TAG_MEMORY) {
-    ProphetMem *m = pl_get(v.payload);
-    printf("Memory(ep=%d, core=%d, steps=%llu, dim=%dx%d, thr=%.2f)", m->nep, m->ncore,
-           (unsigned long long)m->model.steps, m->model.dim, m->model.hidden, m->threshold);
+    printf("Memory");
   } else if (v.tag == TAG_TENSOR) {
-    tl_print(tl_get(v.payload));
+    printf("Tensor");
   } else {
     die("bad value tag");
   }

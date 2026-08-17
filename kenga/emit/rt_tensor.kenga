@@ -165,7 +165,6 @@ fn main() -> i64 {
     s = s + "  shape[1] = n;\n";
     s = s + "  h = tl_zeros(shape, 2);\n";
     s = s + "  o = tl_get(h);\n";
-    s = s + "  if (tl_gemm_cl(m, n, k, ad, bd, o->data)) return h;\n";
     s = s + "  for (i = 0; i < m; i++)\n";
     s = s + "    for (j = 0; j < n; j++) {\n";
     s = s + "      double s = 0.0;\n";

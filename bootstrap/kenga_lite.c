@@ -13,17 +13,9 @@
  *   for x in a..b / for v in xs / break / continue
  *   comments: // line  and  slash-star block comments
  *   type annotations ignored: `let x: i64 =`, `fn f(a: i64) -> i64`, `ttl 5s`
- *   Tensor (no Rust): tensor / t_from / t_fill / t_get / t_set / t_shape /
- *     t_add / t_sub / t_mul / t_matmul / t_reshape / t_transpose /
- *     t_scale / t_sum / t_dot / t_exp / t_log / t_softmax / t_mean /
- *     t_mse / t_patch_mean / t_linear_grad /
- *     save_tensor / load_tensor / write_file / read_file /
- *     load_ppm / load_wav
+ *   Tensor / tape / Prophet: Kenga lists (`ml_host` / `native_ml`), not C heaps
+ *   load_ppm / load_wav: read_bytes CRT + Kenga parse
  *   Events: on "e"(x) { } / emit / pump / pending / listen
- *   Tape: ag_clear / ag_param / ag_const / ag_add|sub|mul|matmul /
- *     ag_scale / ag_relu / ag_neg / ag_transpose / ag_reshape /
- *     ag_exp / ag_log / ag_softmax / ag_mse / ag_sum / ag_value / ag_grad /
- *     ag_backward / ag_step
  *   now_ms() wall clock; to_str(x)
  *   structs: struct Point { x, y } / Point { x: 1, y: 2 } / p.x / p.x = v
  *
@@ -58,7 +50,6 @@
 #include "generated/rt_arena.inc.c"
 
 #include "generated/rt_prophet.inc.c"
-#include "generated/rt_matmul_cl.inc.c"
 #include "generated/rt_tensor.inc.c"
 #include "generated/rt_tape.inc.c"
 #include "generated/rt_events.inc.c"

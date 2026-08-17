@@ -174,7 +174,8 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
       } /* known struct literal */
     } else if (j < n && s[j] == '(') {
       /* builtins: len(xs), push(xs, v) */
-      if (lite_ml_name(id.name) && lite_fn_defined(fnames, id.name)) {
+      if (lite_ml_name(id.name)) {
+        if (!lite_fn_defined(fnames, id.name)) die("ML via native_ml (need ml_host)");
         j++;
         int argc = 0;
         j = skip(s, j, n);

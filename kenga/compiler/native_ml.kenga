@@ -384,12 +384,12 @@ fn nt_linear_grad(w: list, x: list, y: list) -> list {
 }
 
 fn nt_wrap_host(t: list) -> list {
-    let sh = t_shape(t);
+    let sh = nt_shape(t);
     let n: i64 = nt_n(sh);
     let d: list = [];
     let i: i64 = 0;
     while i < n {
-        d = push(d, t_get(t, i));
+        d = push(d, nt_get(t, i));
         i = i + 1;
     }
     return ["T", sh, d];

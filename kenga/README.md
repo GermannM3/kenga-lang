@@ -44,10 +44,10 @@ scripts\freedom-smoke.cmd
 | `emit/rt_types.kenga` | opcodes + Value/Program | кусок bytecode.rs |
 | `emit/rt_prophet.kenga` | Prophet Memory | `memory.rs` |
 | `emit/rt_tensor.kenga` | dense f64 tensors | `tensor.rs` |
-| `emit/rt_matmul_cl.kenga` | optional OpenCL GEMM behind `t_matmul` | GPU host |
+| `emit/rt_matmul_cl.kenga` | leftover OpenCL GEMM emit; lite no longer includes it | GPU host |
 | `emit/rt_tape.kenga` | reverse-mode tape | `autograd.rs` |
 | `emit/rt_events.kenga` | on/emit/pump | events |
-| `emit/rt_chat.kenga` | chat intents | `talk.rs` |
+| `emit/rt_chat.kenga` | leftover C chat emit; CLI uses `compiler/chat.kenga` | `talk.rs` |
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |
 
 Статус по модулям: `docs/REPLACE_RUST.md`.

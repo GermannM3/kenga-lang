@@ -123,10 +123,6 @@ echo === kenga/emit/rt_events.kenga ===
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_events.kenga
 if errorlevel 1 exit /b 1
 
-echo === kenga/emit/rt_chat.kenga ===
-bootstrap\bin\kenga-lite.exe run kenga\emit\rt_chat.kenga
-if errorlevel 1 exit /b 1
-
 echo === kenga-lite chat native_ml ===
 bootstrap\bin\kenga-lite.exe chat minds\agent.km --script examples\ml\chat_script_lite.txt
 if errorlevel 1 exit /b 1
