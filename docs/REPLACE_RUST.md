@@ -8,7 +8,7 @@
 | `lexer.rs` / `token.rs` | 🟡 частично | парсер внутри `kenga/compiler/*.kenga` |
 | `parser.rs` / `ast.rs` | 🟡 частично | то же (рекурсивный descent в `.kenga`) |
 | `compiler.rs` / `bytecode.rs` | 🟢 растёт | `more.kenga` + `rt_factor`/`rt_stmt`/`rt_compile` пишут lite compiler |
-| `vm.rs` (ядро) | 🟢 растёт | VM в `more.kenga` + **`rt_vm.kenga`** пишет C VM lite |
+| `vm.rs` (ядро) | 🟢 растёт | VM в `more.kenga` (fast: sp-стек + hoisted dispatch) + **`rt_vm.kenga`** пишет C VM lite |
 | `tensor.rs` | ✅ на lite | `kenga/emit/rt_tensor.kenga` → `generated/rt_tensor.inc.c` |
 | `autograd.rs` | ✅ на lite + KVal emit | `rt_tape.kenga` / `rt_kval_tape.kenga` |
 | `memory.rs` | ✅ на lite | `kenga/emit/rt_prophet.kenga` |

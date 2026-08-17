@@ -10,7 +10,7 @@
 | Prophet / multimodal | ✅ lite без Rust |
 | Chat intents | ✅ `kenga-lite chat` → `chat.kenga` / `native_ml` |
 | Bigram LM | ✅ `examples/ml/tiny_lm.kenga` |
-| **2-layer word-LM + CE** | ✅ `examples/ml/word_lm.kenga` → `minds/word_lm_*.kt`; lite и `more` VM |
+| **2-layer word-LM + CE** | ✅ `examples/ml/word_lm.kenga` (~6 с) и `word_lm_big.kenga` (V=20/H=16, ~26 с) → `minds/word_lm_*.kt`; lite и `more` VM |
 | **Своя MLP (XOR)** | ✅ `examples/ml/kenga_net.kenga` — list/f64, без tensor host; lite, bc→C и `more` VM |
 | **Decoder GPT-формы** | ✅ `examples/ml/kenga_lm.kenga` — attn + FFN + RMS, next-token |
 | **Char-LM на нашем `.kenga`** | ✅ `examples/ml/kenga_charlm.kenga` + `kenga_char_talk.kenga` |

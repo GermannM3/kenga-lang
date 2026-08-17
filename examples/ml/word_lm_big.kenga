@@ -1,0 +1,142 @@
+// 2-layer word-LM on Kenga tape (CE). Зерно текста без Rust.
+// W1[H,V] → relu → W2[V,H] → softmax; веса в minds/word_lm_big_*.kt
+// Запуск: kenga-lite run examples/ml/word_lm_big.kenga
+
+fn vocab_size() -> i64 { return 20; }
+fn hidden() -> i64 { return 16; }
+
+fn onehot(idx: i64) -> list {
+    let v = vocab_size();
+    let xs = [];
+    let j: i64 = 0;
+    while j < v {
+        if j == idx { xs = push(xs, 1.0); } else { xs = push(xs, 0.0); }
+        j = j + 1;
+    }
+    return xs;
+}
+
+fn zeros(n: i64) -> list {
+    let xs = [];
+    let i: i64 = 0;
+    while i < n {
+        xs = push(xs, 0.05);
+        i = i + 1;
+    }
+    return xs;
+}
+
+fn argmax(t: Tensor) -> i64 {
+    let v = vocab_size();
+    let best: i64 = 0;
+    let best_v = t_get(t, 0);
+    let i: i64 = 1;
+    while i < v {
+        let x = t_get(t, i);
+        if x > best_v {
+            best_v = x;
+            best = i;
+        }
+        i = i + 1;
+    }
+    return best;
+}
+
+fn word(i: i64) -> str {
+    if i == 0 { return "ya"; }
+    if i == 1 { return "kenga"; }
+    if i == 2 { return "zhivu"; }
+    if i == 3 { return "vizhu"; }
+    if i == 4 { return "slyshu"; }
+    if i == 5 { return "pomnyu"; }
+    if i == 6 { return "uchus"; }
+    if i == 7 { return "splyu"; }
+    if i == 8 { return "i"; }
+    if i == 9 { return "mir"; }
+    if i == 10 { return "svet"; }
+    if i == 11 { return "zvuk"; }
+    if i == 12 { return "mysl"; }
+    if i == 13 { return "agent"; }
+    if i == 14 { return "yazyk"; }
+    if i == 15 { return "zhivoy"; }
+    if i == 16 { return "mne"; }
+    if i == 17 { return "nuzhno"; }
+    if i == 18 { return "uchit"; }
+    return ".";
+}
+
+fn forward_probs(w1: Tensor, b1: Tensor, w2: Tensor, b2: Tensor, a: i64) -> Tensor {
+    let x = t_from([vocab_size(), 1], onehot(a));
+    let h0 = t_add(t_matmul(w1, x), b1);
+    let h = t_from([hidden(), 1], zeros(hidden()));
+    let hi: i64 = 0;
+    while hi < hidden() {
+        let v = t_get(h0, hi);
+        if v < 0.0 { v = 0.0; }
+        t_set(h, hi, v);
+        hi = hi + 1;
+    }
+    return t_softmax(t_add(t_matmul(w2, h), b2));
+}
+
+fn train_pair(w1: Tensor, b1: Tensor, w2: Tensor, b2: Tensor, a: i64, b: i64, lr: f64) -> list {
+    ag_clear();
+    let id_w1 = ag_param(w1);
+    let id_b1 = ag_param(b1);
+    let id_w2 = ag_param(w2);
+    let id_b2 = ag_param(b2);
+    let x = t_from([vocab_size(), 1], onehot(a));
+    let y = t_from([vocab_size(), 1], onehot(b));
+    let h = ag_relu(ag_add(ag_matmul(id_w1, ag_const(x)), id_b1));
+    let probs = ag_softmax(ag_add(ag_matmul(id_w2, h), id_b2));
+    let loss = ag_neg(ag_sum(ag_mul(ag_const(y), ag_log(probs))));
+    ag_backward(loss);
+    return [ag_step(id_w1, lr), ag_step(id_b1, lr), ag_step(id_w2, lr), ag_step(id_b2, lr)];
+}
+
+fn main() -> i64 {
+    println("=== word-LM 2-layer (CE, lite) ===");
+    // Repeated core phrases so argmax chain is stable
+    let lefts = [0, 1, 2, 0, 1, 2, 0, 5, 8, 6, 1, 3, 8, 4, 1, 7, 0, 14, 13, 8, 12, 0, 15, 16, 17, 0, 1, 2, 8];
+    let rights = [1, 2, 15, 1, 2, 15, 5, 8, 6, 15, 3, 8, 4, 15, 7, 15, 14, 15, 8, 12, 15, 15, 16, 17, 18, 15, 1, 2, 19];
+
+    let w1 = t_from([hidden(), vocab_size()], zeros(hidden() * vocab_size()));
+    let b1 = t_from([hidden(), 1], zeros(hidden()));
+    let w2 = t_from([vocab_size(), hidden()], zeros(vocab_size() * hidden()));
+    let b2 = t_from([vocab_size(), 1], zeros(vocab_size()));
+
+    let ep: i64 = 0;
+    while ep < 300 {
+        let pi: i64 = 0;
+        while pi < len(lefts) {
+            let packed = train_pair(w1, b1, w2, b2, lefts[pi], rights[pi], 0.6);
+            w1 = packed[0];
+            b1 = packed[1];
+            w2 = packed[2];
+            b2 = packed[3];
+            pi = pi + 1;
+        }
+        ep = ep + 1;
+    }
+
+    let cur: i64 = 0;
+    let out: str = word(cur);
+    let step: i64 = 0;
+    while step < 8 {
+        let probs = forward_probs(w1, b1, w2, b2, cur);
+        cur = argmax(probs);
+        out = out + " " + word(cur);
+        if cur == 19 { break; }
+        step = step + 1;
+    }
+    println(out);
+    assert(len(out) > 5);
+
+    assert(save_tensor(w1, "minds/word_lm_big_w1.kt") == 1);
+    assert(save_tensor(b1, "minds/word_lm_big_b1.kt") == 1);
+    assert(save_tensor(w2, "minds/word_lm_big_w2.kt") == 1);
+    assert(save_tensor(b2, "minds/word_lm_big_b2.kt") == 1);
+    assert(len(t_shape(load_tensor("minds/word_lm_big_w1.kt"))) == 2);
+    println("word_lm_big ok (weights saved)");
+    return 0;
+}

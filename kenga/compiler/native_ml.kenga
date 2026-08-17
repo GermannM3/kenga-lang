@@ -2,29 +2,53 @@
 // instead of lite C builtins. CRT stays: read_file / write_file / now_ms.
 
 fn nt_exp(x: f64) -> f64 {
-    if x > 20.0 { x = 20.0; }
-    if x < 0.0 - 20.0 { x = 0.0 - 20.0; }
+    // exp via range reduction: x = k*ln2 + r, r in [0,ln2); taylor(r,10) * 2^k
+    let ln2: f64 = 0.6931471805599453;
+    let neg: i64 = 0;
+    if x < 0.0 { neg = 1; x = 0.0 - x; }
+    if x > 44.0 { x = 44.0; }
+    let kf: f64 = x / ln2;
+    let k: f64 = round(kf);
+    if k > kf { k = k - 1.0; }
+    let r: f64 = x - k * ln2;
     let sum: f64 = 1.0;
     let term: f64 = 1.0;
     let n: f64 = 1.0;
-    while n < 24.0 {
-        term = term * x / n;
+    while n <= 10.0 {
+        term = term * r / n;
         sum = sum + term;
         n = n + 1.0;
     }
+    let i: f64 = 0.0;
+    while i < k { sum = sum + sum; i = i + 1.0; }
+    if neg == 1 { return 1.0 / sum; }
     return sum;
+}
+
+fn nt_ln_pos(x: f64) -> f64 {
+    // ln(x) for x > 0: reciprocal for x<1, halve to [1,2), atanh series
+    let sign: f64 = 1.0;
+    if x < 1.0 { x = 1.0 / x; sign = 0.0 - 1.0; }
+    let e: f64 = 0.0;
+    while x >= 2.0 { x = x * 0.5; e = e + 1.0; }
+    let t: f64 = (x - 1.0) / (x + 1.0);
+    let t2: f64 = t * t;
+    let sum: f64 = t;
+    let term: f64 = t;
+    let n: f64 = 1.0;
+    while n < 12.0 {
+        term = term * t2;
+        sum = sum + term / (n + n + 1.0);
+        n = n + 1.0;
+    }
+    let res: f64 = e * 0.6931471805599453 + sum + sum;
+    if sign < 0.0 { return 0.0 - res; }
+    return res;
 }
 
 fn nt_log(x: f64) -> f64 {
     if x < 0.000000000001 { x = 0.000000000001; }
-    let y: f64 = 0.0;
-    let i: i64 = 0;
-    while i < 24 {
-        let e: f64 = nt_exp(y);
-        y = y - (e - x) / e;
-        i = i + 1;
-    }
-    return y;
+    return nt_ln_pos(x);
 }
 
 fn nt_n(sh: list) -> i64 {
@@ -118,24 +142,33 @@ fn nt_clone(t: list) -> list {
     return ["T", nt_sclone(t[1]), nt_dclone(t[2])];
 }
 
-fn nt_ew(a: list, b: list, op: i64) -> list {
+fn nt_add(a: list, b: list) -> list {
     let da = a[2];
     let db = b[2];
-    assert(len(da) == len(db));
+    let n: i64 = len(da);
     let o: list = [];
     let i: i64 = 0;
-    while i < len(da) {
-        if op == 0 { o = push(o, da[i] + db[i]); }
-        if op == 1 { o = push(o, da[i] - db[i]); }
-        if op == 2 { o = push(o, da[i] * db[i]); }
-        i = i + 1;
-    }
+    while i < n { o = push(o, da[i] + db[i]); i = i + 1; }
     return ["T", nt_sclone(a[1]), o];
 }
-
-fn nt_add(a: list, b: list) -> list { return nt_ew(a, b, 0); }
-fn nt_sub(a: list, b: list) -> list { return nt_ew(a, b, 1); }
-fn nt_mul(a: list, b: list) -> list { return nt_ew(a, b, 2); }
+fn nt_sub(a: list, b: list) -> list {
+    let da = a[2];
+    let db = b[2];
+    let n: i64 = len(da);
+    let o: list = [];
+    let i: i64 = 0;
+    while i < n { o = push(o, da[i] - db[i]); i = i + 1; }
+    return ["T", nt_sclone(a[1]), o];
+}
+fn nt_mul(a: list, b: list) -> list {
+    let da = a[2];
+    let db = b[2];
+    let n: i64 = len(da);
+    let o: list = [];
+    let i: i64 = 0;
+    while i < n { o = push(o, da[i] * db[i]); i = i + 1; }
+    return ["T", nt_sclone(a[1]), o];
+}
 
 fn nt_scale(a: list, s: f64) -> list {
     let d = a[2];
@@ -160,7 +193,13 @@ fn nt_sum(a: list) -> f64 {
 }
 
 fn nt_dot(a: list, b: list) -> f64 {
-    return nt_sum(nt_mul(a, b));
+    let da = a[2];
+    let db = b[2];
+    let n: i64 = len(da);
+    let acc: f64 = 0.0;
+    let i: i64 = 0;
+    while i < n { acc = acc + da[i] * db[i]; i = i + 1; }
+    return acc;
 }
 
 fn nt_mean(a: list) -> list {
@@ -329,7 +368,11 @@ fn nt_relu_t(a: list) -> list {
 }
 
 fn nt_fill_like(a: list, v: f64) -> list {
-    return ["T", nt_sclone(a[1]), nt_fill(["T", a[1], nt_zeros(len(a[2]))], v)[2]];
+    let n: i64 = len(a[2]);
+    let o: list = [];
+    let i: i64 = 0;
+    while i < n { o = push(o, v); i = i + 1; }
+    return ["T", nt_sclone(a[1]), o];
 }
 
 fn nt_patch_mean(a: list, gh: i64, gw: i64) -> list {
@@ -834,8 +877,10 @@ fn nt_accum(box: list, id: i64, g: list) -> i64 {
         S2(box, 0, id, n);
         return 0;
     }
-    n[8] = nt_add(n[8], g);
-    S2(box, 0, id, n);
+    let a = n[8][2];
+    let b = g[2];
+    let i: i64 = 0;
+    while i < len(a) { a[i] = a[i] + b[i]; i = i + 1; }
     return 0;
 }
 
@@ -977,7 +1022,12 @@ fn nt_ag_backward(box: list, loss: i64) -> i64 {
 fn nt_ag_step(box: list, id: i64, lr: f64) -> list {
     let n = nt_nd(box, id);
     assert(n[7] == 1);
-    return nt_sub(n[3], nt_scale(n[8], lr));
+    let d = n[3][2];
+    let g = n[8][2];
+    let o: list = [];
+    let i: i64 = 0;
+    while i < len(d) { o = push(o, d[i] - g[i] * lr); i = i + 1; }
+    return ["T", nt_sclone(n[3][1]), o];
 }
 
 fn nt_winit(n: i64) -> list {

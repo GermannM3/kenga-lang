@@ -39,7 +39,7 @@
 | ✅ | **`more.kenga`**: `unroll` / `remember_next` |
 | ✅ | **`more.kenga`**: `foresee_n` |
 | ✅ | **`more.kenga`**: `examples/ml/living_multimodal.kenga` (PPM+WAV → Prophet) |
-| ✅ | **`more.kenga`**: `examples/ml/word_lm.kenga` (2-layer CE, ~3 мин) |
+| ✅ | **`more.kenga`**: `examples/ml/word_lm.kenga` (2-layer CE, ~6 с после fast VM) |
 | ✅ | Forward `fn` call patches в `more.kenga` |
 | ✅ | **Events** `on`/`emit`/`pump`/`pending` в `more.kenga` (`examples/agent.kenga`) |
 | ✅ | **`kenga/emit/mini_codegen.kenga`** — parse tiny `.kenga` → C99 |
@@ -77,6 +77,7 @@
 | ✅ | Tape на lite (C99) |
 | ✅ | Patch encoder + linear grad helpers на lite |
 | ✅ | `save_tensor` / `load_tensor` / `write_file` / `read_file` |
+| ✅ | **fast more VM**: sp-index стек + hoisted dispatch + точные `exp`/`log` (ML-проgs ~5–10×) |
 | ⬜ | GPU / production autograd (1660 свободна; lite всё ещё CPU f64) |
 
 ## 3. Multimodal
