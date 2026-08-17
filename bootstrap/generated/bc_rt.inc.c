@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95 };
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
@@ -61,8 +61,8 @@ static char *v_to_cstr(V v) {
 }
 
 typedef struct { V *d; size_t n, cap; } LObj;
-static LObj gL[256];
-static const char *g_ltype[256];
+static LObj gL[1048576];
+static const char *g_ltype[1048576];
 static int gLn = 0;
 
 static void vprint(V v) {
@@ -74,7 +74,7 @@ static void vprint(V v) {
   else printf("%lld", (long long)v.i);
 }
 static int64_t lnew(void) {
-  if (gLn >= 256) { fprintf(stderr, "list heap full\n"); exit(1); }
+  if (gLn >= 1048576) { fprintf(stderr, "list heap full\n"); exit(1); }
   gL[gLn].d = NULL; gL[gLn].n = 0; gL[gLn].cap = 0;
   g_ltype[gLn] = NULL;
   return (int64_t)gLn++;
@@ -385,8 +385,8 @@ static int64_t find_handler(const char *event_name) {
 }
 
 static int64_t vm_run(const int64_t *code, int64_t n) {
-  V stack[256]; int sp = 0;
-  V slots[256]; int64_t slot_used = 0;
+  V stack[4096]; int sp = 0;
+  V slots[4096]; int64_t slot_used = 0;
   int64_t ret_ips[64]; int rsp = 0;
   int64_t slot_bases[64];
   int64_t slot_base = 0;
@@ -395,7 +395,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
   int64_t pump_left = 0;
   int64_t pump_done = 0;
   int64_t pump_ret_ip = 0;
-  for (i = 0; i < 256; i++) slots[i] = Vi(0);
+  for (i = 0; i < 4096; i++) slots[i] = Vi(0);
   while (ip < n) {
   vm_step:
     if (pump_active) {
@@ -691,6 +691,69 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       double x = as_f(stack[--sp]); V tv = stack[--sp]; TObj *t = tobj(tv); int i;
       for (i = 0; i < t->n; i++) t->data[i] = x;
       stack[sp++] = tv;
+    }
+    else if (op == OP_T_SET) {
+      double val = as_f(stack[--sp]); int64_t idx = as_i(stack[--sp]); V tv = stack[--sp]; TObj *t = tobj(tv);
+      if (idx < 0 || idx >= t->n) { fprintf(stderr, "t_set out of range\n"); exit(1); }
+      t->data[idx] = val;
+      stack[sp++] = tv;
+    }
+    else if (op == OP_T_ADD) {
+      V vb = stack[--sp]; V va = stack[--sp];
+      if (va.tag != 5 || vb.tag != 5) { fprintf(stderr, "t_add expects tensors\n"); exit(1); }
+      stack[sp++] = Vt(tew_add(va.i, vb.i));
+    }
+    else if (op == OP_T_SUB) {
+      V vb = stack[--sp]; V va = stack[--sp];
+      if (va.tag != 5 || vb.tag != 5) { fprintf(stderr, "t_sub expects tensors\n"); exit(1); }
+      stack[sp++] = Vt(tew_sub(va.i, vb.i));
+    }
+    else if (op == OP_T_MUL) {
+      V vb = stack[--sp]; V va = stack[--sp];
+      if (va.tag != 5 || vb.tag != 5) { fprintf(stderr, "t_mul expects tensors\n"); exit(1); }
+      stack[sp++] = Vt(tew_mul(va.i, vb.i));
+    }
+    else if (op == OP_T_SCALE) {
+      double sc = as_f(stack[--sp]); V tv = stack[--sp];
+      if (tv.tag != 5) { fprintf(stderr, "t_scale expects tensor\n"); exit(1); }
+      stack[sp++] = Vt(tscale(tv.i, sc));
+    }
+    else if (op == OP_T_TRANSPOSE) {
+      V tv = stack[--sp];
+      if (tv.tag != 5) { fprintf(stderr, "t_transpose expects tensor\n"); exit(1); }
+      stack[sp++] = Vt(ttranspose(tv.i));
+    }
+    else if (op == OP_T_SOFTMAX) {
+      V tv = stack[--sp];
+      if (tv.tag != 5) { fprintf(stderr, "t_softmax expects tensor\n"); exit(1); }
+      stack[sp++] = Vt(tsoftmax(tv.i));
+    }
+    else if (op == OP_SAVE_TENSOR) {
+      V pathv = stack[--sp]; V tv = stack[--sp];
+      if (pathv.tag != 3 || tv.tag != 5) { fprintf(stderr, "save_tensor: expects tensor, str\n"); exit(1); }
+      { TObj *t = tobj(tv); FILE *f = fopen(as_str(pathv), "wb"); int i;
+        if (!f) { stack[sp++] = Vi(0); }
+        else {
+          fprintf(f, "KENGA_TENSOR 1\n%d\n", t->rank);
+          for (i = 0; i < t->rank; i++) fprintf(f, "%s%d", i ? " " : "", t->shape[i]);
+          fprintf(f, "\n");
+          for (i = 0; i < t->n; i++) fprintf(f, "%s%.17g", i ? " " : "", t->data[i]);
+          fprintf(f, "\n");
+          fclose(f); stack[sp++] = Vi(1);
+        } }
+    }
+    else if (op == OP_LOAD_TENSOR) {
+      V pathv = stack[--sp];
+      if (pathv.tag != 3) { fprintf(stderr, "load_tensor: path must be str\n"); exit(1); }
+      { FILE *f = fopen(as_str(pathv), "rb"); char hdr[64]; int rank, i, shape[8]; TObj *t; int64_t h;
+        if (!f) { fprintf(stderr, "load_tensor: cannot open\n"); exit(1); }
+        if (fscanf(f, "%63s %*d", hdr) != 1 || strcmp(hdr, "KENGA_TENSOR") != 0) { fclose(f); fprintf(stderr, "load_tensor: bad format\n"); exit(1); }
+        if (fscanf(f, "%d", &rank) != 1 || rank < 1 || rank > 8) { fclose(f); fprintf(stderr, "load_tensor: bad rank\n"); exit(1); }
+        for (i = 0; i < rank; i++) { if (fscanf(f, "%d", &shape[i]) != 1) { fclose(f); fprintf(stderr, "load_tensor: bad shape\n"); exit(1); } }
+        h = talloc(shape, rank, 0); t = &gT[h];
+        for (i = 0; i < t->n; i++) { if (fscanf(f, "%lf", &t->data[i]) != 1) { fclose(f); fprintf(stderr, "load_tensor: bad data\n"); exit(1); } }
+        fclose(f);
+        stack[sp++] = Vt(h); }
     }
     else if (op == OP_MEM_CONFIG) {
       int64_t hidden = as_i(stack[--sp]); int64_t ep_cap = as_i(stack[--sp]); double thr = as_f(stack[--sp]);

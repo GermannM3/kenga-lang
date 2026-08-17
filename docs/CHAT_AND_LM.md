@@ -22,6 +22,8 @@
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\word_lm.kenga
+scripts\bc-run.cmd examples\ml\word_lm_big.kenga
+```
 bootstrap\bin\kenga-lite.exe run examples\ml\tiny_lm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
 bootstrap\bin\kenga-lite.exe run examples\ml\kenga_trigram.kenga
