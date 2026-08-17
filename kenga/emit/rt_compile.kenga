@@ -7,9 +7,6 @@ fn main() -> i64 {
     s = s + "static Program compile_lite(const char *src) {\n";
     s = s + "  size_t n = strlen(src);\n";
     s = s + "  stypes_reset();\n";
-    s = s + "  pl_mems_reset();\n";
-    s = s + "  tl_tensors_reset();\n";
-    s = s + "  ag_clear();\n";
     s = s + "  g_loop_sp = -1;\n";
     s = s + "  g_tmpn = 0;\n";
     s = s + "  call_patches_reset();\n";

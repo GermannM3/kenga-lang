@@ -2,9 +2,6 @@
 static Program compile_lite(const char *src) {
   size_t n = strlen(src);
   stypes_reset();
-  pl_mems_reset();
-  tl_tensors_reset();
-  ag_clear();
   g_loop_sp = -1;
   g_tmpn = 0;
   call_patches_reset();

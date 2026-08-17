@@ -49,9 +49,6 @@
 #include "generated/rt_val.inc.c"
 #include "generated/rt_arena.inc.c"
 
-#include "generated/rt_prophet.inc.c"
-#include "generated/rt_tensor.inc.c"
-#include "generated/rt_tape.inc.c"
 #include "generated/rt_events.inc.c"
 
 #include "generated/rt_prog.inc.c"

@@ -102,9 +102,6 @@ static int64_t vm_exec(Program *prog) {
       i64a_free(&stack_bases);
       listh_free(&lists);
       structh_free(&structs);
-      pl_mems_reset();
-      tl_tensors_reset();
-      ag_clear();
       ev_reset();
       return r;
     }
@@ -228,274 +225,6 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(s[0] ? (unsigned char)s[0] : 0));
       continue;
     }
-    if (op == OP_MEM_CONFIG) {
-      if (stack.len < 3) die("stack underflow memory_config");
-      Value vc = stack.data[--stack.len];
-      Value ve = stack.data[--stack.len];
-      Value vt = stack.data[--stack.len];
-      int64_t core_cap = as_i64(vc, "memory_config");
-      int64_t ep_cap = as_i64(ve, "memory_config");
-      double thr = to_f64(vt, "memory_config");
-      if (vt.tag == TAG_I64) thr = (double)vt.payload / 100.0;
-      vala_push(&stack, V_mem(pl_mem_new(thr, (int)ep_cap, (int)core_cap)));
-      continue;
-    }
-    if (op == OP_MEM_REMEMBER) {
-      double pat[PL_DIM_MAX];
-      int pn = 0;
-      double surprise;
-      Value vs, vo, vm;
-      ProphetMem *m;
-      if (stack.len < 3) die("stack underflow remember");
-      vs = stack.data[--stack.len];
-      vo = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("remember expects Memory");
-      surprise = to_f64(vs, "remember surprise");
-      if (vs.tag == TAG_I64) surprise = (double)vs.payload / 100.0;
-      pl_value_to_pat(vo, &lists, pat, &pn);
-      m = pl_get(vm.payload);
-      vala_push(&stack, V_i64(pl_remember(m, pat, pn, surprise) ? 1 : 0));
-      continue;
-    }
-    if (op == OP_MEM_SURPRISE) {
-      double a[PL_DIM_MAX], b[PL_DIM_MAX];
-      int an = 0, bn = 0;
-      Value vb, va;
-      if (stack.len < 2) die("stack underflow surprise");
-      vb = stack.data[--stack.len];
-      va = stack.data[--stack.len];
-      pl_value_to_pat(va, &lists, a, &an);
-      pl_value_to_pat(vb, &lists, b, &bn);
-      vala_push(&stack, V_f64(pl_surprise(a, an, b, bn)));
-      continue;
-    }
-    if (op == OP_MEM_FORESEE) {
-      double pat[PL_DIM_MAX], out[PL_DIM_MAX];
-      int pn = 0, on = 0;
-      Value vo, vm;
-      if (stack.len < 2) die("stack underflow foresee");
-      vo = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("foresee expects Memory");
-      pl_value_to_pat(vo, &lists, pat, &pn);
-      pl_foresee(pl_get(vm.payload), pat, pn, out, &on);
-      vala_push(&stack, pl_pat_to_list(out, on, &lists));
-      continue;
-    }
-    if (op == OP_MEM_CONSOLIDATE) {
-      Value vm;
-      if (!stack.len) die("stack underflow consolidate");
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("consolidate expects Memory");
-      vala_push(&stack, V_i64(pl_consolidate(pl_get(vm.payload))));
-      continue;
-    }
-    if (op == OP_MEM_STATS) {
-      Value vm;
-      if (!stack.len) die("stack underflow mem_stats");
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("mem_stats expects Memory");
-      vala_push(&stack, pl_stats(pl_get(vm.payload), &lists));
-      continue;
-    }
-    if (op == OP_MEM_RECALL) {
-      double pat[PL_DIM_MAX];
-      int pn = 0;
-      Value vk, vq, vm;
-      int64_t k;
-      if (stack.len < 3) die("stack underflow recall");
-      vk = stack.data[--stack.len];
-      vq = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("recall expects Memory");
-      k = as_i64(vk, "recall k");
-      pl_value_to_pat(vq, &lists, pat, &pn);
-      vala_push(&stack, pl_recall(pl_get(vm.payload), pat, pn, (int)k, &lists));
-      continue;
-    }
-    if (op == OP_SAVE_MIND) {
-      Value vp, vm;
-      const char *path;
-      if (stack.len < 2) die("stack underflow save_mind");
-      vp = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("save_mind expects Memory");
-      if (vp.tag != TAG_STR) die("save_mind path must be str");
-      if (vp.payload < 0 || (size_t)vp.payload >= strs->len) die("bad str");
-      path = strs->data[vp.payload];
-      if (!pl_save_mind(pl_get(vm.payload), path)) die("save_mind failed");
-      vala_push(&stack, V_i64(1));
-      continue;
-    }
-    if (op == OP_LOAD_MIND) {
-      Value vp;
-      const char *path;
-      if (!stack.len) die("stack underflow load_mind");
-      vp = stack.data[--stack.len];
-      if (vp.tag != TAG_STR) die("load_mind path must be str");
-      if (vp.payload < 0 || (size_t)vp.payload >= strs->len) die("bad str");
-      path = strs->data[vp.payload];
-      vala_push(&stack, V_mem(pl_load_mind(path)));
-      continue;
-    }
-    if (op == OP_TENSOR) {
-      int argc = (int)code->data[ip++];
-      int shape[TL_RANK_MAX];
-      int i;
-      if (argc < 1 || argc > TL_RANK_MAX) die("bad tensor argc");
-      if ((int)stack.len < argc) die("stack underflow tensor");
-      for (i = 0; i < argc; i++) {
-        Value v = stack.data[--stack.len];
-        shape[i] = (int)as_i64(v, "tensor dim");
-      }
-      for (i = 0; i < argc / 2; i++) {
-        int tmp = shape[i];
-        shape[i] = shape[argc - 1 - i];
-        shape[argc - 1 - i] = tmp;
-      }
-      vala_push(&stack, V_tensor(tl_zeros(shape, argc)));
-      continue;
-    }
-    if (op == OP_T_FROM) {
-      Value vd, vs;
-      int shape[TL_RANK_MAX], rank = 0, n;
-      double *buf;
-      if (stack.len < 2) die("stack underflow t_from");
-      vd = stack.data[--stack.len];
-      vs = stack.data[--stack.len];
-      tl_shape_from_list(vs, &lists, shape, &rank);
-      n = tl_product(shape, rank);
-      buf = n > 0 ? (double *)malloc((size_t)n * sizeof(double)) : NULL;
-      if (n > 0 && !buf) die("oom");
-      if (n > 0) tl_data_from_list(vd, &lists, buf, n);
-      {
-        int64_t h = tl_alloc(shape, rank, 0);
-        if (n > 0) {
-          memcpy(tl_get(h)->data, buf, (size_t)n * sizeof(double));
-          free(buf);
-        }
-        vala_push(&stack, V_tensor(h));
-      }
-      continue;
-    }
-    if (op == OP_T_FILL) {
-      Value vv, vt;
-      double x;
-      Tensor *t;
-      int i;
-      if (stack.len < 2) die("stack underflow t_fill");
-      vv = stack.data[--stack.len];
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_fill expects Tensor");
-      x = to_f64(vv, "t_fill");
-      t = tl_get(vt.payload);
-      for (i = 0; i < t->n; i++) t->data[i] = x;
-      vala_push(&stack, vt);
-      continue;
-    }
-    if (op == OP_T_GET) {
-      Value vi, vt;
-      int64_t idx;
-      Tensor *t;
-      if (stack.len < 2) die("stack underflow t_get");
-      vi = stack.data[--stack.len];
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_get expects Tensor");
-      idx = as_i64(vi, "t_get index");
-      t = tl_get(vt.payload);
-      if (idx < 0 || idx >= t->n) die("t_get out of range");
-      vala_push(&stack, V_f64(t->data[idx]));
-      continue;
-    }
-    if (op == OP_T_SET) {
-      Value vv, vi, vt;
-      int64_t idx;
-      Tensor *t;
-      if (stack.len < 3) die("stack underflow t_set");
-      vv = stack.data[--stack.len];
-      vi = stack.data[--stack.len];
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_set expects Tensor");
-      idx = as_i64(vi, "t_set index");
-      t = tl_get(vt.payload);
-      if (idx < 0 || idx >= t->n) die("t_set out of range");
-      t->data[idx] = to_f64(vv, "t_set");
-      vala_push(&stack, vt);
-      continue;
-    }
-    if (op == OP_T_SHAPE) {
-      Value vt;
-      if (!stack.len) die("stack underflow t_shape");
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_shape expects Tensor");
-      vala_push(&stack, tl_shape_to_list(tl_get(vt.payload), &lists));
-      continue;
-    }
-    if (op == OP_T_ADD || op == OP_T_SUB || op == OP_T_MUL || op == OP_T_MATMUL ||
-        op == OP_T_DOT) {
-      Value vb, va;
-      if (stack.len < 2) die("stack underflow tensor binary");
-      vb = stack.data[--stack.len];
-      va = stack.data[--stack.len];
-      if (va.tag != TAG_TENSOR || vb.tag != TAG_TENSOR) die("tensor op expects Tensor");
-      if (op == OP_T_ADD)
-        vala_push(&stack, V_tensor(tl_ew(va.payload, vb.payload, tl_op_add)));
-      else if (op == OP_T_SUB)
-        vala_push(&stack, V_tensor(tl_ew(va.payload, vb.payload, tl_op_sub)));
-      else if (op == OP_T_MUL)
-        vala_push(&stack, V_tensor(tl_ew(va.payload, vb.payload, tl_op_mul)));
-      else if (op == OP_T_MATMUL)
-        vala_push(&stack, V_tensor(tl_matmul(va.payload, vb.payload)));
-      else
-        vala_push(&stack, V_f64(tl_dot(va.payload, vb.payload)));
-      continue;
-    }
-    if (op == OP_T_RESHAPE) {
-      Value vs, vt;
-      int shape[TL_RANK_MAX], rank = 0, n;
-      Tensor *t;
-      if (stack.len < 2) die("stack underflow t_reshape");
-      vs = stack.data[--stack.len];
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_reshape expects Tensor");
-      t = tl_get(vt.payload);
-      tl_shape_from_list(vs, &lists, shape, &rank);
-      n = tl_product(shape, rank);
-      if (n != t->n) die("t_reshape size mismatch");
-      {
-        int64_t h = tl_clone_shape_data(shape, rank, t->data, t->n);
-        vala_push(&stack, V_tensor(h));
-      }
-      continue;
-    }
-    if (op == OP_T_SCALE) {
-      Value vs, vt;
-      if (stack.len < 2) die("stack underflow t_scale");
-      vs = stack.data[--stack.len];
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_scale expects Tensor");
-      vala_push(&stack, V_tensor(tl_scale(vt.payload, to_f64(vs, "t_scale"))));
-      continue;
-    }
-    if (op == OP_T_TRANSPOSE || op == OP_T_EXP || op == OP_T_SOFTMAX || op == OP_T_SUM ||
-        op == OP_T_LOG) {
-      Value vt;
-      if (!stack.len) die("stack underflow tensor unary");
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("tensor unary expects Tensor");
-      if (op == OP_T_TRANSPOSE)
-        vala_push(&stack, V_tensor(tl_transpose(vt.payload)));
-      else if (op == OP_T_EXP)
-        vala_push(&stack, V_tensor(tl_exp(vt.payload)));
-      else if (op == OP_T_SOFTMAX)
-        vala_push(&stack, V_tensor(tl_softmax(vt.payload)));
-      else if (op == OP_T_LOG)
-        vala_push(&stack, V_tensor(tl_log(vt.payload)));
-      else
-        vala_push(&stack, V_f64(tl_sum(vt.payload)));
-      continue;
-    }
     if (op == OP_SWEEP) {
       vala_push(&stack, V_i64(0));
       continue;
@@ -533,47 +262,40 @@ static int64_t vm_exec(Program *prog) {
       }
       continue;
     }
-    if (op == OP_LOAD_PPM || op == OP_LOAD_WAV || op == OP_LOAD_TENSOR || op == OP_READ_FILE) {
+    if (op == OP_READ_FILE) {
       Value vp;
       const char *path;
+      FILE *f;
+      long sz;
+      char *buf;
+      size_t nread;
       if (!stack.len) die("stack underflow load path");
       vp = stack.data[--stack.len];
       if (vp.tag != TAG_STR) die("path must be str");
       if (vp.payload < 0 || (size_t)vp.payload >= strs->len) die("bad str");
       path = strs->data[vp.payload];
-      if (op == OP_LOAD_PPM)
-        vala_push(&stack, V_tensor(tl_load_ppm(path)));
-      else if (op == OP_LOAD_WAV)
-        vala_push(&stack, V_tensor(tl_load_wav(path)));
-      else if (op == OP_LOAD_TENSOR)
-        vala_push(&stack, V_tensor(tl_load_tensor(path)));
-      else {
-        FILE *f = fopen(path, "rb");
-        long sz;
-        char *buf;
-        size_t nread;
-        if (!f) die("read_file: cannot open");
-        if (fseek(f, 0, SEEK_END) != 0) {
-          fclose(f);
-          die("read_file: seek");
-        }
-        sz = ftell(f);
-        if (sz < 0) {
-          fclose(f);
-          die("read_file: tell");
-        }
-        rewind(f);
-        buf = (char *)malloc((size_t)sz + 1);
-        if (!buf) {
-          fclose(f);
-          die("oom");
-        }
-        nread = fread(buf, 1, (size_t)sz, f);
+      f = fopen(path, "rb");
+      if (!f) die("read_file: cannot open");
+      if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
-        buf[nread] = 0;
-        vala_push(&stack, V_str(intern_str(buf)));
-        free(buf);
+        die("read_file: seek");
       }
+      sz = ftell(f);
+      if (sz < 0) {
+        fclose(f);
+        die("read_file: tell");
+      }
+      rewind(f);
+      buf = (char *)malloc((size_t)sz + 1);
+      if (!buf) {
+        fclose(f);
+        die("oom");
+      }
+      nread = fread(buf, 1, (size_t)sz, f);
+      fclose(f);
+      buf[nread] = 0;
+      vala_push(&stack, V_str(intern_str(buf)));
+      free(buf);
       continue;
     }
     if (op == OP_READ_BYTES) {
@@ -657,19 +379,6 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_list(ml_box_h));
       continue;
     }
-    if (op == OP_SAVE_TENSOR) {
-      Value vp, vt;
-      const char *path;
-      if (stack.len < 2) die("stack underflow save_tensor");
-      vp = stack.data[--stack.len];
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("save_tensor expects Tensor");
-      if (vp.tag != TAG_STR) die("save_tensor path must be str");
-      path = strs->data[vp.payload];
-      if (!tl_save_tensor(vt.payload, path)) die("save_tensor failed");
-      vala_push(&stack, V_i64(1));
-      continue;
-    }
     if (op == OP_WRITE_FILE) {
       Value vc, vp;
       const char *path, *body;
@@ -685,143 +394,6 @@ static int64_t vm_exec(Program *prog) {
       fwrite(body, 1, strlen(body), f);
       fclose(f);
       vala_push(&stack, V_i64(1));
-      continue;
-    }
-    if (op == OP_T_MEAN) {
-      Value vt;
-      double f = 0.0;
-      int is_f = 0;
-      int64_t h;
-      if (!stack.len) die("stack underflow t_mean");
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_mean expects Tensor");
-      h = tl_mean_tensor(vt.payload, &f, &is_f);
-      if (is_f)
-        vala_push(&stack, V_f64(f));
-      else
-        vala_push(&stack, V_tensor(h));
-      continue;
-    }
-    if (op == OP_T_MSE) {
-      Value vb, va;
-      if (stack.len < 2) die("stack underflow t_mse");
-      vb = stack.data[--stack.len];
-      va = stack.data[--stack.len];
-      if (va.tag != TAG_TENSOR || vb.tag != TAG_TENSOR) die("t_mse expects Tensor");
-      vala_push(&stack, V_f64(tl_mse_ids(va.payload, vb.payload)));
-      continue;
-    }
-    if (op == OP_T_PATCH_MEAN) {
-      Value vgw, vgh, vt;
-      if (stack.len < 3) die("stack underflow t_patch_mean");
-      vgw = stack.data[--stack.len];
-      vgh = stack.data[--stack.len];
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("t_patch_mean expects Tensor");
-      vala_push(&stack, V_tensor(tl_patch_mean(vt.payload, (int)as_i64(vgh, "t_patch_mean"),
-                                              (int)as_i64(vgw, "t_patch_mean"))));
-      continue;
-    }
-    if (op == OP_T_LINEAR_GRAD) {
-      Value vy, vx, vw;
-      if (stack.len < 3) die("stack underflow t_linear_grad");
-      vy = stack.data[--stack.len];
-      vx = stack.data[--stack.len];
-      vw = stack.data[--stack.len];
-      if (vw.tag != TAG_TENSOR || vx.tag != TAG_TENSOR || vy.tag != TAG_TENSOR)
-        die("t_linear_grad expects Tensor");
-      vala_push(&stack, V_tensor(tl_linear_grad(vw.payload, vx.payload, vy.payload)));
-      continue;
-    }
-    if (op == OP_LEARN) {
-      double x[PL_DIM_MAX], y[PL_DIM_MAX];
-      int xn = 0, yn = 0;
-      Value vy, vx, vm;
-      if (stack.len < 3) die("stack underflow learn");
-      vy = stack.data[--stack.len];
-      vx = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("learn expects Memory");
-      pl_value_to_pat(vx, &lists, x, &xn);
-      pl_value_to_pat(vy, &lists, y, &yn);
-      vala_push(&stack, V_f64(pl_learn(pl_get(vm.payload), x, xn, y, yn)));
-      continue;
-    }
-    if (op == OP_PREDICT) {
-      double pat[PL_DIM_MAX], out[PL_DIM_MAX];
-      int pn = 0, on = 0;
-      Value vo, vm;
-      if (stack.len < 2) die("stack underflow predict");
-      vo = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("predict expects Memory");
-      pl_value_to_pat(vo, &lists, pat, &pn);
-      pl_predict(pl_get(vm.payload), pat, pn, out, &on);
-      vala_push(&stack, pl_pat_to_list(out, on, &lists));
-      continue;
-    }
-    if (op == OP_UNROLL) {
-      double pat[PL_DIM_MAX], traj[64 * PL_DIM_MAX];
-      int pn = 0, steps, os = 0, od = 0, s;
-      Value vk, vo, vm;
-      ValA empty = {0};
-      int64_t oh;
-      if (stack.len < 3) die("stack underflow unroll");
-      vk = stack.data[--stack.len];
-      vo = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("unroll expects Memory");
-      steps = (int)as_i64(vk, "unroll steps");
-      pl_value_to_pat(vo, &lists, pat, &pn);
-      pl_unroll(pl_get(vm.payload), pat, pn, steps, traj, &os, &od);
-      oh = (int64_t)lists.len;
-      listh_push(&lists, empty);
-      for (s = 0; s < os; s++) {
-        Value inner = pl_pat_to_list(traj + s * PL_DIM_MAX, od, &lists);
-        vala_push(&lists.data[oh], inner);
-      }
-      vala_push(&stack, V_list(oh));
-      continue;
-    }
-    if (op == OP_FORESEE_N) {
-      double pat[PL_DIM_MAX], traj[64 * PL_DIM_MAX];
-      int pn = 0, steps, os = 0, od = 0, s;
-      Value vk, vo, vm;
-      ValA empty = {0};
-      int64_t oh;
-      if (stack.len < 3) die("stack underflow foresee_n");
-      vk = stack.data[--stack.len];
-      vo = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("foresee_n expects Memory");
-      steps = (int)as_i64(vk, "foresee_n steps");
-      pl_value_to_pat(vo, &lists, pat, &pn);
-      pl_foresee_n(pl_get(vm.payload), pat, pn, steps, traj, &os, &od);
-      oh = (int64_t)lists.len;
-      listh_push(&lists, empty);
-      for (s = 0; s < os; s++) {
-        Value inner = pl_pat_to_list(traj + s * PL_DIM_MAX, od, &lists);
-        vala_push(&lists.data[oh], inner);
-      }
-      vala_push(&stack, V_list(oh));
-      continue;
-    }
-    if (op == OP_REMEMBER_NEXT) {
-      double a[PL_DIM_MAX], b[PL_DIM_MAX];
-      int an = 0, bn = 0;
-      double surprise;
-      Value vs, vn, vo, vm;
-      if (stack.len < 4) die("stack underflow remember_next");
-      vs = stack.data[--stack.len];
-      vn = stack.data[--stack.len];
-      vo = stack.data[--stack.len];
-      vm = stack.data[--stack.len];
-      if (vm.tag != TAG_MEMORY) die("remember_next expects Memory");
-      surprise = to_f64(vs, "remember_next surprise");
-      if (vs.tag == TAG_I64) surprise = (double)vs.payload / 100.0;
-      pl_value_to_pat(vo, &lists, a, &an);
-      pl_value_to_pat(vn, &lists, b, &bn);
-      vala_push(&stack, V_i64(pl_remember_pair(pl_get(vm.payload), a, an, b, bn, surprise, 0) ? 1 : 0));
       continue;
     }
     if (op == OP_EMIT) {
@@ -888,110 +460,6 @@ static int64_t vm_exec(Program *prog) {
       h = intern_str(ts);
       free(ts);
       vala_push(&stack, V_str(h));
-      continue;
-    }
-    if (op == OP_AG_CLEAR) {
-      ag_clear();
-      vala_push(&stack, V_i64(0));
-      continue;
-    }
-    if (op == OP_AG_PARAM) {
-      Value vt;
-      if (!stack.len) die("stack underflow ag_param");
-      vt = stack.data[--stack.len];
-      if (vt.tag != TAG_TENSOR) die("ag_param expects Tensor");
-      vala_push(&stack, V_i64(ag_param(vt.payload)));
-      continue;
-    }
-    if (op == OP_AG_CONST) {
-      Value vt;
-      if (!stack.len) die("stack underflow ag_const");
-      vt = stack.data[--stack.len];
-      if (vt.tag == TAG_TENSOR)
-        vala_push(&stack, V_i64(ag_const_t(vt.payload)));
-      else if (vt.tag == TAG_F64 || vt.tag == TAG_I64)
-        vala_push(&stack, V_i64(ag_const_f(to_f64(vt, "ag_const"))));
-      else
-        die("ag_const expects Tensor|number");
-      continue;
-    }
-    if (op == OP_AG_ADD || op == OP_AG_SUB || op == OP_AG_MUL || op == OP_AG_MATMUL ||
-        op == OP_AG_MSE) {
-      Value vb, va;
-      int a, b;
-      if (stack.len < 2) die("stack underflow ag binary");
-      vb = stack.data[--stack.len];
-      va = stack.data[--stack.len];
-      a = (int)as_i64(va, "ag node");
-      b = (int)as_i64(vb, "ag node");
-      if (op == OP_AG_ADD)
-        vala_push(&stack, V_i64(ag_add_ids(a, b)));
-      else if (op == OP_AG_SUB)
-        vala_push(&stack, V_i64(ag_sub_ids(a, b)));
-      else if (op == OP_AG_MUL)
-        vala_push(&stack, V_i64(ag_mul_ids(a, b)));
-      else if (op == OP_AG_MATMUL)
-        vala_push(&stack, V_i64(ag_matmul_ids(a, b)));
-      else
-        vala_push(&stack, V_i64(ag_mse_n(a, b)));
-      continue;
-    }
-    if (op == OP_AG_SCALE) {
-      Value vs, va;
-      if (stack.len < 2) die("stack underflow ag_scale");
-      vs = stack.data[--stack.len];
-      va = stack.data[--stack.len];
-      vala_push(&stack, V_i64(ag_scale_n((int)as_i64(va, "ag_scale"), to_f64(vs, "ag_scale"))));
-      continue;
-    }
-    if (op == OP_AG_RESHAPE) {
-      Value vs, va;
-      int shape[TL_RANK_MAX], rank = 0;
-      if (stack.len < 2) die("stack underflow ag_reshape");
-      vs = stack.data[--stack.len];
-      va = stack.data[--stack.len];
-      tl_shape_from_list(vs, &lists, shape, &rank);
-      vala_push(&stack, V_i64(ag_reshape_n((int)as_i64(va, "ag_reshape"), shape, rank)));
-      continue;
-    }
-    if (op == OP_AG_STEP) {
-      Value vs, va;
-      if (stack.len < 2) die("stack underflow ag_step");
-      vs = stack.data[--stack.len];
-      va = stack.data[--stack.len];
-      vala_push(&stack, V_tensor(ag_step_n((int)as_i64(va, "ag_step"), to_f64(vs, "ag_step"))));
-      continue;
-    }
-    if (op == OP_AG_RELU || op == OP_AG_NEG || op == OP_AG_TRANSPOSE || op == OP_AG_EXP ||
-        op == OP_AG_LOG || op == OP_AG_SOFTMAX || op == OP_AG_SUM || op == OP_AG_VALUE ||
-        op == OP_AG_GRAD || op == OP_AG_BACKWARD) {
-      Value va;
-      int id;
-      if (!stack.len) die("stack underflow ag unary");
-      va = stack.data[--stack.len];
-      id = (int)as_i64(va, "ag unary");
-      if (op == OP_AG_RELU)
-        vala_push(&stack, V_i64(ag_relu_n(id)));
-      else if (op == OP_AG_NEG)
-        vala_push(&stack, V_i64(ag_neg_n(id)));
-      else if (op == OP_AG_TRANSPOSE)
-        vala_push(&stack, V_i64(ag_transpose_n(id)));
-      else if (op == OP_AG_EXP)
-        vala_push(&stack, V_i64(ag_exp_n(id)));
-      else if (op == OP_AG_LOG)
-        vala_push(&stack, V_i64(ag_log_n(id)));
-      else if (op == OP_AG_SOFTMAX)
-        vala_push(&stack, V_i64(ag_softmax_n(id)));
-      else if (op == OP_AG_SUM)
-        vala_push(&stack, V_i64(ag_sum_n(id)));
-      else if (op == OP_AG_VALUE)
-        vala_push(&stack, ag_value_v(id));
-      else if (op == OP_AG_GRAD)
-        vala_push(&stack, ag_grad_v(id));
-      else {
-        ag_backward(id);
-        vala_push(&stack, V_i64(0));
-      }
       continue;
     }
     if (op == OP_PUMP) {
@@ -1306,9 +774,6 @@ static int64_t vm_exec(Program *prog) {
     i64a_free(&stack_bases);
     listh_free(&lists);
     structh_free(&structs);
-    pl_mems_reset();
-    tl_tensors_reset();
-    ag_clear();
     ev_reset();
     return r;
   }

@@ -22,7 +22,7 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 4. **`bc_src_c`**: parse `.kenga` → bytecode → generated C VM. Сетка: **`kenga_net.kenga`**. Birth: **`kenga_birth.kenga`** → native C пишет программу. Запуск одного файла: **`scripts\bc-run.cmd`**.  
 5. Emit lite runtime закрыт: `kenga_lite.c` только includes. Дальше — VM на Kenga без C.  
 6. Releases: `kenga-lite` обязателен в CI/zip; cargo `kenga` ещё legacy. `src/` → archive, когда zip = только lite.  
-7. Пользовательский `kenga-lite run file.kenga` — **more VM**. `kenga-lite chat` — `chat.kenga` + `ml_host` (списки). Lite compiler без C-fallback на `t_*`/`ag_*`/`memory_*`: только `ml_host`. `read_bytes` — CRT в VM, не tensor heap. OpenCL GEMM не линкуется. C host = CRT.
+7. Пользовательский `kenga-lite run file.kenga` — **more VM**. `kenga-lite chat` — `chat.kenga` + `ml_host` (списки). Lite compiler без C-fallback на `t_*`/`ag_*`/`memory_*`: только `ml_host`. `read_bytes` — CRT в VM. OpenCL / C Prophet / C tensor / C tape **не линкуются**. C host = CRT + events.
 
 Карта модулей: **`docs/REPLACE_RUST.md`**.
 

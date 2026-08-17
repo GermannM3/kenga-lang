@@ -401,7 +401,7 @@ fn main() -> i64 {
     s = s + "          }\n";
     s = s + "          if (j >= n || s[j] != ')') die(\"expected ) in tensor\");\n";
     s = s + "          j++;\n";
-    s = s + "          if (argc < 1 || argc > TL_RANK_MAX) die(\"tensor dims 1..rank_max\");\n";
+    s = s + "          if (argc < 1 || argc > 8) die(\"tensor dims 1..rank_max\");\n";
     s = s + "          emit2(code, OP_TENSOR, argc);\n";
     s = s + "        }\n";
     s = s + "        i = j;\n";

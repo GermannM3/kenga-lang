@@ -42,10 +42,10 @@ scripts\freedom-smoke.cmd
 | `emit/rt_vm.kenga` | bytecode VM | кусок vm.rs |
 | `emit/rt_selftest.kenga` | run_lite + 68 cases | кусок demo.rs |
 | `emit/rt_types.kenga` | opcodes + Value/Program | кусок bytecode.rs |
-| `emit/rt_prophet.kenga` | Prophet Memory | `memory.rs` |
-| `emit/rt_tensor.kenga` | dense f64 tensors | `tensor.rs` |
+| `emit/rt_prophet.kenga` | leftover C Prophet emit; lite no longer includes it | `memory.rs` |
+| `emit/rt_tensor.kenga` | leftover C tensor emit; lite no longer includes it | `tensor.rs` |
 | `emit/rt_matmul_cl.kenga` | leftover OpenCL GEMM emit; lite no longer includes it | GPU host |
-| `emit/rt_tape.kenga` | reverse-mode tape | `autograd.rs` |
+| `emit/rt_tape.kenga` | leftover C tape emit; lite no longer includes it | `autograd.rs` |
 | `emit/rt_events.kenga` | on/emit/pump | events |
 | `emit/rt_chat.kenga` | leftover C chat emit; CLI uses `compiler/chat.kenga` | `talk.rs` |
 | `emit/lower_kv.kenga` | KVal lowerer (str/ord/hetero/lex) | путь к native `more` |

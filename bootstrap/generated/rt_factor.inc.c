@@ -396,7 +396,7 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
           }
           if (j >= n || s[j] != ')') die("expected ) in tensor");
           j++;
-          if (argc < 1 || argc > TL_RANK_MAX) die("tensor dims 1..rank_max");
+          if (argc < 1 || argc > 8) die("tensor dims 1..rank_max");
           emit2(code, OP_TENSOR, argc);
         }
         i = j;
