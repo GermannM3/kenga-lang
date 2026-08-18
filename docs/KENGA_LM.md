@@ -59,6 +59,7 @@ Char-LM / mm-gen: тот же decoder, **CTX=12** (промпт `"kenga vidit "`
 4. **Char-LM на нашем исходнике** — `kenga_charlm.kenga` + `kenga_char_talk.kenga`.
 5. **Триграмма на list/i64** — `kenga_trigram.kenga`.
 6. **Word-decoder + vis-bias** — `kenga_mm_words.kenga` (D=16, L=1, CTX=12). Word decoder: `kenga_lm.kenga` D=32 L=2.
+7. **Char-LM на полном исходнике** — `kenga_biglm.kenga`: корпус = `kenga/compiler` + selfhost (203 KB), 3 эпохи CPU ~13 мин, native C + GC. Расти D/L/эпохи.
 7. Больше D/L, байтовый/BPE словарь, длинный контекст.
 8. GPU backend. Чужой GGUF — не доказательство.
 9. Большая мультимодальная: git (пример) + Hugging Face `Kenga-ai/kenga-mm`. Сид и упаковка: `docs/HUGGINGFACE.md`.

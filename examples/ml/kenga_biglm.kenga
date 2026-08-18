@@ -1,0 +1,76 @@
+// Char-level decoder trained on the WHOLE kenga/ source tree (not GGUF).
+// Corpus: kenga/compiler + examples/selfhost — the language learns itself.
+// Architecture: kenga_dec.kenga (same as kenga_charlm, bigger corpus).
+//
+//   scripts\bc-run.cmd examples\ml\kenga_biglm.kenga   (native C)
+
+import "kenga_dec.kenga";
+
+fn load_corpus() -> str {
+    let s: str = "";
+    s = s + read_file("kenga/compiler/lite.kenga") + "\n";
+    s = s + read_file("kenga/compiler/more.kenga") + "\n";
+    s = s + read_file("kenga/compiler/native_ml.kenga") + "\n";
+    s = s + read_file("kenga/compiler/ml_host.kenga") + "\n";
+    s = s + read_file("kenga/compiler/chat.kenga") + "\n";
+    s = s + read_file("examples/selfhost/fact_lite.kenga") + "\n";
+    s = s + read_file("examples/selfhost/struct_lite.kenga") + "\n";
+    s = s + read_file("examples/selfhost/lists_lite.kenga") + "\n";
+    s = s + read_file("examples/selfhost/elif_lite.kenga") + "\n";
+    s = s + read_file("examples/selfhost/for_lite.kenga") + "\n";
+    s = s + read_file("examples/selfhost/arith.kenga") + "\n";
+    s = s + read_file("examples/selfhost/loopfn.kenga") + "\n";
+    return s;
+}
+
+fn main() -> i64 {
+    println("=== kenga big char-LM (corpus = kenga/ sources) ===");
+    let t0 = now_ms();
+    let src: str = load_corpus();
+    let alpha: str = build_alpha(src);
+    let ids = encode(src, alpha);
+    let vv: i64 = len(alpha);
+    println("chars");
+    println(len(src));
+    println("vocab");
+    println(vv);
+
+    let e = fill_w(vv, D(), 7);
+    let att = frozen_attn(D(), FF());
+    let wq = att[0];
+    let wk = att[1];
+    let wv = att[2];
+    let wo = att[3];
+    let wf1 = att[4];
+    let wf2 = att[5];
+    let wlm = fill_w(vv, D(), 59);
+
+    let ctxn: i64 = CTX();
+    let ep: i64 = 0;
+    while ep < 3 {
+        let t1 = now_ms();
+        let p: i64 = ctxn;
+        while p < len(ids) {
+            let packed = train_last(e, wlm, window(ids, p, ctxn), ids[p], 0.12, vv, wq, wk, wv, wo, wf1, wf2);
+            e = packed[0];
+            wlm = packed[1];
+            p = p + 1;
+        }
+        println("epoch done ms:");
+        println(now_ms() - t1);
+        ep = ep + 1;
+    }
+
+    let out: str = generate("fn main", alpha, e, wq, wk, wv, wo, wf1, wf2, wlm, 200);
+    println(out);
+    assert(len(out) > 20);
+    assert(ch_id(out, "(") >= 0);
+    assert(write_file("minds/kenga_big_alpha.txt", alpha) == 1);
+    assert(write_file("examples/ml/kenga_big_sample.txt", out) == 1);
+    assert(save_tensor(e, "minds/kenga_big_e.kt") == 1);
+    assert(save_tensor(wlm, "minds/kenga_big_w.kt") == 1);
+    println("total ms:");
+    println(now_ms() - t0);
+    println("kenga biglm ok");
+    return 0;
+}

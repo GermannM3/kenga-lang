@@ -60,11 +60,13 @@ static char *v_to_cstr(V v) {
   return NULL;
 }
 
-typedef struct { V *d; size_t n, cap; } LObj;
+typedef struct { V *d; size_t n, cap; int next_free; } LObj;
 static LObj gL[1048576];
 static const char *g_ltype[1048576];
 static int gLn = 0;
 
+static int64_t gLfree = -1, gLfreecnt = 0;
+static int gGCp = 0;
 static void vprint(V v) {
   if (v.tag==1) printf("%g", v.f);
   else if (v.tag==3) printf("%s", as_str(v));
@@ -74,9 +76,11 @@ static void vprint(V v) {
   else printf("%lld", (long long)v.i);
 }
 static int64_t lnew(void) {
+  if (gLfree >= 0) { int64_t id = gLfree; gLfree = gL[id].next_free; gLfreecnt--; gL[id].d = NULL; gL[id].n = 0; gL[id].cap = 0; g_ltype[id] = NULL; if ((gLn - gLfreecnt) > 65536) gGCp = 1; return id; }
   if (gLn >= 1048576) { fprintf(stderr, "list heap full\n"); exit(1); }
-  gL[gLn].d = NULL; gL[gLn].n = 0; gL[gLn].cap = 0;
+  gL[gLn].d = NULL; gL[gLn].n = 0; gL[gLn].cap = 0; gL[gLn].next_free = -1;
   g_ltype[gLn] = NULL;
+  if ((gLn + 1 - gLfreecnt) > 65536) gGCp = 1;
   return (int64_t)gLn++;
 }
 static void lgrow(int id) {
@@ -110,24 +114,31 @@ typedef float KREAL;
 #else
 typedef double KREAL;
 #endif
-typedef struct { int rank; int shape[8]; int n; KREAL *data; } TObj;
+typedef struct { int rank; int shape[8]; int n; KREAL *data; int next_free; } TObj;
 static TObj *gT = NULL;
 static int gTn = 0, gTcap = 0;
+static int64_t gTfree = -1, gTfreecnt = 0; static size_t gTbytes = 0;
 static int64_t talloc(const int *shape, int rank, int zero) {
-  int n = 1, i;
-  if (gTn >= gTcap) { int nc = gTcap ? gTcap * 2 : 64; TObj *nd = (TObj*)realloc(gT, (size_t)nc * sizeof(TObj)); if (!nd) { fprintf(stderr, "oom\n"); exit(1); } gT = nd; gTcap = nc; }
+  int n = 1, i; int64_t h;
   if (rank < 0 || rank > 8) { fprintf(stderr, "bad tensor rank\n"); exit(1); }
   for (i = 0; i < rank; i++) {
     if (shape[i] < 0) { fprintf(stderr, "negative tensor dim\n"); exit(1); }
     if (shape[i] > 0 && n > 4096 / shape[i]) { fprintf(stderr, "tensor too large\n"); exit(1); }
     n *= shape[i];
   }
-  gT[gTn].rank = rank; gT[gTn].n = n;
-  for (i = 0; i < rank; i++) gT[gTn].shape[i] = shape[i];
-  gT[gTn].data = n > 0 ? (KREAL*)malloc((size_t)n * sizeof(KREAL)) : NULL;
-  if (n > 0 && !gT[gTn].data) { fprintf(stderr, "oom\n"); exit(1); }
-  if (n > 0 && zero) memset(gT[gTn].data, 0, (size_t)n * sizeof(KREAL));
-  return (int64_t)gTn++;
+  if (gTfree >= 0) { h = gTfree; gTfree = gT[h].next_free; gTfreecnt--; }
+  else {
+    if (gTn >= gTcap) { int nc = gTcap ? gTcap * 2 : 64; TObj *nd = (TObj*)realloc(gT, (size_t)nc * sizeof(TObj)); if (!nd) { fprintf(stderr, "oom\n"); exit(1); } gT = nd; gTcap = nc; }
+    h = gTn++;
+  }
+  gT[h].rank = rank; gT[h].n = n; gT[h].next_free = -1;
+  for (i = 0; i < rank; i++) gT[h].shape[i] = shape[i];
+  gT[h].data = n > 0 ? (KREAL*)malloc((size_t)n * sizeof(KREAL)) : NULL;
+  if (n > 0 && !gT[h].data) { fprintf(stderr, "oom\n"); exit(1); }
+  if (n > 0 && zero) memset(gT[h].data, 0, (size_t)n * sizeof(KREAL));
+  gTbytes += (size_t)n * sizeof(KREAL);
+  if ((gTn - gTfreecnt) > 8192 || gTbytes > ((size_t)192 << 20)) gGCp = 1;
+  return h;
 }
 static TObj *tobj(V v) {
   if (v.tag != 5 || v.i < 0 || v.i >= gTn) { fprintf(stderr, "expected tensor\n"); exit(1); }
@@ -389,6 +400,27 @@ static int64_t find_handler(const char *event_name) {
   return -1;
 }
 
+/* mark-sweep GC: roots = VM stack + slots + event queue + tape bag */
+static char *gTmk = NULL; static int64_t gTmkcap = 0;
+static char *gLmk = NULL; static int64_t gLmkcap = 0;
+static void gc_mark_v(V v) {
+  if (v.tag == 2) { int64_t id = v.i; if (id >= 0 && id < gLn && !gLmk[id]) { size_t k; gLmk[id] = 1; for (k = 0; k < gL[id].n; k++) gc_mark_v(gL[id].d[k]); } }
+  else if (v.tag == 5) { if (v.i >= 0 && v.i < gTn) gTmk[v.i] = 1; }
+}
+static void gc_sweep(V *stack, int sp, V *slots, int nslots) {
+  int64_t k; int j; int64_t f;
+  if (gTmkcap < gTn) { gTmkcap = gTn + 4096; gTmk = (char*)realloc(gTmk, (size_t)gTmkcap); if (!gTmk) { fprintf(stderr, "oom\n"); exit(1); } }
+  if (gLmkcap < gLn) { gLmkcap = gLn + 4096; gLmk = (char*)realloc(gLmk, (size_t)gLmkcap); if (!gLmk) { fprintf(stderr, "oom\n"); exit(1); } }
+  memset(gTmk, 0, (size_t)gTn); memset(gLmk, 0, (size_t)gLn);
+  for (j = 0; j < sp; j++) gc_mark_v(stack[j]);
+  for (j = 0; j < nslots; j++) gc_mark_v(slots[j]);
+  for (j = ev_head; j < ev_tail; j++) gc_mark_v(ev_vals[j]);
+  for (k = 0; k < gBagn; k++) { if (gBag[k].th >= 0 && gBag[k].th < gTn) gTmk[gBag[k].th] = 1; if (gBag[k].gth >= 0 && gBag[k].gth < gTn) gTmk[gBag[k].gth] = 1; }
+  f = gTfree; while (f >= 0) { gTmk[f] = 1; f = gT[f].next_free; }
+  f = gLfree; while (f >= 0) { gLmk[f] = 1; f = gL[f].next_free; }
+  for (k = 0; k < gLn; k++) if (!gLmk[k]) { if (gL[k].d) free(gL[k].d); gL[k].d = NULL; gL[k].n = 0; gL[k].cap = 0; gL[k].next_free = gLfree; gLfree = k; gLfreecnt++; g_ltype[k] = NULL; }
+  for (k = 0; k < gTn; k++) if (!gTmk[k]) { if (gT[k].data) { gTbytes -= (size_t)gT[k].n * sizeof(KREAL); free(gT[k].data); } gT[k].data = NULL; gT[k].n = 0; gT[k].next_free = gTfree; gTfree = k; gTfreecnt++; }
+}
 static int64_t vm_run(const int64_t *code, int64_t n) {
   V stack[4096]; int sp = 0;
   V slots[4096]; int64_t slot_used = 0;
@@ -403,6 +435,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
   for (i = 0; i < 4096; i++) slots[i] = Vi(0);
   while (ip < n) {
   vm_step:
+if (gGCp) { gGCp = 0; gc_sweep(stack, sp, slots, 4096); }
     if (pump_active) {
       while (pump_left > 0) {
         char *name_str; V val; int64_t hi, haddr, harity;

@@ -65,6 +65,7 @@
 | ✅ | **`bc_src_c`**: tensor ops `t_set`/`t_add`/`t_sub`/`t_mul`/`t_scale`/`t_transpose`/`t_softmax` + `save_tensor`/`load_tensor` (ops 87–95) — ML **компилируется в native C** с плоскими `double*`: `word_lm_big` 141 с → **0.33 с** (~430×) |
 | ✅ | **`bc_src_c`**: чинит вложенные `break`/`continue` (sentinel-фреймы) и escape-лексер (`\n`/`\t`) — `kenga_charlm` на native C: **16 с** (more-VM не дошёл за 10 мин); `kenga_lm`: 66 с → **0.31 с** |
 | ✅ | **f32-тензоры**: `-DKENGA_TENSOR_F32` (`scripts\bc-run-f32.cmd`) — то же поведение, вдвое меньше память; f64 остаётся дефолтом (мелкие модели чувствительны к точности) |
+| ✅ | **GC в bc-рантайме**: mark-sweep (roots = VM стек/слоты + события + tape) с free-list и бюджетами; длинные обучения больше не текут — `kenga_biglm` (корпус = весь `kenga/` исходник, 203 KB) 3 эпохи на CPU без роста памяти |
 | ✅ | **`bc_src_c`**: list arena 1M + VM stack/slots 4096 (тренировочные циклы не упираются в 256) |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ✅ | Emit lite runtime: **`rt_types` / Prophet / tensor / tape / compiler / VM / selftest** — `kenga_lite.c` каркас |
