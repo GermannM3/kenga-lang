@@ -55,7 +55,7 @@ Char-LM / mm-gen: тот же decoder, **CTX=12** (промпт `"kenga vidit "`
 
 1. XOR-MLP на list/f64 — `kenga_net.kenga` (алгоритм в языке, без tensor host).
 2. 2-layer word-LM + CE — `word_lm.kenga`, больше словарь — `word_lm_big.kenga` (fast more VM **~12.6 с**; native C через `scripts\bc-run.cmd` — **0.33 с**).
-3. **Decoder GPT-формы** — `kenga_lm.kenga`.
+3. **Decoder GPT-формы** — `kenga_lm.kenga` (more VM **~33 с**, 50 эпох × 8; native C через `scripts\bc-run.cmd` — **0.34 с**).
 4. **Char-LM на нашем исходнике** — `kenga_charlm.kenga` + `kenga_char_talk.kenga`.
 5. **Триграмма на list/i64** — `kenga_trigram.kenga`.
 6. **Word-decoder + vis-bias** — `kenga_mm_words.kenga` (D=16, L=1, CTX=12). Word decoder: `kenga_lm.kenga` D=32 L=2.

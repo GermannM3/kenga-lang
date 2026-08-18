@@ -451,14 +451,14 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
                 if rsp >= len(ret_ips) { ret_ips = push(ret_ips, 0); ret_bases = push(ret_bases, 0); }
                 ret_ips[rsp] = ip; ret_bases[rsp] = slot_base; rsp = rsp + 1;
                 slot_base = slots_h;
+                while len(slots) <= slot_base + ac { slots = push(slots, 0); }
                 let ai: i64 = ac - 1;
                 while ai >= 0 {
-                    while len(slots) <= slot_base + ai { slots = push(slots, 0); }
                     spi = spi - 1;
                     slots[slot_base + ai] = stack[spi];
                     ai = ai - 1;
                 }
-                if slot_base + ac > slots_h { slots_h = slot_base + ac; }
+                slots_h = slot_base + ac;
                 ip = addr;
             }
             else if op == oRet {
