@@ -265,13 +265,16 @@ fn nt_matmul(a: list, b: list) -> list {
     let o: list = [];
     let i: i64 = 0;
     while i < m {
+        let rbase: i64 = i * k;
         let j: i64 = 0;
         while j < n {
             let acc: f64 = 0.0;
+            let colb: i64 = j;
             let p: i64 = 0;
             while p < k {
-                acc = acc + ad[i * k + p] * bd[p * n + j];
+                acc = acc + ad[rbase + p] * bd[colb];
                 p = p + 1;
+                colb = colb + n;
             }
             o = push(o, acc);
             j = j + 1;

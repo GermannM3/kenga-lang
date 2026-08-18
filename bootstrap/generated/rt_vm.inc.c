@@ -88,7 +88,8 @@ static int64_t vm_exec(Program *prog) {
 
   while (ip < code->len) {
     int64_t op = code->data[ip++];
-    if (op == OP_HALT) {
+    switch (op) {
+    case OP_HALT: {
       int64_t r = 0;
       if (stack.len) {
         Value top = stack.data[stack.len - 1];
@@ -105,28 +106,28 @@ static int64_t vm_exec(Program *prog) {
       ev_reset();
       return r;
     }
-    if (op == OP_CONST) {
+    case OP_CONST: {
       vala_push(&stack, V_i64(code->data[ip++]));
       continue;
     }
-    if (op == OP_CONST_F64) {
+    case OP_CONST_F64: {
       int64_t bits = code->data[ip++];
       double d;
       memcpy(&d, &bits, sizeof(double));
       vala_push(&stack, V_f64(d));
       continue;
     }
-    if (op == OP_CONST_STR) {
+    case OP_CONST_STR: {
       vala_push(&stack, V_str(code->data[ip++]));
       continue;
     }
-    if (op == OP_LOAD) {
+    case OP_LOAD: {
       int64_t si = slot_base + code->data[ip++];
       ensure_slot(&slots, si);
       vala_push(&stack, slots.data[si]);
       continue;
     }
-    if (op == OP_STORE) {
+    case OP_STORE: {
       int64_t si = slot_base + code->data[ip++];
       ensure_slot(&slots, si);
       if (!stack.len) die("stack underflow STORE");
@@ -135,27 +136,27 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, v);
       continue;
     }
-    if (op == OP_PRINTLN) {
+    case OP_PRINTLN: {
       if (!stack.len) die("stack underflow PRINTLN");
       Value v = stack.data[--stack.len];
       print_value(v, strs, &lists, &structs, prog->stypes, prog->nstypes);
       continue;
     }
-    if (op == OP_PRINT) {
+    case OP_PRINT: {
       if (!stack.len) die("stack underflow PRINT");
       Value v = stack.data[--stack.len];
       print_val_raw(v, strs, &lists, &structs, prog->stypes, prog->nstypes);
       fflush(stdout);
       continue;
     }
-    if (op == OP_LIST_NEW) {
+    case OP_LIST_NEW: {
       ValA empty = {0};
       int64_t h = (int64_t)lists.len;
       listh_push(&lists, empty);
       vala_push(&stack, V_list(h));
       continue;
     }
-    if (op == OP_LIST_PUSH) {
+    case OP_LIST_PUSH: {
       if (stack.len < 2) die("stack underflow LIST_PUSH");
       Value vv = stack.data[--stack.len];
       Value lv = stack.data[--stack.len];
@@ -165,7 +166,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, lv);
       continue;
     }
-    if (op == OP_LEN) {
+    case OP_LEN: {
       if (!stack.len) die("stack underflow LEN");
       Value lv = stack.data[--stack.len];
       if (lv.tag == TAG_LIST) {
@@ -179,7 +180,7 @@ static int64_t vm_exec(Program *prog) {
       }
       continue;
     }
-    if (op == OP_GET) {
+    case OP_GET: {
       if (stack.len < 2) die("stack underflow GET");
       Value iv = stack.data[--stack.len];
       Value lv = stack.data[--stack.len];
@@ -202,7 +203,7 @@ static int64_t vm_exec(Program *prog) {
       }
       continue;
     }
-    if (op == OP_SET) {
+    case OP_SET: {
       if (stack.len < 3) die("stack underflow SET");
       Value vv = stack.data[--stack.len];
       Value iv = stack.data[--stack.len];
@@ -216,7 +217,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, vv);
       continue;
     }
-    if (op == OP_ORD) {
+    case OP_ORD: {
       if (!stack.len) die("stack underflow ORD");
       Value v = stack.data[--stack.len];
       if (v.tag != TAG_STR) die("ord expects str");
@@ -225,7 +226,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(s[0] ? (unsigned char)s[0] : 0));
       continue;
     }
-    if (op == OP_NOW_MS) {
+    case OP_NOW_MS: {
 #ifdef _WIN32
       vala_push(&stack, V_i64((int64_t)GetTickCount64()));
 #else
@@ -237,7 +238,7 @@ static int64_t vm_exec(Program *prog) {
 #endif
       continue;
     }
-    if (op == OP_SLEEP_MS) {
+    case OP_SLEEP_MS: {
       if (!stack.len) die("stack underflow SLEEP_MS");
       {
         int64_t n = as_i64(stack.data[--stack.len], "sleep_ms: expected i64");
@@ -258,7 +259,7 @@ static int64_t vm_exec(Program *prog) {
       }
       continue;
     }
-    if (op == OP_READ_FILE) {
+    case OP_READ_FILE: {
       Value vp;
       const char *path;
       FILE *f;
@@ -294,7 +295,7 @@ static int64_t vm_exec(Program *prog) {
       free(buf);
       continue;
     }
-    if (op == OP_READ_BYTES) {
+    case OP_READ_BYTES: {
       Value vp;
       const char *path;
       unsigned char *b;
@@ -315,11 +316,11 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_list(h));
       continue;
     }
-    if (op == OP_ARGC) {
+    case OP_ARGC: {
       vala_push(&stack, V_i64((int64_t)g_kargc));
       continue;
     }
-    if (op == OP_ARG) {
+    case OP_ARG: {
       int64_t ai;
       if (!stack.len) die("stack underflow arg");
       ai = as_i64(stack.data[--stack.len], "arg: expected i64");
@@ -327,7 +328,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_str(intern_str(g_kargv[ai])));
       continue;
     }
-    if (op == OP_FILE_EXISTS) {
+    case OP_FILE_EXISTS: {
       Value vp;
       const char *path;
       FILE *tf;
@@ -341,7 +342,7 @@ static int64_t vm_exec(Program *prog) {
       else vala_push(&stack, V_i64(0));
       continue;
     }
-    if (op == OP_READ_LINE) {
+    case OP_READ_LINE: {
       char line[1024];
       ValA row = {0};
       int64_t h;
@@ -362,7 +363,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_list(h));
       continue;
     }
-    if (op == OP_ML_BOX) {
+    case OP_ML_BOX: {
       if (ml_box_h < 0) {
         ValA tape = {0};
         ValA box = {0};
@@ -375,7 +376,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_list(ml_box_h));
       continue;
     }
-    if (op == OP_WRITE_FILE) {
+    case OP_WRITE_FILE: {
       Value vc, vp;
       const char *path, *body;
       FILE *f;
@@ -392,7 +393,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(1));
       continue;
     }
-    if (op == OP_EMIT) {
+    case OP_EMIT: {
       Value vv, ve;
       const char *ev;
       if (stack.len < 2) die("stack underflow emit");
@@ -405,11 +406,11 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(0));
       continue;
     }
-    if (op == OP_PENDING) {
+    case OP_PENDING: {
       vala_push(&stack, V_i64(ev_pending()));
       continue;
     }
-    if (op == OP_LISTEN) {
+    case OP_LISTEN: {
       Value vh, ve;
       const char *ev, *hn;
       size_t fi;
@@ -431,7 +432,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(0));
       continue;
     }
-    if (op == OP_TYPEOF) {
+    case OP_TYPEOF: {
       Value v;
       const char *tn = "unknown";
       if (!stack.len) die("stack underflow typeof");
@@ -444,7 +445,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_str(intern_str(tn)));
       continue;
     }
-    if (op == OP_TO_STR) {
+    case OP_TO_STR: {
       Value v;
       char *ts;
       int h;
@@ -456,7 +457,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_str(h));
       continue;
     }
-    if (op == OP_PUMP) {
+    case OP_PUMP: {
       Value vm;
       if (!stack.len) die("stack underflow pump");
       vm = stack.data[--stack.len];
@@ -496,7 +497,7 @@ static int64_t vm_exec(Program *prog) {
         continue;
       }
     }
-    if (op == OP_STRUCT_NEW) {
+    case OP_STRUCT_NEW: {
       int64_t tid = code->data[ip++];
       if (tid < 0 || (size_t)tid >= prog->nstypes) die("bad struct type id");
       StructType *st = &prog->stypes[tid];
@@ -523,7 +524,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_struct(h));
       continue;
     }
-    if (op == OP_GET_FIELD) {
+    case OP_GET_FIELD: {
       int64_t name_idx = code->data[ip++];
       if (!stack.len) die("stack underflow GET_FIELD");
       Value sv = stack.data[--stack.len];
@@ -538,7 +539,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(o->fields.data[fidx]));
       continue;
     }
-    if (op == OP_SET_FIELD) {
+    case OP_SET_FIELD: {
       int64_t name_idx = code->data[ip++];
       if (stack.len < 2) die("stack underflow SET_FIELD");
       Value vv = stack.data[--stack.len];
@@ -578,7 +579,7 @@ static int64_t vm_exec(Program *prog) {
         vala_push(&stack, V_i64(OP_I));                                         \
     }                                                                           \
   } while (0)
-    if (op == OP_ADD) {
+    case OP_ADD: {
       if (stack.len < 2) die("stack underflow");
       Value vb = stack.data[--stack.len];
       Value va = stack.data[--stack.len];
@@ -604,19 +605,19 @@ static int64_t vm_exec(Program *prog) {
       }
       continue;
     }
-    if (op == OP_SUB) {
+    case OP_SUB: {
       BIN_NUM(a - b, a - b, 0);
       continue;
     }
-    if (op == OP_MUL) {
+    case OP_MUL: {
       BIN_NUM(a * b, a * b, 0);
       continue;
     }
-    if (op == OP_DIV) {
+    case OP_DIV: {
       BIN_NUM(a / b, a / b, 0);
       continue;
     }
-    if (op == OP_MOD) {
+    case OP_MOD: {
       if (stack.len < 2) die("stack underflow");
       Value vb = stack.data[--stack.len];
       Value va = stack.data[--stack.len];
@@ -626,7 +627,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(a % b));
       continue;
     }
-    if (op == OP_AND) {
+    case OP_AND: {
       if (stack.len < 2) die("stack underflow");
       Value vb = stack.data[--stack.len];
       Value va = stack.data[--stack.len];
@@ -635,7 +636,7 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64((a != 0 && b != 0) ? 1 : 0));
       continue;
     }
-    if (op == OP_OR) {
+    case OP_OR: {
       if (stack.len < 2) die("stack underflow");
       Value vb = stack.data[--stack.len];
       Value va = stack.data[--stack.len];
@@ -644,37 +645,37 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64((a != 0 || b != 0) ? 1 : 0));
       continue;
     }
-    if (op == OP_NOT) {
+    case OP_NOT: {
       if (!stack.len) die("stack underflow NOT");
       Value v = stack.data[--stack.len];
       int64_t a = as_i64(v, "! expects i64");
       vala_push(&stack, V_i64(a == 0 ? 1 : 0));
       continue;
     }
-    if (op == OP_LT) {
+    case OP_LT: {
       BIN_NUM(a < b, a < b, 1);
       continue;
     }
-    if (op == OP_GT) {
+    case OP_GT: {
       BIN_NUM(a > b, a > b, 1);
       continue;
     }
-    if (op == OP_LE) {
+    case OP_LE: {
       BIN_NUM(a <= b, a <= b, 1);
       continue;
     }
-    if (op == OP_GE) {
+    case OP_GE: {
       BIN_NUM(a >= b, a >= b, 1);
       continue;
     }
 #undef BIN_NUM
-    if (op == OP_ROUND) {
+    case OP_ROUND: {
       if (!stack.len) die("stack underflow ROUND");
       Value v = stack.data[--stack.len];
       vala_push(&stack, V_i64(k_round_d(to_f64(v, "round expects number"))));
       continue;
     }
-    if (op == OP_ASSERT) {
+    case OP_ASSERT: {
       if (!stack.len) die("stack underflow ASSERT");
       Value v = stack.data[--stack.len];
       int64_t ok = as_i64(v, "assert expects i64");
@@ -682,30 +683,30 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(0));
       continue;
     }
-    if (op == OP_POP) {
+    case OP_POP: {
       if (!stack.len) die("stack underflow POP");
       stack.len--;
       continue;
     }
-    if (op == OP_EQ) {
+    case OP_EQ: {
       if (stack.len < 2) die("stack underflow");
       Value vb = stack.data[--stack.len];
       Value va = stack.data[--stack.len];
       vala_push(&stack, V_i64(values_eq(va, vb, strs) ? 1 : 0));
       continue;
     }
-    if (op == OP_NE) {
+    case OP_NE: {
       if (stack.len < 2) die("stack underflow");
       Value vb = stack.data[--stack.len];
       Value va = stack.data[--stack.len];
       vala_push(&stack, V_i64(values_eq(va, vb, strs) ? 0 : 1));
       continue;
     }
-    if (op == OP_JMP) {
+    case OP_JMP: {
       ip = (size_t)code->data[ip];
       continue;
     }
-    if (op == OP_JMPF) {
+    case OP_JMPF: {
       int64_t t = code->data[ip++];
       if (!stack.len) die("stack underflow JMPF");
       Value c = stack.data[--stack.len];
@@ -713,7 +714,7 @@ static int64_t vm_exec(Program *prog) {
       if (cv == 0) ip = (size_t)t;
       continue;
     }
-    if (op == OP_CALL) {
+    case OP_CALL: {
       int64_t addr = code->data[ip++];
       int64_t argc = code->data[ip++];
       if ((int64_t)stack.len < argc) die("stack underflow CALL");
@@ -731,7 +732,7 @@ static int64_t vm_exec(Program *prog) {
       ip = (size_t)addr;
       continue;
     }
-    if (op == OP_RET) {
+    case OP_RET: {
       /* void fn / trailing RET after statements: implicit 0 */
       Value retv = stack.len ? stack.data[--stack.len] : V_i64(0);
       int64_t rip;
@@ -752,7 +753,9 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, retv);
       continue;
     }
-    die("bad opcode");
+    default:
+      die("bad opcode");
+    }
   }
   {
     int64_t r = 0;
