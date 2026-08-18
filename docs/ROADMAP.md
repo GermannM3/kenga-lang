@@ -83,6 +83,7 @@
 | ✅ | Patch encoder + linear grad helpers на lite |
 | ✅ | `save_tensor` / `load_tensor` / `write_file` / `read_file` |
 | ✅ | **fast more VM**: sp-index стек + hoisted dispatch + точные `exp`/`log` (ML-проgs ~5–10×) |
+| ✅ | **more VM 2×**: switch host dispatch + бакетированный more-dispatch + inline `ensure_slot` + без копии слотов на return (`slots_h`) — `word_lm_big` 25.2 с → **12.6 с** |
 | ⬜ | GPU / production autograd (1660 свободна; lite всё ещё CPU f64) |
 
 ## 3. Multimodal
