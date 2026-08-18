@@ -1,0 +1,69 @@
+// Char-level decoder trained on our .kenga (not GGUF).
+// Corpus: seed + selfhost samples. Architecture: kenga_dec.kenga
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\kenga_charlm.kenga
+
+import "kenga_dec.kenga";
+
+fn load_corpus() -> str {
+    let s: str = "";
+    s = s + strip_line_comments(read_file("examples/ml/kenga_seed.kenga"));
+    s = s + "\n";
+    s = s + strip_line_comments(read_file("examples/selfhost/fact_lite.kenga"));
+    s = s + "\n";
+    s = s + strip_line_comments(read_file("examples/selfhost/struct_lite.kenga"));
+    s = s + "\n";
+    s = s + strip_line_comments(read_file("examples/selfhost/lists_lite.kenga"));
+    s = s + "\n";
+    s = s + strip_line_comments(read_file("examples/selfhost/elif_lite.kenga"));
+    return s;
+}
+
+fn main() -> i64 {
+    println("=== kenga char-LM (decoder on our .kenga) ===");
+    let src: str = load_corpus(); println("corpus loaded");
+    let alpha: str = build_alpha(src);
+    let ids = encode(src, alpha);
+    let vv: i64 = len(alpha);
+    let d: i64 = D();
+    let ff: i64 = FF();
+    println("chars");
+    println(len(src));
+    println("vocab");
+    println(vv);
+
+    let e = fill_w(vv, d, 7);
+    let att = frozen_attn(d, ff);
+    let wq = att[0];
+    let wk = att[1];
+    let wv = att[2];
+    let wo = att[3];
+    let wf1 = att[4];
+    let wf2 = att[5];
+    let wlm = fill_w(vv, d, 59);
+
+    let ctxn: i64 = CTX();
+    let ep: i64 = 0;
+    while ep < 1 {
+        let p: i64 = ctxn;
+        while p < len(ids) {
+            let packed = train_last(e, wlm, window(ids, p, ctxn), ids[p], 0.12, vv, wq, wk, wv, wo, wf1, wf2);
+            e = packed[0];
+            wlm = packed[1];
+            p = p + 1;
+        }
+        ep = ep + 1;
+    }
+
+    let out: str = generate("fn add", alpha, e, wq, wk, wv, wo, wf1, wf2, wlm, 56);
+    println(out);
+    assert(len(out) > 20);
+    assert(ch_id(out, "(") >= 0);
+    assert(ch_id(out, ")") >= 0);
+    assert(write_file("minds/kenga_char_alpha.txt", alpha) == 1);
+    assert(write_file("examples/ml/kenga_char_sample.txt", out) == 1);
+    assert(save_tensor(e, "minds/kenga_char_e.kt") == 1);
+    assert(save_tensor(wlm, "minds/kenga_char_w.kt") == 1);
+    println("kenga char-lm ok");
+    return 0;
+}

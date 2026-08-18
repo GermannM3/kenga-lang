@@ -337,14 +337,22 @@ fn parse_string(s: str, i: i64) -> list {
     i = i + 1;
     let out: str = "";
     while i < len(s) {
-        if s[i] == "\"" { return [out, i + 1]; }
         if s[i] == "\\" {
-            if i + 1 < len(s) {
-                out = out + s[i + 1];
-                i = i + 2;
-                continue;
+            i = i + 1;
+            assert(i < len(s));
+            if s[i] == "n" {
+                out = out + "\n";
+            } else {
+                if s[i] == "t" {
+                    out = out + "\t";
+                } else {
+                    out = out + s[i];
+                }
             }
+            i = i + 1;
+            continue;
         }
+        if s[i] == "\"" { return [out, i + 1]; }
         out = out + s[i];
         i = i + 1;
     }
@@ -1223,6 +1231,20 @@ fn loops_pop(loops: list) -> list {
     }
     return out;
 }
+fn loops_close(loops: list, idx: i64) -> list {
+    // close frame in place (shared list): caller sees it too
+    loops[idx] = 0;
+    return loops;
+}
+fn loops_top(loops: list) -> i64 {
+    // innermost open frame: scan down past closed (sentinel) frames
+    let d: i64 = len(loops) - 1;
+    while d >= 0 {
+        if typeof(loops[d]) == "list" { return d; }
+        d = d - 1;
+    }
+    return 0 - 1;
+}
 fn patch_jmp_sites(code: list, sites: list, target: i64) -> list {
     let i: i64 = 0;
     while i < len(sites) {
@@ -1283,12 +1305,12 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             code = push(code, OP_LT());
             let jmpf_at: i64 = len(code);
             code = emit2(code, OP_JMPF(), 0);
+            let my: i64 = len(loops);
             loops = push(loops, [[], []]);
             i = skip(s, i);
             let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops, strbox);
             code = body[0]; i = body[1]; vnames = body[2];
-            let top: i64 = len(loops) - 1;
-            let frame = loops[top];
+            let frame = loops[my];
             let cont_ip: i64 = len(code);
             code = patch_jmp_sites(code, frame[0], cont_ip);
             code = emit2(code, OP_LOAD(), sl[0]);
@@ -1299,7 +1321,7 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             let end_ip: i64 = len(code);
             code[jmpf_at + 1] = end_ip;
             code = patch_jmp_sites(code, frame[1], end_ip);
-            loops = loops_pop(loops);
+            loops = loops_close(loops, my);
             return [code, i, vnames];
         }
         // for v in xs
@@ -1325,12 +1347,12 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         code = emit2(code, OP_LOAD(), ix[0]);
         code = push(code, OP_GET());
         code = emit2(code, OP_STORE(), vsl[0]);
+        let my2: i64 = len(loops);
         loops = push(loops, [[], []]);
         i = skip(s, i);
         let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops, strbox);
         code = body[0]; i = body[1]; vnames = body[2];
-        let top2: i64 = len(loops) - 1;
-        let frame2 = loops[top2];
+        let frame2 = loops[my2];
         let cont_ip2: i64 = len(code);
         code = patch_jmp_sites(code, frame2[0], cont_ip2);
         code = emit2(code, OP_LOAD(), ix[0]);
@@ -1341,7 +1363,7 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         let end_ip2: i64 = len(code);
         code[jmpf_at + 1] = end_ip2;
         code = patch_jmp_sites(code, frame2[1], end_ip2);
-        loops = loops_pop(loops);
+        loops = loops_close(loops, my2);
         return [code, i, vnames];
     }
     if starts_kw(s, i, "while") == 1 {
@@ -1351,18 +1373,18 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         code = r[0]; i = r[1]; vnames = r[2];
         let jmpf_at: i64 = len(code);
         code = emit2(code, OP_JMPF(), 0);
+        let my3: i64 = len(loops);
         loops = push(loops, [[], []]);
         i = skip(s, i);
         let body = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops, strbox);
         code = body[0]; i = body[1]; vnames = body[2];
-        let top3: i64 = len(loops) - 1;
-        let frame3 = loops[top3];
+        let frame3 = loops[my3];
         code = patch_jmp_sites(code, frame3[0], loop_start);
         code = emit2(code, OP_JMP(), loop_start);
         let end_ip3: i64 = len(code);
         code[jmpf_at + 1] = end_ip3;
         code = patch_jmp_sites(code, frame3[1], end_ip3);
-        loops = loops_pop(loops);
+        loops = loops_close(loops, my3);
         return [code, i, vnames];
     }
     if starts_kw(s, i, "if") == 1 {
@@ -1394,7 +1416,8 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
     }
     if starts_kw(s, i, "break") == 1 {
         assert(len(loops) > 0);
-        let top4: i64 = len(loops) - 1;
+        let top4: i64 = loops_top(loops);
+        assert(top4 >= 0);
         code = emit2(code, OP_JMP(), 0);
         let brks = loops[top4][1];
         brks = push(brks, len(code) - 1);
@@ -1405,7 +1428,8 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
     }
     if starts_kw(s, i, "continue") == 1 {
         assert(len(loops) > 0);
-        let top5: i64 = len(loops) - 1;
+        let top5: i64 = loops_top(loops);
+        assert(top5 >= 0);
         code = emit2(code, OP_JMP(), 0);
         let conts = loops[top5][0];
         conts = push(conts, len(code) - 1);
@@ -1912,7 +1936,14 @@ fn write_runtime() -> str {
     s = s + "static int64_t llen(int64_t id) {\n";
     s = s + "  return (int64_t)gL[id].n;\n";
     s = s + "}\n\n";
-    s = s + "typedef struct { int rank; int shape[8]; int n; double *data; } TObj;\n";
+    s = s + "#ifdef KENGA_TENSOR_F32
+typedef float KREAL;
+#else
+typedef double KREAL;
+#endif
+";
+    s = s + "typedef struct { int rank; int shape[8]; int n; KREAL *data; } TObj;
+";
     s = s + "static TObj *gT = NULL;\n";
     s = s + "static int gTn = 0, gTcap = 0;\n";
     s = s + "static int64_t talloc(const int *shape, int rank, int zero) {\n";
@@ -1926,9 +1957,9 @@ fn write_runtime() -> str {
     s = s + "  }\n";
     s = s + "  gT[gTn].rank = rank; gT[gTn].n = n;\n";
     s = s + "  for (i = 0; i < rank; i++) gT[gTn].shape[i] = shape[i];\n";
-    s = s + "  gT[gTn].data = n > 0 ? (double*)malloc((size_t)n * sizeof(double)) : NULL;\n";
+    s = s + "  gT[gTn].data = n > 0 ? (KREAL*)malloc((size_t)n * sizeof(KREAL)) : NULL;\n";
     s = s + "  if (n > 0 && !gT[gTn].data) { fprintf(stderr, \"oom\\n\"); exit(1); }\n";
-    s = s + "  if (n > 0 && zero) memset(gT[gTn].data, 0, (size_t)n * sizeof(double));\n";
+    s = s + "  if (n > 0 && zero) memset(gT[gTn].data, 0, (size_t)n * sizeof(KREAL));\n";
     s = s + "  return (int64_t)gTn++;\n";
     s = s + "}\n";
     s = s + "static TObj *tobj(V v) {\n";
@@ -1940,12 +1971,12 @@ fn write_runtime() -> str {
     s = s + "  return &gT[h];\n";
     s = s + "}\n";
     s = s + "static int64_t tclone(int64_t h) {\n";
-    s = s + "  TObj *t = tid(h); int shape[8], rank = t->rank, n = t->n, i; double *src = t->data; int64_t o;\n";
+    s = s + "  TObj *t = tid(h); int shape[8], rank = t->rank, n = t->n, i; KREAL *src = t->data; int64_t o;\n";
     s = s + "  for (i = 0; i < rank; i++) shape[i] = t->shape[i];\n";
-    s = s + "  o = talloc(shape, rank, 0); if (n > 0) memcpy(gT[o].data, src, (size_t)n * sizeof(double)); return o;\n";
+    s = s + "  o = talloc(shape, rank, 0); if (n > 0) memcpy(gT[o].data, src, (size_t)n * sizeof(KREAL)); return o;\n";
     s = s + "}\n";
     s = s + "static int64_t ttranspose(int64_t ha) {\n";
-    s = s + "  TObj *a = tid(ha); int r, c, i, j, shape[2]; double *ad; int64_t h;\n";
+    s = s + "  TObj *a = tid(ha); int r, c, i, j, shape[2]; KREAL *ad; int64_t h;\n";
     s = s + "  if (a->rank != 2) { fprintf(stderr, \"transpose expects rank-2\\n\"); exit(1); }\n";
     s = s + "  r = a->shape[0]; c = a->shape[1]; ad = a->data; shape[0] = c; shape[1] = r; h = talloc(shape, 2, 1);\n";
     s = s + "  for (i = 0; i < r; i++) for (j = 0; j < c; j++) gT[h].data[j * r + i] = ad[i * c + j]; return h;\n";
@@ -1954,13 +1985,13 @@ fn write_runtime() -> str {
     s = s + "  int64_t h = tclone(ha); int i; for (i = 0; i < gT[h].n; i++) gT[h].data[i] *= s; return h;\n";
     s = s + "}\n";
     s = s + "static int64_t tew_sub(int64_t ha, int64_t hb) {\n";
-    s = s + "  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; double *ad = a->data, *bd = b->data; int64_t h;\n";
+    s = s + "  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; KREAL *ad = a->data, *bd = b->data; int64_t h;\n";
     s = s + "  if (a->n != b->n) { fprintf(stderr, \"tensor size mismatch\\n\"); exit(1); }\n";
     s = s + "  for (i = 0; i < rank; i++) shape[i] = a->shape[i]; h = talloc(shape, rank, 0);\n";
     s = s + "  for (i = 0; i < n; i++) gT[h].data[i] = ad[i] - bd[i]; return h;\n";
     s = s + "}\n";
     s = s + "static int64_t tmatmul_ids(int64_t ha, int64_t hb) {\n";
-    s = s + "  TObj *ta = tid(ha), *tb = tid(hb); int m, k, k2, n, i, j, p, shape[2]; double *ad, *bd; int64_t h;\n";
+    s = s + "  TObj *ta = tid(ha), *tb = tid(hb); int m, k, k2, n, i, j, p, shape[2]; KREAL *ad, *bd; int64_t h;\n";
     s = s + "  if (ta->rank != 2 || tb->rank != 2) { fprintf(stderr, \"t_matmul expects rank-2\\n\"); exit(1); }\n";
     s = s + "  m = ta->shape[0]; k = ta->shape[1]; k2 = tb->shape[0]; n = tb->shape[1];\n";
     s = s + "  if (k != k2) { fprintf(stderr, \"t_matmul inner dim mismatch\\n\"); exit(1); }\n";
@@ -1969,13 +2000,13 @@ fn write_runtime() -> str {
     s = s + "  return h;\n";
     s = s + "}\n";
     s = s + "static int64_t tew_add(int64_t ha, int64_t hb) {\n";
-    s = s + "  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; double *ad = a->data, *bd = b->data; int64_t h;\n";
+    s = s + "  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; KREAL *ad = a->data, *bd = b->data; int64_t h;\n";
     s = s + "  if (a->n != b->n) { fprintf(stderr, \"tensor size mismatch\\n\"); exit(1); }\n";
     s = s + "  for (i = 0; i < rank; i++) shape[i] = a->shape[i]; h = talloc(shape, rank, 0);\n";
     s = s + "  for (i = 0; i < n; i++) gT[h].data[i] = ad[i] + bd[i]; return h;\n";
     s = s + "}\n";
     s = s + "static int64_t tew_mul(int64_t ha, int64_t hb) {\n";
-    s = s + "  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; double *ad = a->data, *bd = b->data; int64_t h;\n";
+    s = s + "  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; KREAL *ad = a->data, *bd = b->data; int64_t h;\n";
     s = s + "  if (a->n != b->n) { fprintf(stderr, \"tensor size mismatch\\n\"); exit(1); }\n";
     s = s + "  for (i = 0; i < rank; i++) shape[i] = a->shape[i]; h = talloc(shape, rank, 0);\n";
     s = s + "  for (i = 0; i < n; i++) gT[h].data[i] = ad[i] * bd[i]; return h;\n";
@@ -2040,8 +2071,8 @@ fn write_runtime() -> str {
     s = s + "    }\n";
     s = s + "    if (node->op == BAG_TRANSPOSE) { bag_accum(&gBag[node->pa], ttranspose(node->gth)); continue; }\n";
     s = s + "    if (node->op == BAG_RESHAPE) {\n";
-    s = s + "      TObj *g = tid(node->gth); double *src = g->data; int nn = g->n; int64_t h = talloc(node->old_shape, node->old_rank, 0);\n";
-    s = s + "      memcpy(gT[h].data, src, (size_t)nn * sizeof(double)); bag_accum(&gBag[node->pa], h); continue;\n";
+    s = s + "      TObj *g = tid(node->gth); KREAL *src = g->data; int nn = g->n; int64_t h = talloc(node->old_shape, node->old_rank, 0);\n";
+    s = s + "      memcpy(gT[h].data, src, (size_t)nn * sizeof(KREAL)); bag_accum(&gBag[node->pa], h); continue;\n";
     s = s + "    }\n";
     s = s + "    if (node->op == BAG_EXP) {\n";
     s = s + "      if (node->is_scalar) bag_accum_s(&gBag[node->pa], node->gscalar * node->scalar);\n";
@@ -2050,11 +2081,11 @@ fn write_runtime() -> str {
     s = s + "    if (node->op == BAG_LOG) {\n";
     s = s + "      BagNode *a = &gBag[node->pa];\n";
     s = s + "      if (node->grad_is_scalar) { double x = a->is_scalar ? a->scalar : 1.0; if (x < 1e-12) x = 1e-12; bag_accum_s(a, node->gscalar / x); }\n";
-    s = s + "      else { TObj *xv = tid(a->th), *gg = tid(node->gth); double *xd = xv->data, *gd = gg->data; int64_t h = tclone(node->gth); int j; for (j = 0; j < gT[h].n; j++) { double x = xd[j] < 1e-12 ? 1e-12 : xd[j]; gT[h].data[j] = gd[j] / x; } bag_accum(a, h); }\n";
+    s = s + "      else { TObj *xv = tid(a->th), *gg = tid(node->gth); KREAL *xd = xv->data, *gd = gg->data; int64_t h = tclone(node->gth); int j; for (j = 0; j < gT[h].n; j++) { double x = xd[j] < 1e-12 ? 1e-12 : xd[j]; gT[h].data[j] = gd[j] / x; } bag_accum(a, h); }\n";
     s = s + "      continue;\n";
     s = s + "    }\n";
     s = s + "    if (node->op == BAG_SOFTMAX) {\n";
-    s = s + "      TObj *y = tid(node->th), *gy = tid(node->gth); double *yd = y->data, *gyd = gy->data; double dot = 0.0; int j, yn = y->n; int64_t h;\n";
+    s = s + "      TObj *y = tid(node->th), *gy = tid(node->gth); KREAL *yd = y->data, *gyd = gy->data; double dot = 0.0; int j, yn = y->n; int64_t h;\n";
     s = s + "      if (yn != gy->n) { fprintf(stderr, \"ag softmax grad len\\n\"); exit(1); }\n";
     s = s + "      for (j = 0; j < yn; j++) dot += gyd[j] * yd[j];\n";
     s = s + "      h = tclone(node->th); for (j = 0; j < gT[h].n; j++) gT[h].data[j] = yd[j] * (gyd[j] - dot);\n";
@@ -2065,7 +2096,7 @@ fn write_runtime() -> str {
     s = s + "      if (a->is_scalar) bag_accum_s(a, g); else bag_accum(a, tfill_like(a->th, g)); continue;\n";
     s = s + "    }\n";
     s = s + "    if (node->op == BAG_RELU) {\n";
-    s = s + "      BagNode *a = &gBag[node->pa]; TObj *av = tid(a->th); double *ad = av->data; int64_t h = tclone(node->gth); int j;\n";
+    s = s + "      BagNode *a = &gBag[node->pa]; TObj *av = tid(a->th); KREAL *ad = av->data; int64_t h = tclone(node->gth); int j;\n";
     s = s + "      for (j = 0; j < gT[h].n; j++) if (ad[j] <= 0.0) gT[h].data[j] = 0.0;\n";
     s = s + "      bag_accum(a, h); continue;\n";
     s = s + "    }\n";
@@ -2552,7 +2583,7 @@ fn write_runtime() -> str {
     s = s + "        if (fscanf(f, \"%d\", &rank) != 1 || rank < 1 || rank > 8) { fclose(f); fprintf(stderr, \"load_tensor: bad rank\\n\"); exit(1); }\n";
     s = s + "        for (i = 0; i < rank; i++) { if (fscanf(f, \"%d\", &shape[i]) != 1) { fclose(f); fprintf(stderr, \"load_tensor: bad shape\\n\"); exit(1); } }\n";
     s = s + "        h = talloc(shape, rank, 0); t = &gT[h];\n";
-    s = s + "        for (i = 0; i < t->n; i++) { if (fscanf(f, \"%lf\", &t->data[i]) != 1) { fclose(f); fprintf(stderr, \"load_tensor: bad data\\n\"); exit(1); } }\n";
+    s = s + "        for (i = 0; i < t->n; i++) { double tmpv; if (fscanf(f, \"%lf\", &tmpv) != 1) { fclose(f); fprintf(stderr, \"load_tensor: bad data\\n\"); exit(1); } t->data[i] = (KREAL)tmpv; }\n";
     s = s + "        fclose(f);\n";
     s = s + "        stack[sp++] = Vt(h); }\n";
     s = s + "    }\n";
@@ -2748,7 +2779,7 @@ fn write_runtime() -> str {
     s = s + "      rank = (int)llen(sh.i); if (rank < 1 || rank > 8) { fprintf(stderr, \"ag_reshape rank\\n\"); exit(1); }\n";
     s = s + "      need = 1; for (i = 0; i < rank; i++) { ishape[i] = (int)as_i(lget(sh.i, i)); if (ishape[i] < 1) { fprintf(stderr, \"ag_reshape dim\\n\"); exit(1); } need *= ishape[i]; }\n";
     s = s + "      if (need != t->n) { fprintf(stderr, \"ag_reshape size mismatch\\n\"); exit(1); }\n";
-    s = s + "      { double *src = t->data; int nn = t->n; n.th = talloc(ishape, rank, 0); memcpy(gT[n.th].data, src, (size_t)nn * sizeof(double)); }\n";
+    s = s + "      { KREAL *src = t->data; int nn = t->n; n.th = talloc(ishape, rank, 0); memcpy(gT[n.th].data, src, (size_t)nn * sizeof(KREAL)); }\n";
     s = s + "      n.op = BAG_RESHAPE; n.pa = (int)a; n.pb = -1; n.requires_grad = na->requires_grad; stack[sp++] = Vi(bag_push(n));\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_AG_EXP) {\n";

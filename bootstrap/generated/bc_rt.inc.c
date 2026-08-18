@@ -105,7 +105,12 @@ static int64_t llen(int64_t id) {
   return (int64_t)gL[id].n;
 }
 
-typedef struct { int rank; int shape[8]; int n; double *data; } TObj;
+#ifdef KENGA_TENSOR_F32
+typedef float KREAL;
+#else
+typedef double KREAL;
+#endif
+typedef struct { int rank; int shape[8]; int n; KREAL *data; } TObj;
 static TObj *gT = NULL;
 static int gTn = 0, gTcap = 0;
 static int64_t talloc(const int *shape, int rank, int zero) {
@@ -119,9 +124,9 @@ static int64_t talloc(const int *shape, int rank, int zero) {
   }
   gT[gTn].rank = rank; gT[gTn].n = n;
   for (i = 0; i < rank; i++) gT[gTn].shape[i] = shape[i];
-  gT[gTn].data = n > 0 ? (double*)malloc((size_t)n * sizeof(double)) : NULL;
+  gT[gTn].data = n > 0 ? (KREAL*)malloc((size_t)n * sizeof(KREAL)) : NULL;
   if (n > 0 && !gT[gTn].data) { fprintf(stderr, "oom\n"); exit(1); }
-  if (n > 0 && zero) memset(gT[gTn].data, 0, (size_t)n * sizeof(double));
+  if (n > 0 && zero) memset(gT[gTn].data, 0, (size_t)n * sizeof(KREAL));
   return (int64_t)gTn++;
 }
 static TObj *tobj(V v) {
@@ -133,12 +138,12 @@ static TObj *tid(int64_t h) {
   return &gT[h];
 }
 static int64_t tclone(int64_t h) {
-  TObj *t = tid(h); int shape[8], rank = t->rank, n = t->n, i; double *src = t->data; int64_t o;
+  TObj *t = tid(h); int shape[8], rank = t->rank, n = t->n, i; KREAL *src = t->data; int64_t o;
   for (i = 0; i < rank; i++) shape[i] = t->shape[i];
-  o = talloc(shape, rank, 0); if (n > 0) memcpy(gT[o].data, src, (size_t)n * sizeof(double)); return o;
+  o = talloc(shape, rank, 0); if (n > 0) memcpy(gT[o].data, src, (size_t)n * sizeof(KREAL)); return o;
 }
 static int64_t ttranspose(int64_t ha) {
-  TObj *a = tid(ha); int r, c, i, j, shape[2]; double *ad; int64_t h;
+  TObj *a = tid(ha); int r, c, i, j, shape[2]; KREAL *ad; int64_t h;
   if (a->rank != 2) { fprintf(stderr, "transpose expects rank-2\n"); exit(1); }
   r = a->shape[0]; c = a->shape[1]; ad = a->data; shape[0] = c; shape[1] = r; h = talloc(shape, 2, 1);
   for (i = 0; i < r; i++) for (j = 0; j < c; j++) gT[h].data[j * r + i] = ad[i * c + j]; return h;
@@ -147,13 +152,13 @@ static int64_t tscale(int64_t ha, double s) {
   int64_t h = tclone(ha); int i; for (i = 0; i < gT[h].n; i++) gT[h].data[i] *= s; return h;
 }
 static int64_t tew_sub(int64_t ha, int64_t hb) {
-  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; double *ad = a->data, *bd = b->data; int64_t h;
+  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; KREAL *ad = a->data, *bd = b->data; int64_t h;
   if (a->n != b->n) { fprintf(stderr, "tensor size mismatch\n"); exit(1); }
   for (i = 0; i < rank; i++) shape[i] = a->shape[i]; h = talloc(shape, rank, 0);
   for (i = 0; i < n; i++) gT[h].data[i] = ad[i] - bd[i]; return h;
 }
 static int64_t tmatmul_ids(int64_t ha, int64_t hb) {
-  TObj *ta = tid(ha), *tb = tid(hb); int m, k, k2, n, i, j, p, shape[2]; double *ad, *bd; int64_t h;
+  TObj *ta = tid(ha), *tb = tid(hb); int m, k, k2, n, i, j, p, shape[2]; KREAL *ad, *bd; int64_t h;
   if (ta->rank != 2 || tb->rank != 2) { fprintf(stderr, "t_matmul expects rank-2\n"); exit(1); }
   m = ta->shape[0]; k = ta->shape[1]; k2 = tb->shape[0]; n = tb->shape[1];
   if (k != k2) { fprintf(stderr, "t_matmul inner dim mismatch\n"); exit(1); }
@@ -162,13 +167,13 @@ static int64_t tmatmul_ids(int64_t ha, int64_t hb) {
   return h;
 }
 static int64_t tew_add(int64_t ha, int64_t hb) {
-  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; double *ad = a->data, *bd = b->data; int64_t h;
+  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; KREAL *ad = a->data, *bd = b->data; int64_t h;
   if (a->n != b->n) { fprintf(stderr, "tensor size mismatch\n"); exit(1); }
   for (i = 0; i < rank; i++) shape[i] = a->shape[i]; h = talloc(shape, rank, 0);
   for (i = 0; i < n; i++) gT[h].data[i] = ad[i] + bd[i]; return h;
 }
 static int64_t tew_mul(int64_t ha, int64_t hb) {
-  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; double *ad = a->data, *bd = b->data; int64_t h;
+  TObj *a = tid(ha), *b = tid(hb); int i, n = a->n, rank = a->rank, shape[8]; KREAL *ad = a->data, *bd = b->data; int64_t h;
   if (a->n != b->n) { fprintf(stderr, "tensor size mismatch\n"); exit(1); }
   for (i = 0; i < rank; i++) shape[i] = a->shape[i]; h = talloc(shape, rank, 0);
   for (i = 0; i < n; i++) gT[h].data[i] = ad[i] * bd[i]; return h;
@@ -233,8 +238,8 @@ static void bag_backward(int64_t loss_id) {
     }
     if (node->op == BAG_TRANSPOSE) { bag_accum(&gBag[node->pa], ttranspose(node->gth)); continue; }
     if (node->op == BAG_RESHAPE) {
-      TObj *g = tid(node->gth); double *src = g->data; int nn = g->n; int64_t h = talloc(node->old_shape, node->old_rank, 0);
-      memcpy(gT[h].data, src, (size_t)nn * sizeof(double)); bag_accum(&gBag[node->pa], h); continue;
+      TObj *g = tid(node->gth); KREAL *src = g->data; int nn = g->n; int64_t h = talloc(node->old_shape, node->old_rank, 0);
+      memcpy(gT[h].data, src, (size_t)nn * sizeof(KREAL)); bag_accum(&gBag[node->pa], h); continue;
     }
     if (node->op == BAG_EXP) {
       if (node->is_scalar) bag_accum_s(&gBag[node->pa], node->gscalar * node->scalar);
@@ -243,11 +248,11 @@ static void bag_backward(int64_t loss_id) {
     if (node->op == BAG_LOG) {
       BagNode *a = &gBag[node->pa];
       if (node->grad_is_scalar) { double x = a->is_scalar ? a->scalar : 1.0; if (x < 1e-12) x = 1e-12; bag_accum_s(a, node->gscalar / x); }
-      else { TObj *xv = tid(a->th), *gg = tid(node->gth); double *xd = xv->data, *gd = gg->data; int64_t h = tclone(node->gth); int j; for (j = 0; j < gT[h].n; j++) { double x = xd[j] < 1e-12 ? 1e-12 : xd[j]; gT[h].data[j] = gd[j] / x; } bag_accum(a, h); }
+      else { TObj *xv = tid(a->th), *gg = tid(node->gth); KREAL *xd = xv->data, *gd = gg->data; int64_t h = tclone(node->gth); int j; for (j = 0; j < gT[h].n; j++) { double x = xd[j] < 1e-12 ? 1e-12 : xd[j]; gT[h].data[j] = gd[j] / x; } bag_accum(a, h); }
       continue;
     }
     if (node->op == BAG_SOFTMAX) {
-      TObj *y = tid(node->th), *gy = tid(node->gth); double *yd = y->data, *gyd = gy->data; double dot = 0.0; int j, yn = y->n; int64_t h;
+      TObj *y = tid(node->th), *gy = tid(node->gth); KREAL *yd = y->data, *gyd = gy->data; double dot = 0.0; int j, yn = y->n; int64_t h;
       if (yn != gy->n) { fprintf(stderr, "ag softmax grad len\n"); exit(1); }
       for (j = 0; j < yn; j++) dot += gyd[j] * yd[j];
       h = tclone(node->th); for (j = 0; j < gT[h].n; j++) gT[h].data[j] = yd[j] * (gyd[j] - dot);
@@ -258,7 +263,7 @@ static void bag_backward(int64_t loss_id) {
       if (a->is_scalar) bag_accum_s(a, g); else bag_accum(a, tfill_like(a->th, g)); continue;
     }
     if (node->op == BAG_RELU) {
-      BagNode *a = &gBag[node->pa]; TObj *av = tid(a->th); double *ad = av->data; int64_t h = tclone(node->gth); int j;
+      BagNode *a = &gBag[node->pa]; TObj *av = tid(a->th); KREAL *ad = av->data; int64_t h = tclone(node->gth); int j;
       for (j = 0; j < gT[h].n; j++) if (ad[j] <= 0.0) gT[h].data[j] = 0.0;
       bag_accum(a, h); continue;
     }
@@ -751,7 +756,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
         if (fscanf(f, "%d", &rank) != 1 || rank < 1 || rank > 8) { fclose(f); fprintf(stderr, "load_tensor: bad rank\n"); exit(1); }
         for (i = 0; i < rank; i++) { if (fscanf(f, "%d", &shape[i]) != 1) { fclose(f); fprintf(stderr, "load_tensor: bad shape\n"); exit(1); } }
         h = talloc(shape, rank, 0); t = &gT[h];
-        for (i = 0; i < t->n; i++) { if (fscanf(f, "%lf", &t->data[i]) != 1) { fclose(f); fprintf(stderr, "load_tensor: bad data\n"); exit(1); } }
+        for (i = 0; i < t->n; i++) { double tmpv; if (fscanf(f, "%lf", &tmpv) != 1) { fclose(f); fprintf(stderr, "load_tensor: bad data\n"); exit(1); } t->data[i] = (KREAL)tmpv; }
         fclose(f);
         stack[sp++] = Vt(h); }
     }
@@ -947,7 +952,7 @@ static int64_t vm_run(const int64_t *code, int64_t n) {
       rank = (int)llen(sh.i); if (rank < 1 || rank > 8) { fprintf(stderr, "ag_reshape rank\n"); exit(1); }
       need = 1; for (i = 0; i < rank; i++) { ishape[i] = (int)as_i(lget(sh.i, i)); if (ishape[i] < 1) { fprintf(stderr, "ag_reshape dim\n"); exit(1); } need *= ishape[i]; }
       if (need != t->n) { fprintf(stderr, "ag_reshape size mismatch\n"); exit(1); }
-      { double *src = t->data; int nn = t->n; n.th = talloc(ishape, rank, 0); memcpy(gT[n.th].data, src, (size_t)nn * sizeof(double)); }
+      { KREAL *src = t->data; int nn = t->n; n.th = talloc(ishape, rank, 0); memcpy(gT[n.th].data, src, (size_t)nn * sizeof(KREAL)); }
       n.op = BAG_RESHAPE; n.pa = (int)a; n.pb = -1; n.requires_grad = na->requires_grad; stack[sp++] = Vi(bag_push(n));
     }
     else if (op == OP_AG_EXP) {
