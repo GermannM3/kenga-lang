@@ -120,4 +120,35 @@
 | ✅ | LEARN / LANGUAGE / UNIX / LIVING_MULTIMODAL / CHAT_AND_LM / INDEPENDENCE / REPLACE_RUST / HUGGINGFACE / … |
 | ✅ | Marketplace: ручной Upload `.vsix` (без Azure PAT) |
 
-Версия расширения: **3.13.0** (Marketplace). Язык в `kenga/` дальше; следующий VSIX — когда накопится в `editors/vscode`.
+Версия расширения: **3.13.0** (Marketplace).
+
+## 5. Нейромодель: маленькая → воспринимается как 27B
+
+Не «обогнать 27B». Реальный тезис: **на своём корпусе и в своём языке
+маленькая модель достигает пропускной способности, сопоставимой с
+большой fine-tuned, за счёт структуры, а не параметров**.
+
+Шесть осей и где каждая живёт в коде — `docs/NEUROMODEL_27B.md`.
+Короткая версия:
+
+1. **Язык как сжатие**: маленький словарь (~300 лексем),
+   синтаксис декодеру **не надо учить** — `kenga/compiler/more.kenga`,
+   лексер. `kenga_lm.kenga`, `kenga_birth.kenga` (24).
+2. **Prophet как внешняя память**: `foresee` / `remember` /
+   `save_mind` — `examples/prophet.kenga`, `minds/*.km`.
+3. **Tools как method calls**: events / `on "e"(x)` / `emit` / `pump`
+   уже в `kenga`. LLM пишет `fn` → среда исполняет, модель не помнит
+   алгоритмы.
+4. **Native C tape**: `bc_src_c` + `-DKENGA_TENSOR_F32` +
+   `scripts\bc-run-f32.cmd` → десятки эпох за минуты.
+5. **Свой корпус**: `kenga/` + `examples/ml/` + `examples/selfhost/`
+   — без StackOverflow, без лицензий. Loss = pass-rate программ.
+6. **Sparse inference**: OpenCL `t_matmul` (`matmul_cl.kenga`),
+   KV-кеш в `_lite_t.kt`, `unroll` / `foresee_n` — bounded-depth.
+
+Следующие шаги по таблице в `docs/NEUROMODEL_27B.md`:
+D=128 L=4 на `kenga/`-корпусе; Prophet → токен;
+function-call в `more.kenga`; BPE-codec 256; KV-reuse;
+pass-rate probe-set.
+
+Язык в `kenga/` дальше; следующий VSIX — когда накопится в `editors/vscode`.

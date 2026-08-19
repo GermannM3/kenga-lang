@@ -49,6 +49,12 @@ Char-LM / mm-gen: тот же decoder, **CTX=12** (промпт `"kenga vidit "`
 | GPU-ядра | OpenCL за `t_matmul` на Windows; мелкие матрицы всё ещё CPU; native C через `scripts\bc-run.cmd` (f64) и `scripts\bc-run-f32.cmd` (f32-тензоры) |
 | Загрузка чужих весов (GGUF) | нет |
 
+Подробнее о стратегии "маленькая модель выглядит как большая на нашем
+корпусе и в нашем языке" — `docs/NEUROMODEL_27B.md`: шесть осей
+(язык как сжатие, Prophet как память, tools как method calls, native C
+tape, свой корпус, sparse inference) + таблица измеримых шагов
+(D=128 L=4 → prophet-token → function-call → BPE-codec → KV-reuse).
+
 Без GPU и корпуса «половина меня» не появится, какой бы синтаксис ни был. Появится, когда этот же decoder жрёт реальные веса и железо.
 
 ## Лестница
