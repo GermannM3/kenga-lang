@@ -221,6 +221,7 @@ fn main() {
 | Self-host Kenga-lite → bytecode VM | ✅ |
 | **`lower_c`**: Kenga → native C (agent/for/lists/struct/elif/float) | ✅ |
 | **`lower_kv` + `rt_kval`**: tagged KVal (str/ord/lex_frag/agent) | ✅ |
+| **`bc_src_c`**: parse → bytecode → C-рантайм + native `gcc`/`cl` (opcodes 1–109: print/sleep/now_ms, tensor, Prophet, tape, `argc`/`arg`/`file_exists`/`read_line`) | ✅ |
 | Полный self-host / LLVM / LLM | 🚧 |
 
 ---

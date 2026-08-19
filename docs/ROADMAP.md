@@ -67,6 +67,8 @@
 | ✅ | **f32-тензоры**: `-DKENGA_TENSOR_F32` (`scripts\bc-run-f32.cmd`) — то же поведение, вдвое меньше память; f64 остаётся дефолтом (мелкие модели чувствительны к точности) |
 | ✅ | **GC в bc-рантайме**: mark-sweep (roots = VM стек/слоты + события + tape) с free-list и бюджетами; длинные обучения больше не текут — `kenga_biglm` (корпус = весь `kenga/` исходник, 203 KB) 3 эпохи на CPU без роста памяти |
 | ✅ | **`bc_src_c`**: list arena 1M + VM stack/slots 4096 (тренировочные циклы не упираются в 256) |
+| ✅ | **`bc_src_c`** + write_c_driver: `int main(int argc, char **argv)` — host `argc(argv)` пробрасывается в runtime через `g_kargc`/`g_kargv`; opcodes **106–109**: `OP_ARGC` / `OP_ARG` / `OP_FILE_EXISTS` / `OP_READ_LINE` |
+| ✅ | **`bc_src_c`**: тест **`bc_argc.kenga`** → `bootstrap/generated/bc_from_argc.c` (asserts на opcode seq); native `bc_one_out.exe` собирается штатным `gcc`/`cl` — **полный bootstrap без Rust** |
 | ✅ | **`kenga/emit/{expr_c,control_c,core_c}.kenga`** + `scripts/freedom-smoke.cmd` |
 | ✅ | Emit lite runtime: **`rt_types` / Prophet / tensor / tape / compiler / VM / selftest** — `kenga_lite.c` каркас |
 | ✅ | CI job `lite` без cargo; release **требует** `kenga-lite` (cargo `kenga` ещё legacy в архиве) |

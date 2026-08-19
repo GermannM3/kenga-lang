@@ -2,6 +2,24 @@
 
 Проверяй через `kenga run --lite` (или полный `kenga run`). Ответы не подглядывай в `examples/` сразу — сначала сам.
 
+## E0. Host-ввод (bootstrap circular)
+
+Напиши `examples/exercises/e00_argc.kenga`:
+
+```kenga
+fn main() -> i64 {
+  let n = argc();
+  println(n);
+  if n > 0 { println(arg(0)); }
+  if file_exists("kenga/compiler/more.kenga") == 1 {
+    println("have more.kenga");
+  }
+  return 0;
+}
+```
+
+Прогони дважды: через `kenga run --lite` (без аргументов → `argc() == 0`, ветка `arg(0)` не сработает) и через native exe — `scripts\bc-run.cmd examples\exercises\e00_argc.kenga myarg`. Без Rust, без аргументов host просто даёт 0; с exe ты получаешь свой `argv[0]`. Шпаргалка: `examples/selfhost/bc_argc.kenga`.
+
 ## E1. Арифметика
 
 Напиши `examples/exercises/e01_sum.kenga`: сумма чисел от 1 до 100, `println`, `return 0`.

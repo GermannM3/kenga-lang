@@ -1,33 +1,34 @@
-fn main[5 ri6>(r
-}/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"f}
-/,"
+fn maind;
+ x> 
+
+ // es
+whi<> e
+ e
+ enurest(");
+ whi<> 
+
+ e
+ enurest(");
+ whi<> 
+
+ e
+ enurest(");
+ whi<> 
+
+ e
+ enurest(");
+ whi<> 
+
+ e
+ enurest(");
+ whi<> 
+
+ e
+ enurest(");
+ whi<> 
+
+ e
+ enurest(");
+ whi<> 
+
+ 

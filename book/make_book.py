@@ -292,6 +292,7 @@ def write_content():
         ["Living runtime (rt_*)", "да", "нет, gcc/cl"],
         ["more.kenga: birth, XOR, c_seed", "да", "нет"],
         ["lower_c / lower_kv", "да", "нет, линкер"],
+        ["**bc_src_c** (.kenga → native exe)", "да", "нет, gcc/cl"],
         ["Полный CLI src/", "ещё legacy", "—"],
     ], [5.2 * cm, 3.6 * cm, 3.6 * cm])
     P("Лестница из docs/INDEPENDENCE.md. Сначала lite-хост. Потом "
@@ -398,6 +399,10 @@ def write_content():
       "события, файловый ввод-вывод. bc_src_c разбирает исходник в "
       "байткод и выплёвывает C-VM. На этой сетке уже сидят kenga_net и "
       "kenga_birth.")
+    P("bc_src_c пробрасывает host-argc/argv в VM как `g_kargc`/`g_kargv`. "
+      "Любая .kenga может звать argc(), arg(i), file_exists(p), read_line() "
+      "нативно (opcodes 106–109). Гостевой argv пропускает путь к more — "
+      "host даёт свою папку, гость читает свои пути.")
     P("Это всё ещё C на выходе. Свобода здесь в авторе: исходник "
       "генератора — .kenga, не codegen.rs. Когда VM more покроет тот же "
       "контур без gcc, ступень можно вычеркнуть.")

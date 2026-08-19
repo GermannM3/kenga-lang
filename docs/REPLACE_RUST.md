@@ -32,5 +32,22 @@ bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 ```
 
 `kenga-lite run file.kenga` гоняет файл на **more VM**. Сьют `more.kenga` без аргументов. `kenga/emit/*` пишет host и остаётся lite bootstrap.  
-`bc_src_c` пишет тот же диалект в native C (`bc_from_agent`, `bc_from_import`, **`bc_from_net`**, **`bc_from_birth`**, logic, typeof, print).  
+`bc_src_c` пишет тот же диалект в native C (`bc_from_agent`, `bc_from_import`, **`bc_from_net`**, **`bc_from_birth`**, logic, typeof, print, **`bc_from_argc`** — opcodes 106–109).  
 `rt_*` пишут весь lite host, включая типы, Prophet, tensor, tape, events, chat, compiler, VM. `kenga_lite.c` — комментарий, CRT includes и `#include`.
+
+## Полный bootstrap без Rust
+
+`bc_src_c` закрывает путь «.kenga → native exe»:
+
+```
+# 1. Kenga-исходник генерирует bc_rt.inc.c + bc_from_*.c:
+bootstrap/bin/kenga-lite.exe run kenga/emit/bc_src_c.kenga
+#   → bootstrap/generated/bc_rt.inc.c (runtime с OP_ARGC/ARG/FILE_EXISTS/READ_LINE)
+#   → bootstrap/generated/bc_from_agent.c, bc_from_argc.c, bc_one_out.c, …
+
+# 2. Любой штатный C-компилятор (msvc / gcc / clang) собирает native exe:
+cl  /O2 /TC bc_one_out.c /Febc_one_out.exe        :: MSVC
+gcc -O2 -std=c99 bc_one_out.c -o bc_one_out.exe   ;; MinGW / Linux
+```
+
+`bc_src_c` теперь умеет пробрасывать host-`argc`/`argv` в VM через `g_kargc`/`g_kargv` (opcodes 106–109). Любая `.kenga` программа корректно читает `argc()`, `arg(i)`, `file_exists(p)`, `read_line()` — нативно, без интерпретатора.

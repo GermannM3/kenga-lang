@@ -9,9 +9,9 @@ Kenga должна **жить на себе**. C и Rust — подмости.
 | Living runtime | ✅ `kenga-lite` целиком из `rt_*.kenga` (типы, Prophet, tensor, tape, compiler, VM) | ❌ C99 glue / gcc |
 | Word-LM / tape / tensor / Prophet / chat | ✅ | ✅ списки (`native_ml` / `chat.kenga`); CRT: байты, stdin |
 | Компилятор на Kenga | ✅ **`more.kenga`**: `kenga-lite run file` → more VM; сьют без аргументов | ❌ CRT |
-| Emit на Kenga | ✅ **`lower_c`** + **`lower_kv`/`rt_kval`** | ❌ gcc/cl |
-| Native из `.kenga` | ✅ agent / net / **birth** (`bc_from_birth.c` → пишет `kenga_born.kenga`) | ❌ |
-| Каталог замены Rust | ✅ **`kenga/`** + `docs/REPLACE_RUST.md` | — |
+| Emit на Kenga | ✅ **`lower_c`** + **`lower_kv`/`rt_kval`** + **`bc_src_c`** | ❌ gcc/cl |
+| Native из `.kenga` | ✅ agent / net / **birth** (`bc_from_birth.c` → пишет `kenga_born.kenga`) / **`argc_more`** (`bc_from_argc.c` через `g_kargc`/`g_kargv`) | ❌ |
+| Каталог замены Rust | ✅ **`kenga/`** + `docs/REPLACE_RUST.md` + `bootstrap/generated/_bc_path.txt` (host → guest) | — |
 | Полный CLI `src/` | 🟡 legacy | — |
 
 ## Лестница

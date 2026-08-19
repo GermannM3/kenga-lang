@@ -119,7 +119,7 @@ scripts\freedom-smoke.cmd
 
 - `lower_c` — i64/struct/float/agent, `typeof`/`to_str`, `print`/`sleep_ms`/`now_ms` → `bootstrap/bin/lower_*.c`  
 - `lower_kv` — tagged KVal + Memory + Tensor/tape как lite (CE: `ag_softmax`/`ag_log`) → `bootstrap/generated/`  
-- `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, `print`/`sleep_ms`/`now_ms`, birth/net/agent)  
+- `bc_src_c` — парсит `.kenga` → bytecode → native VM (`&&` `||` `!` `%`, `typeof`/`to_str`, `print`/`sleep_ms`/`now_ms`, birth/net/agent, **opcodes 106–109** `argc`/`arg`/`file_exists`/`read_line`) → `bootstrap/generated/bc_one_out.c`  
 - `rt_*` — Kenga пишет весь lite host (типы, Prophet, tensor, tape, compiler, VM, selftest). `kenga_lite.c` — `#include`.
 
 Это путь, которым `more.kenga` перестанет нуждаться в C-VM host.
