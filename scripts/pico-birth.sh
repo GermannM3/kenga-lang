@@ -8,7 +8,7 @@ if [ ! -x bootstrap/bin/kenga-lite.exe ]; then
 fi
 
 PASS=0
-TOTAL=5
+TOTAL=9
 ARGS=examples/ml/_pico_args.txt
 
 run_test() {
@@ -44,11 +44,15 @@ run_test() {
   rm -f "$out"
 }
 
-run_test "fn add"  examples/ml/kenga_seed_add.kenga  5
-run_test "fn sub"  examples/ml/kenga_seed_sub.kenga  7
-run_test "fn mul"  examples/ml/kenga_seed_mul.kenga  42
-run_test "fn fact" examples/ml/kenga_seed_fact.kenga 120
-run_test "fn fib"  examples/ml/kenga_seed_fib.kenga  21
+run_test "fn add"   examples/ml/kenga_seed_add.kenga   5
+run_test "fn sub"   examples/ml/kenga_seed_sub.kenga   7
+run_test "fn mul"   examples/ml/kenga_seed_mul.kenga   42
+run_test "fn fact"  examples/ml/kenga_seed_fact.kenga  120
+run_test "fn fib"   examples/ml/kenga_seed_fib.kenga   21
+run_test "fn max"   examples/ml/kenga_seed_max.kenga   7
+run_test "fn sqr"   examples/ml/kenga_seed_sqr.kenga   81
+run_test "fn pow"   examples/ml/kenga_seed_pow.kenga   1024
+run_test "fn sumto" examples/ml/kenga_seed_sum.kenga   55
 
 echo
 echo "=== pico-birth pass-rate: $PASS / $TOTAL ==="
