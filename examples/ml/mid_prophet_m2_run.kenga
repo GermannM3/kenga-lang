@@ -1,0 +1,155 @@
+// Mid-Prophet M2 inference: load trained weights, predict next-token
+// for each window in the input stream.
+
+fn add_i(s: str, n: i64) -> str {
+    let out = s;
+    let sign: i64 = 0;
+    let v: i64 = n;
+    if v < 0 { sign = 1; v = 0 - v; }
+    if v == 0 { return out + "0"; }
+    let rev: str = "";
+    while v > 0 {
+        let d: i64 = v - (v / 10) * 10;
+        let c: str = "";
+        if d == 0 { c = "0"; }
+        if d == 1 { c = "1"; } if d == 2 { c = "2"; } if d == 3 { c = "3"; }
+        if d == 4 { c = "4"; } if d == 5 { c = "5"; } if d == 6 { c = "6"; }
+        if d == 7 { c = "7"; } if d == 8 { c = "8"; } if d == 9 { c = "9"; }
+        rev = c + rev;
+        v = v / 10;
+    }
+    if sign == 1 { rev = "-" + rev; }
+    return out + rev;
+}
+
+fn parse_ints(line: str) -> list {
+    let parts = [];
+    let cur: i64 = 0;
+    let neg: i64 = 0;
+    let got: i64 = 0;
+    let i: i64 = 0;
+    while i < len(line) {
+        let ch: str = line[i];
+        if ch == "," || ch == " " || ch == "=" {
+            if got == 1 {
+                if neg == 1 { parts = push(parts, 0 - cur); } else { parts = push(parts, cur); }
+                cur = 0;
+                neg = 0;
+                got = 0;
+            }
+            i = i + 1;
+            continue;
+        }
+        if ch == "-" && got == 0 {
+            neg = 1;
+            i = i + 1;
+            continue;
+        }
+        let d: i64 = 0 - 1;
+        if ch == "0" { d = 0; }
+        if ch == "1" { d = 1; } if ch == "2" { d = 2; } if ch == "3" { d = 3; }
+        if ch == "4" { d = 4; } if ch == "5" { d = 5; } if ch == "6" { d = 6; }
+        if ch == "7" { d = 7; } if ch == "8" { d = 8; } if ch == "9" { d = 9; }
+        if d >= 0 { cur = cur * 10 + d; got = 1; }
+        i = i + 1;
+    }
+    if got == 1 {
+        if neg == 1 { parts = push(parts, 0 - cur); } else { parts = push(parts, cur); }
+    }
+    return parts;
+}
+
+fn starts_bracket(line: str) -> i64 {
+    if len(line) < 3 { return 0; }
+    if line[0] != "[" { return 0; }
+    return 1;
+}
+
+fn load_weights(path: str) -> list {
+    let raw = read_file(path);
+    let rows: list = [];
+    let cur: str = "";
+    let i: i64 = 0;
+    while i < len(raw) {
+        if raw[i] == "\n" {
+            if starts_bracket(cur) == 1 {
+                let row: list = parse_ints(cur);
+                if len(row) > 1 {
+                    let cleaned: list = [];
+                    let j: i64 = 1;
+                    while j < len(row) {
+                        cleaned = push(cleaned, row[j]);
+                        j = j + 1;
+                    }
+                    rows = push(rows, cleaned);
+                }
+            }
+            cur = "";
+            i = i + 1;
+            continue;
+        }
+        cur = cur + raw[i];
+        i = i + 1;
+    }
+    if starts_bracket(cur) == 1 {
+        let row: list = parse_ints(cur);
+        if len(row) > 1 {
+            let cleaned: list = [];
+            let j: i64 = 1;
+            while j < len(row) {
+                cleaned = push(cleaned, row[j]);
+                j = j + 1;
+            }
+            rows = push(rows, cleaned);
+        }
+    }
+    return rows;
+}
+
+fn main() -> i64 {
+    let window_size: i64 = 4;
+    let weights = load_weights("minds/mid_prophet_m2_w.txt");
+    let stream: list = parse_ints(read_file("examples/ml/_m2_stream.txt"));
+    let n_tokens: i64 = len(stream);
+
+    let v = len(weights);
+    let correct: i64 = 0;
+    let total: i64 = 0;
+    let pos: i64 = window_size;
+    while pos < n_tokens {
+        // build window
+        let window = [];
+        let i: i64 = 0;
+        while i < window_size {
+            window = push(window, stream[pos - window_size + i]);
+            i = i + 1;
+        }
+        let target: i64 = stream[pos];
+        // predict
+        let best: i64 = 0;
+        let best_v: i64 = 0 - 10000000;
+        let vi: i64 = 0;
+        while vi < v {
+            let r: list = weights[vi];
+            let bias: i64 = r[len(r) - 1];
+            let dot: i64 = bias;
+            let j: i64 = 0;
+            while j < window_size {
+                dot = dot + r[j * v + window[j]];
+                j = j + 1;
+            }
+            if dot > best_v {
+                best_v = dot;
+                best = vi;
+            }
+            vi = vi + 1;
+        }
+        if best == target {
+            correct = correct + 1;
+        }
+        total = total + 1;
+        pos = pos + 1;
+    }
+    println(add_i("acc=", correct) + add_i("/", total));
+    return 0;
+}
