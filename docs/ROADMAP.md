@@ -104,6 +104,7 @@
 | ✅ | **`kenga_char_talk.kenga`** — generate из сохранённых весов |
 | ✅ | **`kenga_trigram.kenga`** — char-триграмма на list/i64, корпус наш |
 | ✅ | **`kenga_birth.kenga`** — suffix LM → `kenga_born.kenga` → run → 24 |
+| ✅ | **`pico-birth.sh`** — 5/5 pass-rate на 5 коротких Kenga-targets (5/7/42/120/21); suffix-LM (`examples/ml/pico_birth_single.kenga`) + 5 seed-файлов + 100% compile+run oracle (`docs/PICO_PROPHET.md`) |
 | ✅ | **`kenga_mm_lm.kenga`** / **`kenga_mm_talk.kenga`** — PPM+WAV → caption |
 | ✅ | **`kenga_mm_gen.kenga`** — decoder пишет стебель цвета (kra/ze/si) |
 | ✅ | **`kenga_mm_words`** — 3 подписи + `kenga zhivet v yazyke` (12 токенов); `more.kenga` гоняет XOR |

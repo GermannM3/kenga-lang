@@ -1,0 +1,15 @@
+// pico seed mul: 6 * 7 = 42
+fn mul(a: i64, b: i64) -> i64 {
+    return a * b;
+}
+fn add(a: i64, b: i64) -> i64 {
+    return a + b;
+}
+fn sub(a: i64, b: i64) -> i64 {
+    return a - b;
+}
+fn main() -> i64 {
+    let x = mul(6, 7);
+    println(x);
+    return 0;
+}

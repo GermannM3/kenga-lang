@@ -1,0 +1,15 @@
+// pico seed sub: 10 - 3 = 7
+fn add(a: i64, b: i64) -> i64 {
+    return a + b;
+}
+fn sub(a: i64, b: i64) -> i64 {
+    return a - b;
+}
+fn mul(a: i64, b: i64) -> i64 {
+    return a * b;
+}
+fn main() -> i64 {
+    let x = sub(10, 3);
+    println(x);
+    return 0;
+}
