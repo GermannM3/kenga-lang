@@ -1,8 +1,14 @@
 // General lowerer: Kenga i64/str/list subset → C99 (no Rust).
 // + multi-fn, string literals, list [ ] / push / len / index,
 //   events (on/emit/pump), import flatten, for-in-list, true/false,
-//   && || % ! and block comments, typeof / to_str, print / sleep_ms / now_ms.
-// Run: bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga
+//   && || % ! and block comments, typeof / to_str, print / sleep_ms / now_ms,
+//   u8/u16/u32/u64 width types (declare in struct fields; pass-by-value),
+//   intrinsics passthrough for bare-metal: mmio_readN, mmio_writeN, asm_hlt/cli/sti,
+//   atomic_{load,store,cas,fence}, asm(code). Stubbed call to C runtime — the kernel
+//   provides kf_alloc (weak) and friends in kf_rt.h.
+// Run: bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga --freestanding -o out.c in.kenga
+
+let g_freestanding: i64 = 0;
 
 fn is_space(ch: str) -> i64 {
     if ch == " " { return 1; }
@@ -184,7 +190,7 @@ fn skip_type_annot(s: str, i: i64) -> i64 {
     return r[1];
 }
 fn parse_type_kind(s: str, i: i64) -> list {
-    // returns [kind, new_i] kind 0=i64 1=list 2=str
+    // returns [kind, new_i] kind 0=i64 1=list 2=str 3=f64 4=u8 5=u16 6=u32 7=u64 8=u8* 9=i8 10=i16 11=i32
     i = skip(s, i);
     if i >= len(s) { return [0, i]; }
     if s[i] != ":" { return [0, i]; }
@@ -194,13 +200,54 @@ fn parse_type_kind(s: str, i: i64) -> list {
     if ty[0] == "list" { k = 1; }
     if ty[0] == "str" { k = 2; }
     if ty[0] == "f64" { k = 3; }
+    if ty[0] == "u8" { k = 4; }
+    if ty[0] == "u16" { k = 5; }
+    if ty[0] == "u32" { k = 6; }
+    if ty[0] == "u64" { k = 7; }
+    if ty[0] == "i8" { k = 9; }
+    if ty[0] == "i16" { k = 10; }
+    if ty[0] == "i32" { k = 11; }
     return [k, skip(s, ty[1])];
 }
 fn ctype(k: i64) -> str {
     if k == 1 { return "KList"; }
     if k == 2 { return "const char*"; }
     if k == 3 { return "double"; }
+    if k == 4 { return "uint8_t"; }
+    if k == 5 { return "uint16_t"; }
+    if k == 6 { return "uint32_t"; }
+    if k == 7 { return "uint64_t"; }
+    if k == 9 { return "int8_t"; }
+    if k == 10 { return "int16_t"; }
+    if k == 11 { return "int32_t"; }
     return "int64_t";
+}
+
+// Build a C function call: prefix( e1, e2, ..., en )
+// where prefix == "" means no namespace (e.g. for cast'd expressions).
+// Returns just "prefix(e1, e2, ..., en)" without trailing semicolon.
+fn lower_call_args(s: str, j: i64, decls: list, prefix: str, n: i64) -> str {
+    assert(s[j] == "(");
+    j = j + 1;
+    let parts: str = "";
+    let k: i64 = 0;
+    while k < n {
+        j = skip(s, j);
+        let ax = lower_cmp(s, j, decls);
+        if k > 0 { parts = parts + ", "; }
+        parts = parts + ax[0];
+        k = k + 1;
+        j = skip(s, ax[1]);
+        if k < n {
+            assert(s[j] == ",");
+            j = j + 1;
+        }
+    }
+    assert(s[j] == ")");
+    if len(prefix) > 0 {
+        return prefix + "(" + parts + ")";
+    }
+    return parts;
 }
 
 fn find_struct(stypes: list, name: str) -> i64 {
@@ -415,6 +462,23 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
     let j: i64 = skip(s, id[1]);
     if id[0] == "true" { return ["1LL", id[1], 0]; }
     if id[0] == "false" { return ["0LL", id[1], 0]; }
+    // Bare-metal intrinsics — passthrough as plain C (host provides in kf_rt.h).
+    if id[0] == "mmio_read8"  { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_r8",  1) + " ;; (int64_t)", j, 0]; }
+    if id[0] == "mmio_read16" { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_r16", 1) + " ;; (int64_t)", j, 0]; }
+    if id[0] == "mmio_read32" { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_r32", 1) + " ;; (int64_t)", j, 0]; }
+    if id[0] == "mmio_read64" { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_r64", 1), j, 0]; }
+    if id[0] == "mmio_write8"  { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_w8",  2) + " ;; 0LL", j, 0]; }
+    if id[0] == "mmio_write16" { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_w16", 2) + " ;; 0LL", j, 0]; }
+    if id[0] == "mmio_write32" { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_w32", 2) + " ;; 0LL", j, 0]; }
+    if id[0] == "mmio_write64" { j = j + 1; return [lower_call_args(s, j, decls, "_k_mmio_w64", 2) + " ;; 0LL", j, 0]; }
+    if id[0] == "asm_hlt"     { return ["__asm__ __volatile__(\"hlt\"); 0LL", id[1], 0]; }
+    if id[0] == "asm_cli"     { return ["__asm__ __volatile__(\"cli\"); 0LL", id[1], 0]; }
+    if id[0] == "asm_sti"     { return ["__asm__ __volatile__(\"sti\"); 0LL", id[1], 0]; }
+    if id[0] == "atomic_fence" { return ["__atomic_thread_fence(__ATOMIC_SEQ_CST); 0LL", id[1], 0]; }
+    if id[0] == "atomic_load"  { j = j + 1; return ["((int64_t)__atomic_load_n((volatile int64_t*)(uintptr_t)" + lower_call_args(s, j, decls, "", 1) + "))", j, 0]; }
+    if id[0] == "atomic_store" { j = j + 1; return ["__atomic_store_n((volatile int64_t*)(uintptr_t)" + lower_call_args(s, j, decls, "", 2) + "); 0LL", j, 0]; }
+    // asm(code) — Kenga emits string literal.
+    if id[0] == "asm" { j = j + 1; return ["__asm__ __volatile__(" + lower_call_args(s, j, decls, "", 1) + "); 0LL", j, 0]; }
     if j < len(s) {
         if s[j] == "{" {
             let tid: i64 = find_struct(stypes_of(decls), id[0]);

@@ -232,6 +232,44 @@ impl<'a> Lexer<'a> {
     }
 
     fn number(&mut self, start: Span) -> Result<Token> {
+        // hex literal: 0x3F8 / 0X1F
+        if self.peek() == Some('0')
+            && matches!(self.peek2(), Some('x') | Some('X'))
+        {
+            self.bump(); // 0
+            self.bump(); // x
+            let mut hex = String::new();
+            while matches!(self.peek(), Some(c) if c.is_ascii_hexdigit()) {
+                hex.push(self.bump().unwrap());
+            }
+            if hex.is_empty() {
+                return Err(KengaError::at("empty hex literal '0x'", start));
+            }
+            let v = i64::from_str_radix(&hex, 16).map_err(|_| {
+                KengaError::at(format!("hex literal '0x{hex}' out of range"), start.clone())
+            })?;
+            return Ok(Token::new(TokenKind::Int(v), start));
+        }
+
+        // binary literal: 0b101 / 0B101
+        if self.peek() == Some('0')
+            && matches!(self.peek2(), Some('b') | Some('B'))
+        {
+            self.bump(); // 0
+            self.bump(); // b
+            let mut bin = String::new();
+            while matches!(self.peek(), Some(c) if c == '0' || c == '1') {
+                bin.push(self.bump().unwrap());
+            }
+            if bin.is_empty() {
+                return Err(KengaError::at("empty binary literal '0b'", start));
+            }
+            let v = i64::from_str_radix(&bin, 2).map_err(|_| {
+                KengaError::at(format!("binary literal '0b{bin}' out of range"), start.clone())
+            })?;
+            return Ok(Token::new(TokenKind::Int(v), start));
+        }
+
         let mut raw = String::new();
         while matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
             raw.push(self.bump().unwrap());

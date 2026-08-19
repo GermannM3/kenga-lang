@@ -86,11 +86,23 @@ fn real_main() -> Result<()> {
             }
         }
         "emit-c" => {
+            let use_freestanding = args.iter().any(|a| a == "--freestanding");
+            let args: Vec<String> = args
+                .into_iter()
+                .filter(|a| a != "--freestanding")
+                .collect();
             let path = args.first().ok_or_else(|| {
-                KengaError::new("usage: kenga emit-c <file.kenga> [-o out.c]", None)
+                KengaError::new(
+                    "usage: kenga emit-c <file.kenga> [-o out.c] [--freestanding]",
+                    None,
+                )
             })?;
             let program = parse_file(&PathBuf::from(path))?;
-            let c = emit_c(&program)?;
+            let c = if use_freestanding {
+                kenga::codegen::emit_c_freestanding(&program)?
+            } else {
+                emit_c(&program)?
+            };
             let out_path = flag_value(&args, "-o").unwrap_or_else(|| {
                 PathBuf::from(path)
                     .with_extension("c")
@@ -100,7 +112,7 @@ fn real_main() -> Result<()> {
             fs::write(&out_path, &c).map_err(|e| {
                 KengaError::new(format!("cannot write {out_path}: {e}"), None)
             })?;
-            println!("wrote {out_path}");
+            println!("wrote {out_path}{}", if use_freestanding { " (freestanding)" } else { "" });
         }
         "build" => {
             let path = args.first().ok_or_else(|| {

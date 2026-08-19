@@ -10,6 +10,13 @@ use crate::error::{KengaError, Result};
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum CTy {
     I64,
+    I32,
+    I16,
+    I8,
+    U64,
+    U32,
+    U16,
+    U8,
     F64,
     List,
     Str,
@@ -40,6 +47,14 @@ impl<'a> EmitCtx<'a> {
 }
 
 pub fn emit_c(program: &Program) -> Result<String> {
+    emit_c_with_options(program, false)
+}
+
+pub fn emit_c_freestanding(program: &Program) -> Result<String> {
+    emit_c_with_options(program, true)
+}
+
+fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> {
     let mut structs: HashMap<String, StructInfo> = HashMap::new();
     for item in &program.items {
         if let Item::Struct(s) = item {
@@ -112,7 +127,11 @@ pub fn emit_c(program: &Program) -> Result<String> {
     }
 
     let mut out = String::new();
-    out.push_str(RUNTIME);
+    if freestanding {
+        out.push_str(RUNTIME_FS);
+    } else {
+        out.push_str(RUNTIME);
+    }
     out.push_str(&body);
     Ok(out)
 }
@@ -128,7 +147,16 @@ fn map_type(t: &Type, structs: &HashMap<String, StructInfo>) -> Result<CTy> {
             if structs.contains_key(n) {
                 CTy::Struct(n.clone())
             } else {
-                CTy::I64
+                match n.as_str() {
+                    "u8" => CTy::U8,
+                    "u16" => CTy::U16,
+                    "u32" => CTy::U32,
+                    "u64" => CTy::U64,
+                    "i8" => CTy::I8,
+                    "i16" => CTy::I16,
+                    "i32" => CTy::I32,
+                    _ => CTy::I64,
+                }
             }
         }
     })
@@ -137,6 +165,13 @@ fn map_type(t: &Type, structs: &HashMap<String, StructInfo>) -> Result<CTy> {
 fn c_type(t: &CTy) -> String {
     match t {
         CTy::I64 | CTy::List => "int64_t".into(),
+        CTy::I32 => "int32_t".into(),
+        CTy::I16 => "int16_t".into(),
+        CTy::I8 => "int8_t".into(),
+        CTy::U64 => "uint64_t".into(),
+        CTy::U32 => "uint32_t".into(),
+        CTy::U16 => "uint16_t".into(),
+        CTy::U8 => "uint8_t".into(),
         CTy::F64 => "double".into(),
         CTy::Str => "const char*".into(),
         CTy::Void => "void".into(),
@@ -146,15 +181,51 @@ fn c_type(t: &CTy) -> String {
 }
 
 fn is_numeric(t: &CTy) -> bool {
-    matches!(t, CTy::I64 | CTy::F64)
+    matches!(t, CTy::I64 | CTy::I32 | CTy::I16 | CTy::I8 | CTy::U64 | CTy::U32 | CTy::U16 | CTy::U8 | CTy::F64)
 }
 
 fn promote_num(a: &CTy, b: &CTy) -> Option<CTy> {
+    use CTy::*;
     match (a, b) {
-        (CTy::F64, CTy::F64)
-        | (CTy::F64, CTy::I64)
-        | (CTy::I64, CTy::F64) => Some(CTy::F64),
-        (CTy::I64, CTy::I64) => Some(CTy::I64),
+        (F64, F64)
+        | (F64, I64) | (I64, F64)
+        | (F64, I32) | (I32, F64)
+        | (F64, I16) | (I16, F64)
+        | (F64, I8)  | (I8,  F64)
+        | (F64, U64) | (U64, F64)
+        | (F64, U32) | (U32, F64)
+        | (F64, U16) | (U16, F64)
+        | (F64, U8)  | (U8,  F64) => Some(F64),
+        (I64, I64)
+        | (I64, I32) | (I32, I64)
+        | (I64, I16) | (I16, I64)
+        | (I64, I8)  | (I8,  I64)
+        | (I64, U64) | (U64, I64)
+        | (I64, U32) | (U32, I64)
+        | (I64, U16) | (U16, I64)
+        | (I64, U8)  | (U8,  I64)
+        | (I32, I32)
+        | (I32, I16) | (I16, I32)
+        | (I32, I8)  | (I8,  I32)
+        | (I32, U32) | (U32, I32)
+        | (I32, U16) | (U16, I32)
+        | (I32, U8)  | (U8,  I32)
+        | (U64, U64)
+        | (U64, U32) | (U32, U64)
+        | (U64, U16) | (U16, U64)
+        | (U64, U8)  | (U8,  U64)
+        | (U32, U32)
+        | (U32, U16) | (U16, U32)
+        | (U32, U8)  | (U8,  U32)
+        | (I16, I16)
+        | (I16, I8)  | (I8,  I16)
+        | (I16, U16) | (U16, I16)
+        | (I16, U8)  | (U8,  I16)
+        | (U16, U16)
+        | (U16, U8)  | (U8,  U16)
+        | (I8, I8)
+        | (I8, U8)   | (U8,  I8)
+        | (U8, U8) => Some(I64),
         _ => None,
     }
 }
@@ -198,7 +269,14 @@ fn indent_pre(pre: &str, indent: usize) -> String {
 fn wrap_as_val(expr: &str, from: &CTy) -> String {
     match from {
         CTy::Val => expr.to_string(),
-        CTy::I64 => format!("kval_i64({expr})"),
+        CTy::I64
+        | CTy::I32
+        | CTy::I16
+        | CTy::I8
+        | CTy::U64
+        | CTy::U32
+        | CTy::U16
+        | CTy::U8 => format!("kval_i64({expr})"),
         CTy::F64 => format!("kval_f64({expr})"),
         CTy::Str => format!("kval_str({expr})"),
         CTy::List => format!("kval_list({expr})"),
@@ -627,6 +705,127 @@ fn emit_as_num(expr: &Expr, ctx: &mut EmitCtx<'_>, want: &CTy) -> Result<(String
     Ok((pre, e))
 }
 
+fn emit_intrinsic_call(
+    name: &str,
+    args: &[Expr],
+    span: &crate::error::Span,
+    ctx: &mut EmitCtx<'_>,
+) -> Result<(String, String)> {
+    use std::fmt::Write;
+    match name {
+        "mmio_read8" | "mmio_read16" | "mmio_read32" | "mmio_read64" => {
+            if args.len() != 1 {
+                return Err(KengaError::at(
+                    format!("{name} takes 1 argument (address)"),
+                    span.clone(),
+                ));
+            }
+            let (p, addr) = emit_as_i64(&args[0], ctx)?;
+            let suffix = &name["mmio_read".len()..];
+            let c_fn = format!("_k_mmio_r{suffix}");
+            Ok((p, format!("((int64_t){c_fn}((uint64_t)({addr})))")))
+        }
+        "mmio_write8" | "mmio_write16" | "mmio_write32" | "mmio_write64" => {
+            if args.len() != 2 {
+                return Err(KengaError::at(
+                    format!("{name} takes 2 arguments (address, value)"),
+                    span.clone(),
+                ));
+            }
+            let (p1, addr) = emit_as_i64(&args[0], ctx)?;
+            let (p2, val) = emit_as_i64(&args[1], ctx)?;
+            let suffix = &name["mmio_write".len()..];
+            let c_fn = format!("_k_mmio_w{suffix}");
+            Ok((
+                format!("{p1}{p2}(void){c_fn}((uint64_t)({addr}), (uint{suffix}_t)({val}));\n"),
+                "0".into(),
+            ))
+        }
+        "asm_hlt" => {
+            if !args.is_empty() {
+                return Err(KengaError::at("asm_hlt takes 0 args", span.clone()));
+            }
+            Ok(("__asm__ __volatile__(\"hlt\");\n".into(), "0".into()))
+        }
+        "asm_cli" => {
+            if !args.is_empty() {
+                return Err(KengaError::at("asm_cli takes 0 args", span.clone()));
+            }
+            Ok(("__asm__ __volatile__(\"cli\");\n".into(), "0".into()))
+        }
+        "asm_sti" => {
+            if !args.is_empty() {
+                return Err(KengaError::at("asm_sti takes 0 args", span.clone()));
+            }
+            Ok(("__asm__ __volatile__(\"sti\");\n".into(), "0".into()))
+        }
+        "asm" => {
+            if args.len() != 1 && args.len() != 2 {
+                return Err(KengaError::at(
+                    "asm(code) or asm(arch, code)",
+                    span.clone(),
+                ));
+            }
+            let code_idx = if args.len() == 1 { 0 } else { 1 };
+            let (p, code) = emit_expr(&args[code_idx], ctx)?;
+            let ty = infer_expr(&args[code_idx], ctx)?;
+            let code = coerce_expr(&code, &ty, &CTy::Str)?;
+            let mut out = String::new();
+            writeln!(out, "{p}__asm__ __volatile__({code});").unwrap();
+            Ok((out, "0".into()))
+        }
+        "atomic_load" => {
+            if args.len() != 1 {
+                return Err(KengaError::at("atomic_load takes 1 arg (ptr)", span.clone()));
+            }
+            let (p, ptr) = emit_as_i64(&args[0], ctx)?;
+            Ok((
+                p,
+                format!("((int64_t)__atomic_load_n((volatile int64_t*)(uintptr_t){ptr}, __ATOMIC_SEQ_CST))"),
+            ))
+        }
+        "atomic_store" => {
+            if args.len() != 2 {
+                return Err(KengaError::at(
+                    "atomic_store takes 2 args (ptr, val)",
+                    span.clone(),
+                ));
+            }
+            let (p1, ptr) = emit_as_i64(&args[0], ctx)?;
+            let (p2, val) = emit_as_i64(&args[1], ctx)?;
+            Ok((
+                format!(
+                    "{p1}{p2}__atomic_store_n((volatile int64_t*)(uintptr_t){ptr}, (int64_t){val}, __ATOMIC_SEQ_CST);\n"
+                ),
+                "0".into(),
+            ))
+        }
+        "atomic_cas" => {
+            if args.len() != 3 {
+                return Err(KengaError::at(
+                    "atomic_cas takes 3 args (ptr, expected, desired)",
+                    span.clone(),
+                ));
+            }
+            let (p1, ptr) = emit_as_i64(&args[0], ctx)?;
+            let (p2, exp) = emit_as_i64(&args[1], ctx)?;
+            let (p3, des) = emit_as_i64(&args[2], ctx)?;
+            let tmp = ctx.fresh("cas");
+            let pre = format!(
+                "{p1}{p2}{p3}int64_t {tmp} = (int64_t){exp};\n(int64_t)__atomic_compare_exchange_n((volatile int64_t*)(uintptr_t){ptr}, &{tmp}, (int64_t){des}, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);\n"
+            );
+            Ok((pre, "0".into()))
+        }
+        "atomic_fence" => {
+            if !args.is_empty() {
+                return Err(KengaError::at("atomic_fence takes 0 args", span.clone()));
+            }
+            Ok(("__atomic_thread_fence(__ATOMIC_SEQ_CST);\n".into(), "0".into()))
+        }
+        _ => unreachable!(),
+    }
+}
+
 fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
     match expr {
         Expr::Int(n, _) => Ok((String::new(), n.to_string())),
@@ -817,6 +1016,13 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 }
                 let (p, e) = emit_as_i64(&args[0], ctx)?;
                 Ok((format!("{p}k_assert({e});\n"), "0".into()))
+            }
+            "mmio_read8"  | "mmio_read16" | "mmio_read32" | "mmio_read64"
+          | "mmio_write8" | "mmio_write16"| "mmio_write32"| "mmio_write64"
+          | "asm_hlt" | "asm_cli" | "asm_sti"
+          | "atomic_load" | "atomic_store" | "atomic_cas" | "atomic_fence"
+          | "asm" => {
+                emit_intrinsic_call(callee.as_str(), &args, span, ctx)
             }
             "ord" => {
                 if args.len() != 1 {
@@ -1124,6 +1330,272 @@ static void kenga_println_val(KVal v) {
 static void k_assert(int64_t c) {
   if (!c) k_die("assert failed");
 }
+static int64_t k_ord(const char *s) {
+  if (!s || !s[0]) return 0;
+  return (unsigned char)s[0];
+}
+
+"#;
+
+const RUNTIME_FS: &str = r#"/* Generated by Kenga emit-c -- freestanding (no libc / no CRT) */
+#include <stdint.h>
+#include <stddef.h>
+
+#ifndef __cplusplus
+typedef _Bool bool;
+#define true  1
+#define false 0
+#endif
+
+/* ---- freestanding libc replacements ---- */
+static inline void* _k_memcpy(void* d, const void* s, size_t n) {
+  unsigned char*       _d = (unsigned char*)d;
+  const unsigned char* _s = (const unsigned char*)s;
+  for (size_t _i = 0; _i < n; _i++) _d[_i] = _s[_i];
+  return d;
+}
+static inline void* _k_memset(void* d, int c, size_t n) {
+  unsigned char* _d = (unsigned char*)d;
+  unsigned char  _v = (unsigned char)c;
+  for (size_t _i = 0; _i < n; _i++) _d[_i] = _v;
+  return d;
+}
+static inline int _k_memcmp(const void* a, const void* b, size_t n) {
+  const unsigned char* _pa = (const unsigned char*)a;
+  const unsigned char* _pb = (const unsigned char*)b;
+  for (size_t _i = 0; _i < n; _i++) {
+    if (_pa[_i] != _pb[_i]) return (int)_pa[_i] - (int)_pb[_i];
+  }
+  return 0;
+}
+static inline size_t _k_strlen(const char* s) {
+  size_t n = 0;
+  if (!s) return 0;
+  while (s[n]) n++;
+  return n;
+}
+static inline int _k_strcmp(const char* a, const char* b) {
+  if (!a) a = "";
+  if (!b) b = "";
+  while (*a && *a == *b) { a++; b++; }
+  return (int)(unsigned char)*a - (int)(unsigned char)*b;
+}
+#define memcpy _k_memcpy
+#define memset _k_memset
+#define memcmp _k_memcmp
+#define strlen _k_strlen
+#define strcmp _k_strcmp
+
+static inline void k_die(const char* /*msg*/) {
+  for (;;) {
+    __asm__ __volatile__("cli; hlt");
+  }
+}
+static inline void abort(void) { k_die("abort"); }
+static inline void exit(int x) { (void)x; k_die("exit"); }
+
+/* ---- mmio intrinsics (volatile, type-safe) ---- */
+#define K_MMIO_R(T, a)   (*(volatile T*)(uintptr_t)(a))
+#define K_MMIO_W(T, a, v) (*(volatile T*)(uintptr_t)(a) = (T)(v))
+static inline uint8_t  _k_mmio_r8 (uint64_t a) { return K_MMIO_R(uint8_t,  a); }
+static inline uint16_t _k_mmio_r16(uint64_t a) { return K_MMIO_R(uint16_t, a); }
+static inline uint32_t _k_mmio_r32(uint64_t a) { return K_MMIO_R(uint32_t, a); }
+static inline uint64_t _k_mmio_r64(uint64_t a) { return K_MMIO_R(uint64_t, a); }
+static inline void _k_mmio_w8 (uint64_t a, uint8_t  v) { K_MMIO_W(uint8_t,  a, v); }
+static inline void _k_mmio_w16(uint64_t a, uint16_t v) { K_MMIO_W(uint16_t, a, v); }
+static inline void _k_mmio_w32(uint64_t a, uint32_t v) { K_MMIO_W(uint32_t, a, v); }
+static inline void _k_mmio_w64(uint64_t a, uint64_t v) { K_MMIO_W(uint64_t, a, v); }
+
+/* ---- atomic primitives (GCC / clang builtins) ---- */
+#define K_ATOMIC_LOAD(p)       __atomic_load_n((p), __ATOMIC_SEQ_CST)
+#define K_ATOMIC_STORE(p, v)   __atomic_store_n((p), (v), __ATOMIC_SEQ_CST)
+#define K_ATOMIC_CAS(p, e, d)  __atomic_compare_exchange_n((p), &(e), (d), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define K_ATOMIC_FENCE()       __atomic_thread_fence(__ATOMIC_SEQ_CST)
+
+/* ---- tagged KVal runtime ---- */
+enum { KV_I64 = 0, KV_STR = 1, KV_LIST = 2, KV_F64 = 3 };
+
+typedef struct {
+  int tag;
+  union {
+    int64_t i;
+    double  f;
+    const char *s;
+    int64_t list_id;
+  } u;
+} KVal;
+
+typedef struct {
+  KVal  *data;
+  size_t len;
+  size_t cap;
+} KListObj;
+
+static KListObj *g_lists = NULL;
+static size_t    g_lists_len = 0;
+static size_t    g_lists_cap = 0;
+
+static KVal kval_i64(int64_t x)     { KVal v; v.tag = KV_I64; v.u.i = x; return v; }
+static KVal kval_f64(double x)      { KVal v; v.tag = KV_F64; v.u.f = x; return v; }
+static KVal kval_str(const char *s) { KVal v; v.tag = KV_STR; v.u.s = s ? s : ""; return v; }
+static KVal kval_list(int64_t id)   { KVal v; v.tag = KV_LIST; v.u.list_id = id; return v; }
+
+static int64_t kval_as_i64(KVal v) {
+  if (v.tag == KV_I64) return v.u.i;
+  if (v.tag == KV_F64) return (int64_t)v.u.f;
+  k_die("expected i64"); return 0;
+}
+static double kval_as_f64(KVal v) {
+  if (v.tag == KV_F64) return v.u.f;
+  if (v.tag == KV_I64) return (double)v.u.i;
+  k_die("expected f64"); return 0.0;
+}
+static const char *kval_as_str(KVal v) {
+  if (v.tag != KV_STR) k_die("expected str");
+  return v.u.s;
+}
+static int64_t kval_as_list(KVal v) {
+  if (v.tag != KV_LIST) k_die("expected list");
+  return v.u.list_id;
+}
+
+static KListObj *klist_obj(int64_t id) {
+  if (id < 0 || (size_t)id >= g_lists_len) k_die("bad list handle");
+  return &g_lists[id];
+}
+
+static void* _k_arena_alloc(size_t n) {
+  /* Allocation hook order (kernel-friendly):
+   *   1) weak kf_alloc(n)  — kernel provides its own allocator (kmalloc/buddy). Declare in kf_rt.h.
+   *   2) weak __builtin_malloc(n) — libc fallback.
+   *   3) k_die("oom") — last resort. In real kernels kf_alloc must be provided.
+   */
+  extern void* kf_alloc(size_t) __attribute__((weak));
+  if (&kf_alloc) {
+    void* p = kf_alloc(n);
+    if (p) return p;
+  }
+  extern void* __builtin_malloc(size_t) __attribute__((weak));
+  if (&__builtin_malloc) {
+    void* p = __builtin_malloc(n);
+    if (p) return p;
+  }
+  k_die("oom");
+  return NULL;
+}
+
+static int64_t klist_new(void) {
+  if (g_lists_len + 1 > g_lists_cap) {
+    size_t ncap = g_lists_cap ? g_lists_cap * 2 : 8;
+    KListObj *nd = (KListObj *)_k_arena_alloc(ncap * sizeof(KListObj));
+    if (g_lists) _k_memcpy(nd, g_lists, g_lists_len * sizeof(KListObj));
+    g_lists = nd;
+    g_lists_cap = ncap;
+  }
+  KListObj *o = &g_lists[g_lists_len];
+  o->data = NULL; o->len = 0; o->cap = 0;
+  return (int64_t)g_lists_len++;
+}
+
+static void klist_push_val(int64_t id, KVal v) {
+  KListObj *l = klist_obj(id);
+  if (l->len + 1 > l->cap) {
+    size_t ncap = l->cap ? l->cap * 2 : 8;
+    KVal *nd = (KVal *)_k_arena_alloc(ncap * sizeof(KVal));
+    if (l->data) _k_memcpy(nd, l->data, l->len * sizeof(KVal));
+    l->data = nd; l->cap = ncap;
+  }
+  l->data[l->len++] = v;
+}
+static KVal klist_get_val(int64_t id, int64_t i) {
+  KListObj *l = klist_obj(id);
+  if (i < 0 || (size_t)i >= l->len) k_die("index oob");
+  return l->data[i];
+}
+static void klist_set_val(int64_t id, int64_t i, KVal v) {
+  KListObj *l = klist_obj(id);
+  if (i < 0 || (size_t)i >= l->len) k_die("index oob");
+  l->data[i] = v;
+}
+static int64_t klist_len(int64_t id) { return (int64_t)klist_obj(id)->len; }
+
+static int64_t klist_concat(int64_t a, int64_t b) {
+  int64_t o = klist_new();
+  KListObj *la = klist_obj(a);
+  KListObj *lb = klist_obj(b);
+  for (size_t i = 0; i < la->len; i++) klist_push_val(o, la->data[i]);
+  for (size_t i = 0; i < lb->len; i++) klist_push_val(o, lb->data[i]);
+  return o;
+}
+
+static const char *kstr_from_i64(int64_t x) {
+  char *o = (char *)_k_arena_alloc(32);
+  /* minimal itoa (decimal, signed) */
+  int neg = 0; char *p = o + 22; *p = 0;
+  uint64_t u = (uint64_t)x;
+  if (x < 0) { neg = 1; u = (uint64_t)(-(x + 1)) + 1ULL; }
+  if (u == 0) { *--p = '0'; }
+  else { while (u) { *--p = (char)('0' + (u % 10)); u /= 10; } }
+  if (neg) *--p = '-';
+  _k_memcpy(o, p, (size_t)(o + 22 - p + 1));
+  return o;
+}
+static const char *kstr_from_f64(double x) { return kstr_from_i64((int64_t)x); }
+
+static const char *kstr_concat(const char *a, const char *b) {
+  if (!a) a = "";
+  if (!b) b = "";
+  size_t na = _k_strlen(a), nb = _k_strlen(b);
+  char *o = (char *)_k_arena_alloc(na + nb + 1);
+  _k_memcpy(o, a, na);
+  _k_memcpy(o + na, b, nb);
+  o[na + nb] = 0;
+  return o;
+}
+
+static int64_t kval_eq(KVal a, KVal b) {
+  if (a.tag == KV_I64 && b.tag == KV_F64) return (double)a.u.i == b.u.f;
+  if (a.tag == KV_F64 && b.tag == KV_I64) return a.u.f == (double)b.u.i;
+  if (a.tag != b.tag) return 0;
+  if (a.tag == KV_I64) return a.u.i == b.u.i;
+  if (a.tag == KV_F64) return a.u.f == b.u.f;
+  if (a.tag == KV_STR) return _k_strcmp(a.u.s ? a.u.s : "", b.u.s ? b.u.s : "") == 0;
+  if (a.tag == KV_LIST) return a.u.list_id == b.u.list_id;
+  return 0;
+}
+
+static KVal kstr_index_val(const char *s, int64_t i) {
+  if (!s) k_die("str index on null");
+  size_t n = _k_strlen(s);
+  if (i < 0 || (size_t)i >= n) k_die("str index oob");
+  char *o = (char *)_k_arena_alloc(2);
+  o[0] = s[i]; o[1] = 0;
+  return kval_str(o);
+}
+
+static KVal kval_index(KVal v, int64_t i) {
+  if (v.tag == KV_LIST) return klist_get_val(v.u.list_id, i);
+  if (v.tag == KV_STR)  return kstr_index_val(v.u.s, i);
+  k_die("index on non-list/str");
+  return kval_i64(0);
+}
+
+static int64_t kval_len(KVal v) {
+  if (v.tag == KV_LIST) return klist_len(v.u.list_id);
+  if (v.tag == KV_STR)  return (int64_t)_k_strlen(v.u.s ? v.u.s : "");
+  k_die("len on non-list/str");
+  return 0;
+}
+
+/* freestanding stubs for kenga_print* (no-op; use kputs() externally) */
+static void kenga_println_i64(int64_t /*v*/) { }
+static void kenga_println_f64(double /*v*/) { }
+static void kenga_println_str(const char * /*s*/) { }
+static void kenga_print_val(KVal /*v*/) { }
+static void kenga_println_val(KVal /*v*/) { }
+static void kenga_println_list(int64_t /*id*/) { }
+
+static void k_assert(int64_t c) { if (!c) k_die("assert failed"); }
 static int64_t k_ord(const char *s) {
   if (!s || !s[0]) return 0;
   return (unsigned char)s[0];
