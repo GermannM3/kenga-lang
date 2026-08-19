@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    AssignTarget, BinaryOp, Expr, Function, Item, Program, Stmt, Type, UnaryOp,
+    AssignTarget, BinaryOp, Block, Expr, Function, Item, Program, Stmt, Type, UnaryOp,
 };
 use crate::error::{KengaError, Result};
 
@@ -90,6 +90,18 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
                 has_main = true;
             }
         }
+        // @intrinsic fn foo(...) -> t;  — extern/FFI declaration. Feed its
+        // signature into sigs so calls get proper arg coercion, and emit a
+        // C prototype below.
+        if let Item::Intrinsic(i) = item {
+            let ret = map_type(&i.ret, &structs)?;
+            let params = i
+                .params
+                .iter()
+                .map(|p| map_type(&p.ty, &structs))
+                .collect::<Result<Vec<_>>>()?;
+            sigs.insert(i.name.clone(), (ret, params));
+        }
     }
     if !has_main {
         return Err(KengaError::new("emit-c requires fn main()", None));
@@ -114,6 +126,21 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
                 continue;
             }
             body.push_str(&emit_prototype(f, &structs)?);
+            body.push_str(";\n");
+        }
+        // FFI prototypes for user-declared @intrinsic fn (kernel externs).
+        if let Item::Intrinsic(i) = item {
+            if is_builtin_intrinsic(&i.name) {
+                continue;
+            }
+            let f = Function {
+                name: i.name.clone(),
+                params: i.params.clone(),
+                ret: i.ret.clone(),
+                body: Block { stmts: vec![] },
+                span: i.span.clone(),
+            };
+            body.push_str(&emit_prototype(&f, &structs)?);
             body.push_str(";\n");
         }
     }
@@ -248,6 +275,21 @@ fn c_ident(name: &str) -> String {
     } else {
         format!("k_{name}")
     }
+}
+
+/// Intrinsics that emit_c special-cases inline (mmio, asm, atomic, len/ord/assert,
+/// print). They must NOT get a `k_<name>` prototype: some collide with static
+/// helpers in the emitted runtime (k_ord, k_assert, kenga_println_*). Calls to
+/// them never resolve to a real `k_<name>` symbol.
+fn is_builtin_intrinsic(name: &str) -> bool {
+    matches!(name,
+        "len" | "ord" | "assert" | "print" | "println"
+        | "mmio_read8" | "mmio_read16" | "mmio_read32" | "mmio_read64"
+        | "mmio_write8" | "mmio_write16" | "mmio_write32" | "mmio_write64"
+        | "asm_hlt" | "asm_cli" | "asm_sti" | "asm"
+        | "asm_inb" | "asm_inw" | "asm_inl"
+        | "asm_outb" | "asm_outw" | "asm_outl"
+        | "atomic_load" | "atomic_store" | "atomic_cas" | "atomic_fence")
 }
 
 fn escape_c(s: &str) -> String {
@@ -775,6 +817,46 @@ fn emit_intrinsic_call(
             writeln!(out, "{p}__asm__ __volatile__({code});").unwrap();
             Ok((out, "0".into()))
         }
+        "asm_inb" | "asm_inw" | "asm_inl" => {
+            if args.len() != 1 {
+                return Err(KengaError::at(
+                    "asm_inb/asm_inw/asm_inl take 1 arg (port)",
+                    span.clone(),
+                ));
+            }
+            let (p, port) = emit_as_i64(&args[0], ctx)?;
+            let (var_ty, size) = match name {
+                "asm_inb" => ("uint8_t", "b"),
+                "asm_inw" => ("uint16_t", "w"),
+                _ => ("uint32_t", "l"),
+            };
+            let mut out = p;
+            out += &format!("{var_ty} _k_port_in;\n");
+            out += &format!(
+                "__asm__ __volatile__(\"in{size} %1, %0\" : \"=a\"(_k_port_in) : \"Nd\"((uint16_t)({port})));\n"
+            );
+            Ok((out, "((int64_t)_k_port_in)".into()))
+        }
+        "asm_outb" | "asm_outw" | "asm_outl" => {
+            if args.len() != 2 {
+                return Err(KengaError::at(
+                    "asm_outb/asm_outw/asm_outl take 2 args (port, val)",
+                    span.clone(),
+                ));
+            }
+            let (p1, port) = emit_as_i64(&args[0], ctx)?;
+            let (p2, val) = emit_as_i64(&args[1], ctx)?;
+            let (val_ty, size) = match name {
+                "asm_outb" => ("uint8_t", "b"),
+                "asm_outw" => ("uint16_t", "w"),
+                _ => ("uint32_t", "l"),
+            };
+            let mut out = format!("{p1}{p2}");
+            out += &format!(
+                "__asm__ __volatile__(\"out{size} %0, %1\" : : \"a\"(({val_ty})({val})), \"Nd\"((uint16_t)({port})));\n"
+            );
+            Ok((out, "0".into()))
+        }
         "atomic_load" => {
             if args.len() != 1 {
                 return Err(KengaError::at("atomic_load takes 1 arg (ptr)", span.clone()));
@@ -1027,6 +1109,8 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             "mmio_read8"  | "mmio_read16" | "mmio_read32" | "mmio_read64"
           | "mmio_write8" | "mmio_write16"| "mmio_write32"| "mmio_write64"
           | "asm_hlt" | "asm_cli" | "asm_sti"
+          | "asm_inb" | "asm_inw" | "asm_inl"
+          | "asm_outb" | "asm_outw" | "asm_outl"
           | "atomic_load" | "atomic_store" | "atomic_cas" | "atomic_fence"
           | "asm" => {
                 emit_intrinsic_call(callee.as_str(), &args, span, ctx)
@@ -1474,17 +1558,18 @@ static KListObj *klist_obj(int64_t id) {
 static void* _k_arena_alloc(size_t n) {
   /* Allocation hook order (kernel-friendly):
    *   1) weak kf_alloc(n)  — kernel provides its own allocator (kmalloc/buddy). Declare in kf_rt.h.
-   *   2) weak __builtin_malloc(n) — libc fallback.
+   *   2) weak kf_libc_malloc(n) — optional libc fallback (hosted toolchains only).
    *   3) k_die("oom") — last resort. In real kernels kf_alloc must be provided.
+   * NOTE: do not use __builtin_malloc here — clang forbids taking its address.
    */
   extern void* kf_alloc(size_t) __attribute__((weak));
   if (&kf_alloc) {
     void* p = kf_alloc(n);
     if (p) return p;
   }
-  extern void* __builtin_malloc(size_t) __attribute__((weak));
-  if (&__builtin_malloc) {
-    void* p = __builtin_malloc(n);
+  extern void* kf_libc_malloc(size_t) __attribute__((weak));
+  if (&kf_libc_malloc) {
+    void* p = kf_libc_malloc(n);
     if (p) return p;
   }
   k_die("oom");
