@@ -5,8 +5,8 @@ import sys
 from huggingface_hub import HfApi, create_repo, upload_folder
 
 TOKEN = "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"
-REPO_ID = os.environ.get("KENGA_HF_REPO", "GermannM/kenga-prophet")
-FOLDER = "hf/Kenga-prophet"
+REPO_ID = os.environ.get("KENGA_HF_REPO", "GermannM/kenga-prophet-m2-k16")
+FOLDER = "hf/Kenga-prophet-m2-k16"
 
 api = HfApi(token=TOKEN)
 

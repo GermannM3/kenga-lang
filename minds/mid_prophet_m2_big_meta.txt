@@ -1,1 +1,8 @@
-V=28\nK=8\ntrain_tokens=156622\nparams=6300\nepochs=60\nlr=0.005\nheld_total=665\nheld_correct=149\n
+V=28
+K=8
+train_tokens=156622
+params=6300
+epochs=60
+lr=0.005
+held_total=665
+held_correct=149

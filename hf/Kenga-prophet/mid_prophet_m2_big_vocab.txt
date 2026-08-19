@@ -1,1 +1,29 @@
-# vocab tokens = 28\n0\tfn\n1\treturn\n2\tlet\n3\tif\n4\telse\n5\twhile\n6\tfor\n7\ti64\n8\t:\n9\t,\n10\t;\n11\t{\n12\t}\n13\t(\n14\t)\n15\t->\n16\t+\n17\t-\n18\t*\n19\t/\n20\t=\n21\t==\n22\t<\n23\t<=\n24\t>\n25\tprintln\n26\tID\n27\tNUM\n
+# vocab tokens = 28
+0	fn
+1	return
+2	let
+3	if
+4	else
+5	while
+6	for
+7	i64
+8	:
+9	,
+10	;
+11	{
+12	}
+13	(
+14	)
+15	->
+16	+
+17	-
+18	*
+19	/
+20	=
+21	==
+22	<
+23	<=
+24	>
+25	println
+26	ID
+27	NUM

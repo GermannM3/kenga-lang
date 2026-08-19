@@ -1,0 +1,8 @@
+V=28
+K=16
+train_tokens=156622
+params=12572
+epochs=60
+lr=0.005
+held_total=593
+held_correct=139

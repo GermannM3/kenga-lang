@@ -6,11 +6,11 @@ kenga source corpus (~186 .kenga files). Uses numpy for tractable
 training time.
 
 Outputs:
-  minds/mid_prophet_m2_big_w.txt       -- integer weights, scale=1000
-  minds/mid_prophet_m2_big_vocab.txt   -- 28-token codec
-  minds/mid_prophet_m2_big_train.txt   -- first 90% (token ids)
-  minds/mid_prophet_m2_big_test.txt    -- last 10% (token ids)
-  minds/mid_prophet_m2_big_meta.txt    -- accuracy summary
+  minds/mid_prophet_m2_k16_w.txt       -- integer weights, scale=1000
+  minds/mid_prophet_m2_k16_vocab.txt   -- 28-token codec
+  minds/mid_prophet_m2_k16_train.txt   -- first 90% (token ids)
+  minds/mid_prophet_m2_k16_test.txt    -- last 10% (token ids)
+  minds/mid_prophet_m2_k16_meta.txt    -- accuracy summary
 
 Run:
   /c/Python314/python tools/train_m2_big.py
@@ -144,7 +144,7 @@ def main():
     print(f'total train tokens: {len(big)}')
 
     os.makedirs('minds', exist_ok=True)
-    with open('minds/mid_prophet_m2_big_vocab.txt', 'w') as f:
+    with open('minds/mid_prophet_m2_k16_vocab.txt', 'w') as f:
         f.write(f'# vocab tokens = {NUM_TOK}\n')
         for tok, idx in VOCAB.items():
             f.write(f'{idx}\t{tok}\n')
@@ -153,13 +153,13 @@ def main():
     split = int(n * 0.9)
     train_stream = big[:split]
     val_stream = big[split:]
-    with open('minds/mid_prophet_m2_big_train.txt', 'w') as f:
+    with open('minds/mid_prophet_m2_k16_train.txt', 'w') as f:
         f.write(' '.join(str(x) for x in train_stream))
-    with open('minds/mid_prophet_m2_big_test.txt', 'w') as f:
+    with open('minds/mid_prophet_m2_k16_test.txt', 'w') as f:
         f.write(' '.join(str(x) for x in val_stream))
 
     # numpy training: vectorized softmax-linear, K=window, V=28
-    K = 8
+    K = 16  # M2.1 explicit
     V = NUM_TOK
     rng = np.random.RandomState(7)
     W = rng.randn(V, K * V) * 0.02
@@ -221,7 +221,7 @@ def main():
 
     # Save weights
     SCALE = 1000
-    with open('minds/mid_prophet_m2_big_w.txt', 'w') as f:
+    with open('minds/mid_prophet_m2_k16_w.txt', 'w') as f:
         f.write(f'vocab={V} k={K} scale={SCALE}\n')
         for v in range(V):
             row = [round(float(W[v, d]) * SCALE) for d in range(K * V)]
@@ -254,10 +254,10 @@ def main():
         name = p.replace('\\\\', '/').split('/')[-1]
         print(f'  held {name}: {c}/{t} = {c*100/t:.2f}%')
 
-    print(f'\noverall kenga_seed_* held-out: {correct}/{val_total} = {correct*100/val_total:.2f}%')
+    print(f'\nkenga-prophet m2.1 (K=16) held-out: {correct}/{val_total} = {correct*100/val_total:.2f}%')
 
     # Save summary
-    with open('minds/mid_prophet_m2_big_meta.txt', 'w') as f:
+    with open('minds/mid_prophet_m2_k16_meta.txt', 'w') as f:
         f.write(f'V={V}\n')
         f.write(f'K={K}\n')
         f.write(f'train_tokens={n_total}\n')

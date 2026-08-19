@@ -123,9 +123,9 @@ def main():
 
     os.makedirs('minds', exist_ok=True)
     with open('minds/mid_prophet_m2_big_vocab.txt','w') as f:
-        f.write(f'# vocab tokens = {NUM_TOK}\\n')
+        f.write(f'# vocab tokens = {NUM_TOK}\n')
         for tok, idx in VOCAB.items():
-            f.write(f'{idx}\\t{tok}\\n')
+            f.write(f'{idx}\t{tok}\n')
 
     # Architecture: embed(K=8) -> sum+linear -> hidden(32) -> output(28)
     K = 8
@@ -218,15 +218,15 @@ def main():
     # Save: write E,W1,W2,b1,b2 to single file
     SCALE = 1000
     with open('minds/mid_prophet_m2_big_w.txt','w') as f:
-        f.write(f'vocab={V} k={K} dim={DIM} h={H} scale={SCALE} arch=mlp\\n')
-        f.write(f'[E] ' + ','.join(str(int(round(float(E[v,d])*SCALE))) for v in range(V) for d in range(DIM)) + '\\n')
-        f.write(f'[W1] ' + ','.join(str(int(round(float(W1[i,j])*SCALE))) for i in range(DIM) for j in range(H)) + '\\n')
-        f.write(f'[b1] ' + ','.join(str(int(round(float(b1[j])*SCALE))) for j in range(H)) + '\\n')
-        f.write(f'[W2] ' + ','.join(str(int(round(float(W2[i,j])*SCALE))) for i in range(H) for j in range(V)) + '\\n')
-        f.write(f'[b2] ' + ','.join(str(int(round(float(b2[j])*SCALE))) for j in range(V)) + '\\n')
+        f.write(f'vocab={V} k={K} dim={DIM} h={H} scale={SCALE} arch=mlp\n')
+        f.write(f'[E] ' + ','.join(str(int(round(float(E[v,d])*SCALE))) for v in range(V) for d in range(DIM)) + '\n')
+        f.write(f'[W1] ' + ','.join(str(int(round(float(W1[i,j])*SCALE))) for i in range(DIM) for j in range(H)) + '\n')
+        f.write(f'[b1] ' + ','.join(str(int(round(float(b1[j])*SCALE))) for j in range(H)) + '\n')
+        f.write(f'[W2] ' + ','.join(str(int(round(float(W2[i,j])*SCALE))) for i in range(H) for j in range(V)) + '\n')
+        f.write(f'[b2] ' + ','.join(str(int(round(float(b2[j])*SCALE))) for j in range(V)) + '\n')
 
     # Held-out eval
-    print(f'\\n=== held-out evaluation ===')
+    print(f'\n=== held-out evaluation ===')
     val_total = 0
     correct = 0
     for p in held_files:
@@ -250,7 +250,7 @@ def main():
         correct += c
         name = p.replace('\\\\','/').split('/')[-1]
         print(f'  held {name}: {c}/{t} = {c*100/t:.2f}%')
-    print(f'\\noverall held-out: {correct}/{val_total} = {correct*100/val_total:.2f}%')
+    print(f'\noverall held-out: {correct}/{val_total} = {correct*100/val_total:.2f}%')
 
     # Also eval on last 10% of training as in-dist
     n = len(big); split = int(n*0.9)
