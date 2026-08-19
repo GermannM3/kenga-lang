@@ -5,8 +5,8 @@ import sys
 from huggingface_hub import HfApi, create_repo, upload_folder
 
 TOKEN = "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"
-REPO_ID = os.environ.get("KENGA_HF_REPO", "GermannM/kenga-prophet-m2-k16")
-FOLDER = "hf/Kenga-prophet-m2-k16"
+REPO_ID = os.environ.get("KENGA_HF_REPO", "GermannM/kenga-prophet-m3")
+FOLDER = "hf/Kenga-prophet-m3"
 
 api = HfApi(token=TOKEN)
 
@@ -19,7 +19,7 @@ result = upload_folder(
     repo_id=REPO_ID,
     repo_type="model",
     token=TOKEN,
-    commit_message="Kenga Prophet M2: linear token predictor (~6.3K params) on Kenga corpus, 21.4% held-out token accuracy",
+    commit_message="Kenga Prophet M3: numpy transformer decoder (~11.1K params) on Kenga corpus, 71.9% held-out token accuracy",
 )
 print("uploaded:")
 print(result)
