@@ -147,18 +147,34 @@ five-axis stack**, not to graft more parameters in:
 ## Current measured numbers
 
 ```
-scripts/pico-birth.sh      -> 9 / 9 (100%) on 9 narrow Kenga-targets
+scripts/pico-birth.sh        -> 9 / 9 (100%) on 9 narrow Kenga-targets
 scripts/mid-birth-classify.sh -> 8 / 9 (89%) on a 9-seed signature-NN
-docs/NEUROMODEL_27B.md     -> 6-axis stack declaration
+scripts/mid-birth-m2.sh      -> 254 / 312 (81%) on 4 held-out Kenga programs
+docs/NEUROMODEL_27B.md       -> 6-axis stack declaration
 ```
 
-The Mid-Prophet M1 figure (8/9) loses the `sqr` seed via a Lite
-more-VM parser/runtime quirk specific to that seed's character
-profile. This is documented; the **signature algorithm itself**
-classifies correctly when the underlying string operations complete.
-A future commit will route `mid_prophet_classify.kenga` through
-native C via the byte-code path to remove the Lite-more-VM
-interference.
+The progression:
+
+* **Pico-Prophet (M0)**: 0 parameter suffix-LM, generates 9/9 compiler-and-runnable
+  Kenga programs on a 9-seed corpus.
+* **Mid-Prophet M1**: 0 parameter signature-NN classifier, 8/9 on the same
+  in-distribution probe set (one Lite more-VM parser quirk costs us the
+  `sqr` seed).
+* **Mid-Prophet M2**: ~2916-parameter linear classifier over a 28-token
+  Kenga codepoint vocabulary, trained in Python (`tools/train_m2.py`)
+  and shipped as integer weights; inference runs in Kenga Lite.
+  Held-out token-level accuracy on 4 unseen programs is
+  **254 / 312 = 81%**. This is still under the 27B threshold gap
+  (≤ 0% on the same task), but no longer zero: the small model starts
+  to model the **lexical semantics** of Kenga, not just the
+  identifier frequencies or the longest source-line suffix.
+
+The M1 figure (8/9) loses the `sqr` seed via a Lite more-VM
+parser/runtime quirk specific to that seed's character
+profile. The M2 figure is computed by running the same Python
+trainer twice — once natively in Python, once fully in Lite — and
+the two outputs match exactly, which is what makes the cross-
+language round-trip honest.
 * Replace the suffix walker with a 128-d 2-layer decoder over the
   BPE tokens (see `examples/ml/kenga_lm.kenga`). D=32 L=2 fits in
   < 100 KB of `double*` and runs native C in 0.34 s.
