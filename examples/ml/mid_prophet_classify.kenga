@@ -1,0 +1,141 @@
+// Mid-Prophet M1: cluster Kenga programs by signature (a..z frequency)
+// and pick the closest seed by approximate cosine.
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\mid_prophet_classify.kenga
+//
+// Args file examples/ml/_mid_args.txt:
+//   line 1: probe program path
+//   line 2+: candidate seed signatures ("a:b:c:..." 26 numbers)
+// Output: "id=N score=M" where N is the closest seed index.
+
+fn add_i(s: str, n: i64) -> str {
+    let out = s;
+    let sign: i64 = 0;
+    let v: i64 = n;
+    if v < 0 { sign = 1; v = 0 - v; }
+    if v == 0 { out = out + "0"; return out; }
+    let rev: str = "";
+    while v > 0 {
+        let d: i64 = v - (v / 10) * 10;
+        let c: str = "";
+        if d == 0 { c = "0"; }
+        if d == 1 { c = "1"; } if d == 2 { c = "2"; } if d == 3 { c = "3"; }
+        if d == 4 { c = "4"; } if d == 5 { c = "5"; } if d == 6 { c = "6"; }
+        if d == 7 { c = "7"; } if d == 8 { c = "8"; } if d == 9 { c = "9"; }
+        rev = c + rev;
+        v = v / 10;
+    }
+    if sign == 1 { rev = "-" + rev; }
+    return out + rev;
+}
+
+fn split_lines(s: str) -> list {
+    let out = [];
+    let cur: str = "";
+    let i: i64 = 0;
+    while i < len(s) {
+        if s[i] == "\n" {
+            let lc: str = "";
+            let j: i64 = 0;
+            while j < len(cur) {
+                if cur[j] != "\r" {
+                    lc = lc + cur[j];
+                }
+                j = j + 1;
+            }
+            out = push(out, lc);
+            cur = "";
+            i = i + 1;
+            continue;
+        }
+        cur = cur + s[i];
+        i = i + 1;
+    }
+    return out;
+}
+
+fn count_char(s: str, ch: str) -> i64 {
+    let c: i64 = 0;
+    let i: i64 = 0;
+    while i < len(s) {
+        if s[i] == ch { c = c + 1; }
+        i = i + 1;
+    }
+    return c;
+}
+
+fn main() -> i64 {
+    let raw = split_lines(read_file("examples/ml/_mid_args.txt"));
+    let probe = signature(read_file(raw[0]));
+    let best_i: i64 = 0 - 1;
+    let best_score: i64 = 0;
+    let k: i64 = 1;
+    while k < len(raw) {
+        let sig = parse_signature(raw[k]);
+        let score: i64 = cos_approx(probe, sig);
+        if score > best_score {
+            best_score = score;
+            best_i = k - 1;
+        }
+        k = k + 1;
+    }
+    if best_i < 0 {
+        println("<unknown>");
+    } else {
+        println(add_i("id=", best_i) + add_i(" score=", best_score));
+    }
+    return 0;
+}
+
+fn signature(s: str) -> list {
+    let chars: str = "abcdefghijklmnopqrstuvwxyz";
+    let r = [];
+    let i: i64 = 0;
+    while i < 26 {
+        r = push(r, count_char(s, chars[i]));
+        i = i + 1;
+    }
+    return r;
+}
+
+fn parse_signature(line: str) -> list {
+    let parts = [];
+    let cur: i64 = 0;
+    let i: i64 = 0;
+    while i < len(line) {
+        if line[i] == ":" {
+            parts = push(parts, cur);
+            cur = 0;
+            i = i + 1;
+            continue;
+        }
+        let ch: str = line[i];
+        let d: i64 = 0 - 1;
+        if ch == "0" { d = 0; } if ch == "1" { d = 1; }
+        if ch == "2" { d = 2; } if ch == "3" { d = 3; }
+        if ch == "4" { d = 4; } if ch == "5" { d = 5; }
+        if ch == "6" { d = 6; } if ch == "7" { d = 7; }
+        if ch == "8" { d = 8; } if ch == "9" { d = 9; }
+        if d >= 0 { cur = cur * 10 + d; }
+        i = i + 1;
+    }
+    parts = push(parts, cur);
+    return parts;
+}
+
+fn cos_approx(a: list, b: list) -> i64 {
+    let dot: i64 = 0;
+    let sa: i64 = 0;
+    let sb: i64 = 0;
+    let i: i64 = 0;
+    while i < len(a) {
+        let av = a[i];
+        let bv = b[i];
+        dot = dot + av * bv;
+        sa = sa + av * av;
+        sb = sb + bv * bv;
+        i = i + 1;
+    }
+    if sa < 1 || sb < 1 { return 0; }
+    return dot * 10000 / (sa + sb);
+}
