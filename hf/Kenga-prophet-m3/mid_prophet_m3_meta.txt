@@ -1,0 +1,8 @@
+V=28
+K=32
+D=32
+H=4
+HEAD=8
+train_tokens=136298
+steps=2400
+LR=0.005
