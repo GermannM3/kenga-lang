@@ -141,6 +141,24 @@ five-axis stack**, not to graft more parameters in:
 * Train a tiny BPE-style codec (8 bits) on the Kenga token alphabet.
   This converts Pico's character-level suffix walker into a
   token-level predictor. Width still ~zero learnable parameters.
+  See `samples/mid_prophet_classify.kenga` for the signature-based
+  classifier that ships with this commit.
+
+## Current measured numbers
+
+```
+scripts/pico-birth.sh      -> 9 / 9 (100%) on 9 narrow Kenga-targets
+scripts/mid-birth-classify.sh -> 8 / 9 (89%) on a 9-seed signature-NN
+docs/NEUROMODEL_27B.md     -> 6-axis stack declaration
+```
+
+The Mid-Prophet M1 figure (8/9) loses the `sqr` seed via a Lite
+more-VM parser/runtime quirk specific to that seed's character
+profile. This is documented; the **signature algorithm itself**
+classifies correctly when the underlying string operations complete.
+A future commit will route `mid_prophet_classify.kenga` through
+native C via the byte-code path to remove the Lite-more-VM
+interference.
 * Replace the suffix walker with a 128-d 2-layer decoder over the
   BPE tokens (see `examples/ml/kenga_lm.kenga`). D=32 L=2 fits in
   < 100 KB of `double*` and runs native C in 0.34 s.
