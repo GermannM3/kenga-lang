@@ -2,6 +2,7 @@
 setlocal
 cd /d "%~dp0"
 if not exist bin mkdir bin
+if not exist minds mkdir minds
 
 set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
 if exist "%VCVARS%" (
