@@ -65,7 +65,7 @@ All values are ints scaled ×1000 (divide by 1000 at load).
 ## Provenance
 
 ```
-Kenga commit  :  (to be filled at publish)
+Kenga commit  :  ddd48da
 Training   V  :  28
 Context    K  :  32
 Embed dim  D  :  32
