@@ -378,6 +378,7 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
             match op {
                 UnaryOp::Neg => ops.push(Op::Neg),
                 UnaryOp::Not => ops.push(Op::Not),
+                UnaryOp::BitNot => ops.push(Op::BitNot),
             }
         }
         Expr::Binary {
@@ -399,6 +400,11 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                 BinaryOp::Ge => Op::Ge,
                 BinaryOp::And => Op::And,
                 BinaryOp::Or => Op::Or,
+                BinaryOp::BitAnd => Op::BitAnd,
+                BinaryOp::BitOr => Op::BitOr,
+                BinaryOp::BitXor => Op::BitXor,
+                BinaryOp::Shl => Op::Shl,
+                BinaryOp::Shr => Op::Shr,
             });
         }
         Expr::Call { callee, args, span } => {

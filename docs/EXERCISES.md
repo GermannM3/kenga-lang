@@ -14,11 +14,39 @@ fn main() -> i64 {
   if file_exists("kenga/compiler/more.kenga") == 1 {
     println("have more.kenga");
   }
+  let line = read_line();
+  if len(line) > 0 { println(line); }
   return 0;
 }
 ```
 
-Прогони дважды: через `kenga run --lite` (без аргументов → `argc() == 0`, ветка `arg(0)` не сработает) и через native exe — `scripts\bc-run.cmd examples\exercises\e00_argc.kenga myarg`. Без Rust, без аргументов host просто даёт 0; с exe ты получаешь свой `argv[0]`. Шпаргалка: `examples/selfhost/bc_argc.kenga`.
+Прогони дважды:
+- через `bootstrap\bin\kenga-lite.exe run` (без аргументов → `argc() == 0`, ветка `arg(0)` не сработает);
+- через native exe — `scripts\bc-run.cmd examples\exercises\e00_argc.kenga myarg` (подтянет gcc/cl и соберёт `.exe`).
+
+Шпаргалка: `examples/selfhost/bc_argc.kenga` и `examples/selfhost/bc_files.kenga`.
+
+## E_bitops. Битовые операции
+
+Напиши `examples/exercises/e_bitops.kenga`. Нужны: `&`, `|`, `^`, `~`, `<<`, `>>`.
+
+Сценарий ядра KengaOS: прочитай "key" (любое число) и распакуй low/high нibbles маской `& 0xF` и сдвигом `>> 4` — это то, что каждая функция VGA / 8259 / UART делает.
+
+```kenga
+fn main() -> i64 {
+  let key = 0xC0DEF00D;
+  let lo = key & 0xF;
+  let hi = (key >> 12) & 0xF;
+  // Ожидай lo == 13, hi == 12  (или посчитай вручную).
+  println(lo);
+  println(hi);
+  // Проверь precedence — & выше |, | выше ^:
+  println(0xF0 | 0x0F & 0xFF);  // → 0xFF = 255
+  return 0;
+}
+```
+
+Шпаргалка: `examples/selfhost/bitops.kenga`. Прогон через **Rust VM или emit-c → gcc** — kenga-lite C VM пока не покрывает.
 
 ## E1. Арифметика
 

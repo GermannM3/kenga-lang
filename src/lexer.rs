@@ -162,6 +162,32 @@ impl<'a> Lexer<'a> {
                     TokenKind::Not
                 }
             }
+            '&' if self.peek() == Some('&') => {
+                self.bump();
+                TokenKind::And
+            }
+            // Bitwise & (single character, or operator — `& expr`).
+            '&' => TokenKind::Amp,
+            '|' if self.peek() == Some('|') => {
+                self.bump();
+                TokenKind::Or
+            }
+            // Bitwise |.
+            '|' => TokenKind::Pipe,
+            // Bitwise ^ (XOR).
+            '^' => TokenKind::Caret,
+            // Bitwise ~ (unary NOT; lexer emits same token as binary op — parser resolves).
+            '~' => TokenKind::Tilde,
+            // Shift left << must precede < to avoid matching as separate tokens.
+            '<' if self.peek() == Some('<') => {
+                self.bump();
+                TokenKind::Shl
+            }
+            // Shift right >> must precede > likewise.
+            '>' if self.peek() == Some('>') => {
+                self.bump();
+                TokenKind::Shr
+            }
             '<' => {
                 if self.peek() == Some('=') {
                     self.bump();
@@ -177,14 +203,6 @@ impl<'a> Lexer<'a> {
                 } else {
                     TokenKind::Gt
                 }
-            }
-            '&' if self.peek() == Some('&') => {
-                self.bump();
-                TokenKind::And
-            }
-            '|' if self.peek() == Some('|') => {
-                self.bump();
-                TokenKind::Or
             }
             other => {
                 return Err(KengaError::at(

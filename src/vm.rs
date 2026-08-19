@@ -236,6 +236,50 @@ impl Vm {
                 let a = self.pop()?;
                 self.stack.push(Value::Bool(!a.as_bool()));
             }
+            Op::BitNot => match self.pop()? {
+                Value::I64(n) => self.stack.push(Value::I64(!n)),
+                _ => return Err(KengaError::new("~ on non-i64", None)),
+            },
+            Op::BitAnd => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                match (a, b) {
+                    (Value::I64(x), Value::I64(y)) => self.stack.push(Value::I64(x & y)),
+                    _ => return Err(KengaError::new("& expects i64", None)),
+                }
+            }
+            Op::BitOr => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                match (a, b) {
+                    (Value::I64(x), Value::I64(y)) => self.stack.push(Value::I64(x | y)),
+                    _ => return Err(KengaError::new("| expects i64", None)),
+                }
+            }
+            Op::BitXor => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                match (a, b) {
+                    (Value::I64(x), Value::I64(y)) => self.stack.push(Value::I64(x ^ y)),
+                    _ => return Err(KengaError::new("^ expects i64", None)),
+                }
+            }
+            Op::Shl => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                match (a, b) {
+                    (Value::I64(x), Value::I64(y)) => self.stack.push(Value::I64(x << y)),
+                    _ => return Err(KengaError::new("<< expects i64", None)),
+                }
+            }
+            Op::Shr => {
+                let b = self.pop()?;
+                let a = self.pop()?;
+                match (a, b) {
+                    (Value::I64(x), Value::I64(y)) => self.stack.push(Value::I64(x >> y)),
+                    _ => return Err(KengaError::new(">> expects i64", None)),
+                }
+            }
             Op::Eq => {
                 let b = self.pop()?;
                 let a = self.pop()?;

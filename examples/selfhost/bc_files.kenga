@@ -1,0 +1,22 @@
+// bc_files.kenga — file_exists + read_file + write_file round-trip on a tiny file.
+// Run through native exe: scripts/bc-run.cmd examples/selfhost/bc_files.kenga
+
+fn main() -> i64 {
+  let p = "minds/_bc_files_smoke.txt";
+
+  // OP_WRITE_FILE via write_file builtin.
+  assert(write_file(p, "kenga file smoke\n") == 1);
+  assert(file_exists(p) == 1);
+
+  // OP_READ_FILE via read_file builtin; verify the bytes we just wrote.
+  let body = read_file(p);
+  let n = len(body);
+  // body == "kenga file smoke\n"  -> len 17
+  assert(n == 17);
+
+  // OP_FILE_EXISTS: file absent vs present.
+  assert(file_exists("no_such_zz.kenga") == 0);
+
+  println("bc_files ok");
+  return 0;
+}

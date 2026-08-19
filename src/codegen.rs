@@ -604,6 +604,7 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
                 UnaryOp::Neg if t == CTy::F64 => CTy::F64,
                 UnaryOp::Neg if is_numeric(&t) => CTy::I64,
                 UnaryOp::Not => CTy::I64,
+                UnaryOp::BitNot if is_numeric(&t) => CTy::I64,
                 _ => CTy::I64,
             }
         }
@@ -924,6 +925,7 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             let o = match op {
                 UnaryOp::Neg => "-",
                 UnaryOp::Not => "!",
+                UnaryOp::BitNot => "~",
             };
             Ok((p, format!("({o}{e})")))
         }
@@ -1002,6 +1004,11 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 BinaryOp::Ge => ">=",
                 BinaryOp::And => "&&",
                 BinaryOp::Or => "||",
+                BinaryOp::BitAnd => "&",
+                BinaryOp::BitOr => "|",
+                BinaryOp::BitXor => "^",
+                BinaryOp::Shl => "<<",
+                BinaryOp::Shr => ">>",
             };
             Ok((format!("{pl}{pr}"), format!("({l} {o} {r})")))
         }

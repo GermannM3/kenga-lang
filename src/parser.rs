@@ -419,12 +419,57 @@ impl Parser {
     }
 
     fn parse_and(&mut self) -> Result<Expr> {
-        let mut left = self.parse_equality()?;
+        let mut left = self.parse_bitor()?;
         while self.check(&TokenKind::And) {
+            let span = self.bump().span;
+            let right = self.parse_bitor()?;
+            left = Expr::Binary {
+                op: BinaryOp::And,
+                left: Box::new(left),
+                right: Box::new(right),
+                span,
+            };
+        }
+        Ok(left)
+    }
+
+    fn parse_bitor(&mut self) -> Result<Expr> {
+        let mut left = self.parse_bitxor()?;
+        while self.check(&TokenKind::Pipe) {
+            let span = self.bump().span;
+            let right = self.parse_bitxor()?;
+            left = Expr::Binary {
+                op: BinaryOp::BitOr,
+                left: Box::new(left),
+                right: Box::new(right),
+                span,
+            };
+        }
+        Ok(left)
+    }
+
+    fn parse_bitxor(&mut self) -> Result<Expr> {
+        let mut left = self.parse_bitand()?;
+        while self.check(&TokenKind::Caret) {
+            let span = self.bump().span;
+            let right = self.parse_bitand()?;
+            left = Expr::Binary {
+                op: BinaryOp::BitXor,
+                left: Box::new(left),
+                right: Box::new(right),
+                span,
+            };
+        }
+        Ok(left)
+    }
+
+    fn parse_bitand(&mut self) -> Result<Expr> {
+        let mut left = self.parse_equality()?;
+        while self.check(&TokenKind::Amp) {
             let span = self.bump().span;
             let right = self.parse_equality()?;
             left = Expr::Binary {
-                op: BinaryOp::And,
+                op: BinaryOp::BitAnd,
                 left: Box::new(left),
                 right: Box::new(right),
                 span,
@@ -454,13 +499,33 @@ impl Parser {
     }
 
     fn parse_comparison(&mut self) -> Result<Expr> {
-        let mut left = self.parse_term()?;
+        let mut left = self.parse_shift()?;
         loop {
             let op = match self.peek_kind() {
                 TokenKind::Lt => BinaryOp::Lt,
                 TokenKind::Le => BinaryOp::Le,
                 TokenKind::Gt => BinaryOp::Gt,
                 TokenKind::Ge => BinaryOp::Ge,
+                _ => break,
+            };
+            let span = self.bump().span;
+            let right = self.parse_shift()?;
+            left = Expr::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+                span,
+            };
+        }
+        Ok(left)
+    }
+
+    fn parse_shift(&mut self) -> Result<Expr> {
+        let mut left = self.parse_term()?;
+        loop {
+            let op = match self.peek_kind() {
+                TokenKind::Shl => BinaryOp::Shl,
+                TokenKind::Shr => BinaryOp::Shr,
                 _ => break,
             };
             let span = self.bump().span;
@@ -532,6 +597,15 @@ impl Parser {
                 let expr = self.parse_unary()?;
                 Ok(Expr::Unary {
                     op: UnaryOp::Not,
+                    expr: Box::new(expr),
+                    span,
+                })
+            }
+            TokenKind::Tilde => {
+                let span = self.bump().span;
+                let expr = self.parse_unary()?;
+                Ok(Expr::Unary {
+                    op: UnaryOp::BitNot,
                     expr: Box::new(expr),
                     span,
                 })

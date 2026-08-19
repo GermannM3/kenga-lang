@@ -1,0 +1,54 @@
+// bitops.kenga — smoke for & | ^ ~ << >> (opcodes 1–109 parity).
+//
+// Kernel-mode relevance (KengaOS): every flag/mask/vga register poke
+// needs these. Bitwise operators are first-class.
+//
+// Run via the Rust bytecode VM:
+//   kenga run examples/bitops.kenga
+// Or compile straight to native C:
+//   gcc -O2 -std=c99 (kenga emit-c examples/bitops.kenga -o out.c) -o out.exe
+// Or as bare-metal:
+//   gcc -ffreestanding -nostdlib -c (kenga emit-c examples/bitops.kenga --freestanding -o out.c)
+//
+// See: docs/LANGUAGE.md (operator section), docs/EXERCISES.md (E_bitops).
+
+fn main() -> i64 {
+  // AND / OR / XOR.
+  println(0xF0 & 0x0F);   // 0
+  println(0xF0 | 0x0F);   // 255
+  println(0xF0 ^ 0x0F);   // 255
+
+  // Shifts.
+  println(1 << 4);        // 16
+  println(0x80 >> 3);     // 16
+
+  // Unary NOT (i64).
+  println(~0);            // -1
+
+  // Precedence snapshot (low → high: || && | ^ & == .. << >> ..).
+  println(0xF0 | 0x0F & 0xFF);  // &  → 0xF0 | 0x0F   = 255
+  println(0x01 ^ 0x02 | 0x04); // ^, | → (1^2) | 4    = 7
+
+  // Mask-and-extract idiom common in kernel ring-buffers.
+  let key: i64 = 0xC0DEF00D;
+  let lo_nibble: i64 = key & 0xF;
+  let hi_nibble: i64 = (key >> 12) & 0xF;
+  println(lo_nibble);          // 13
+  println(hi_nibble);          // 12
+
+  // Bit-set / bit-test pack a flags bitfield.
+  let flags: i64 = 0;
+  flags = flags | (1 << 0);   // IRQF-ready
+  flags = flags | (1 << 1);   // FIQ
+  flags = flags & ~(1 << 1); // clear FIQ
+  println((flags >> 0) & 1);   // 1
+  println((flags >> 1) & 1);   // 0
+
+  // Splice & mask naive ring-buffer header.
+  let msg: i64 = 0xDEADBEEF;
+  let body: i64 = msg & 0xFFFF;
+  let tag:  i64 = (msg >> 16) & 0xFFFF;
+  println(body);               // 48879 = 0xBEEF
+  println(tag);                // 57005 = 0xDEAD
+  return 0;
+}

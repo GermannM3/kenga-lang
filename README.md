@@ -203,6 +203,8 @@ fn main() {
 |---|---|
 | **Установка без Rust, без Python** — `bootstrap\build.cmd` + `kenga-lite` | ✅ |
 | Функции, if/else, while, for/in, break/continue | ✅ |
+| **Битовые** `& \| ^ ~` + сдвиги `<< >>` (Rust VM + emit-c; `kenga-lite` C VM — в плане) | ✅ |
+| HEX `0x3F8` / BINARY `0b101` литералы | ✅ |
 | Списки, ranges, struct, import | ✅ |
 | Living `ttl` / `sweep`, events on/emit/pump | ✅ |
 | **Prophet** — living memory + unroll + `save_mind`/`.km` | ✅ |

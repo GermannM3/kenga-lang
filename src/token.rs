@@ -67,6 +67,13 @@ pub enum TokenKind {
     And,
     Or,
     Not,
+    // bitwise (single & / | / ^ / ~ — disambiguate from logical &&/|| by lexer)
+    Amp,
+    Pipe,
+    Caret,
+    Tilde,
+    Shl,
+    Shr,
 
     DurationMs(u64),
     Eof,
