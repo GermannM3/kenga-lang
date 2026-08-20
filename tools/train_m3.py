@@ -1,17 +1,21 @@
 """
 Mid-Prophet M3: real transformer-style decoder (numpy-only).
 
+Configurable: width (D), depth (L blocks), context (K), heads (H).
+Same training procedure as M3.0 regardless of size, so capacity is
+the only axis changed.
+
 Architecture:
   - 28-token vocabulary
-  - K=32 token context window
-  - learned embedding (28 -> 32) + positional embedding (K -> 32)
-  - one decoder block: causal multi-head attention (4 heads, head_dim=8)
-                       with real QKV projections, + tanh FFN (32 -> 64 -> 32),
-                       residual connections
-  - softmax projection (32 -> 28)
-  - trained with proper backprop through attention + FFN + embeddings
+  - K-token context window
+  - learned embedding (28 -> D) + positional embedding (K -> D)
+  - L decoder blocks: causal multi-head attention (H heads, head_dim=D//H)
+                       with real QKV projections + Wo,
+                       tanh FFN (D -> 2D -> D), residuals
+  - softmax projection (D -> 28)
+  - proper backprop through attention + FFN + embeddings
 
-Train: mini-batch SGD/Adam over the full Kenga corpus. Held out: 9
+Train: mini-batch Adam over the full Kenga corpus. Held out: 9
 kenga_seed_*.kenga programs (next-token accuracy).
 
 Run:
@@ -92,55 +96,83 @@ def collect_corpus():
     return parts
 
 
-class M3:
-    def __init__(self, V, K, D, H, rng):
-        self.V = V
-        self.K = K
-        self.D = D
-        self.H = H
-        self.HEAD = D // H
-        self.E_tok = rng.randn(V, D) * 0.10
-        self.E_pos = rng.randn(K, D) * 0.10
+class Block:
+    """One transformer decoder block: self-attention + tanh FFN, both residual."""
+    def __init__(self, D, FF, rng):
         self.Wq = rng.randn(D, D) * 0.05
         self.Wk = rng.randn(D, D) * 0.05
         self.Wv = rng.randn(D, D) * 0.05
         self.Wo = rng.randn(D, D) * 0.05
-        self.W1 = rng.randn(D, D * 2) * 0.04
-        self.b1 = np.zeros(D * 2)
-        self.W2 = rng.randn(D * 2, D) * 0.04
+        self.W1 = rng.randn(D, FF) * 0.04
+        self.b1 = np.zeros(FF)
+        self.W2 = rng.randn(FF, D) * 0.04
         self.b2 = np.zeros(D)
+
+    def params(self):
+        return ['Wq', 'Wk', 'Wv', 'Wo', 'W1', 'b1', 'W2', 'b2']
+
+
+class M3:
+    def __init__(self, V, K, D, H, L, rng):
+        self.V, self.K, self.D, self.H, self.L = V, K, D, H, L
+        self.HEAD = D // H
+        self.FF = D * 2
+        self.E_tok = rng.randn(V, D) * 0.10
+        self.E_pos = rng.randn(K, D) * 0.10
+        self.blocks = [Block(D, self.FF, rng) for _ in range(L)]
         self.Wout = rng.randn(D, V) * 0.05
         self.bout = None
         self.mask = np.triu(np.ones((K, K), dtype=bool), k=1)
 
+    def n_params(self):
+        n = self.V * self.D + self.K * self.D
+        n += sum(4 * self.D * self.D + 2 * self.D * self.FF + self.FF + self.D
+                 for _ in self.blocks)
+        n += self.D * self.V + self.V
+        return n
+
+    def params_map(self):
+        """Flatten all params into {name: array} for the optimizer."""
+        p = {}
+        p['E_tok'] = self.E_tok
+        p['E_pos'] = self.E_pos
+        for li, blk in enumerate(self.blocks):
+            for name in blk.params():
+                p[f'{li}:{name}'] = getattr(blk, name)
+        p['Wout'] = self.Wout
+        p['bout'] = self.bout
+        return p
+
     def forward(self, x):
-        """x: (B, K) token ids -> logits (B, V). Returns logits + cached values."""
+        """x: (B, K) token ids -> logits (B, V). Returns logits + caches."""
         B = x.shape[0]
         K, D, H, HEAD = self.K, self.D, self.H, self.HEAD
-        E_tok, E_pos = self.E_tok, self.E_pos
-        X = E_tok[x] + E_pos[np.arange(K)]  # (B, K, D)
-        Q = X @ self.Wq
-        K_ = X @ self.Wk
-        V_ = X @ self.Wv
-        q = Q.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)   # (B,H,K,HEAD)
-        k = K_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
-        v = V_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
-        scores = q @ k.transpose(0, 1, 3, 2) / np.sqrt(HEAD)  # (B,H,K,K)
-        scores = scores + np.where(self.mask, -1e9, 0.0)
-        attn = np.exp(scores - scores.max(axis=-1, keepdims=True))
-        attn = attn / attn.sum(axis=-1, keepdims=True)
-        ctx = attn @ v  # (B,H,K,HEAD)
-        ctx = ctx.transpose(0, 2, 1, 3).reshape(B, K, D)
-        attn_out = X + ctx @ self.Wo  # residual 1
-
-        h1 = attn_out @ self.W1 + self.b1  # (B,K,2D)
-        act = np.tanh(h1)
-        h2 = act @ self.W2 + self.b2       # (B,K,D)
-        Y = attn_out + h2                  # residual 2
-
-        last_y = Y[:, -1, :]
+        X = self.E_tok[x] + self.E_pos[np.arange(K)]  # (B, K, D)
+        cur = X
+        caches = []  # per-block: (X_in, Q, K_, V_, q, k, v, scores, attn, ctx, attn_out, h1, act, h2, Y)
+        for blk in self.blocks:
+            Q = cur @ blk.Wq
+            K_ = cur @ blk.Wk
+            V_ = cur @ blk.Wv
+            q = Q.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
+            k = K_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
+            v = V_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
+            scores = q @ k.transpose(0, 1, 3, 2) / np.sqrt(HEAD)
+            scores = scores + np.where(self.mask, -1e9, 0.0)
+            attn = np.exp(scores - scores.max(axis=-1, keepdims=True))
+            attn = attn / attn.sum(axis=-1, keepdims=True)
+            ctx = attn @ v
+            ctx = ctx.transpose(0, 2, 1, 3).reshape(B, K, D)
+            attn_out = cur + ctx @ blk.Wo
+            h1 = attn_out @ blk.W1 + blk.b1
+            act = np.tanh(h1)
+            h2 = act @ blk.W2 + blk.b2
+            Y = attn_out + h2
+            caches.append((cur, Q, K_, V_, q, k, v, scores, attn, ctx, attn_out, h1, act, h2, Y))
+            cur = Y
+        last_y = cur[:, -1, :]
         logits = last_y @ self.Wout + self.bout
-        return logits, (x, X, Q, K_, V_, q, k, v, scores, attn, ctx, attn_out, h1, act, h2, Y, last_y)
+        return logits, (x, X, caches, last_y)
 
 
 class AdamOpt:
@@ -162,14 +194,52 @@ class AdamOpt:
             self.params[k] -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
 
 
+def block_backward(blk, cache, dY, m, B, K, D, H, HEAD):
+    """Backward through one block. dY: gradient on block output (B,K,D).
+    Returns (grads_prefix, dXin) where grads_prefix keys are block-local
+    ('Wq','Wk',...) and dXin is gradient on block input."""
+    cur, Q, K_, V_, q, k, v, scores, attn, ctx, attn_out, h1, act, h2, Y = cache
+    g = {}
+    dattn_out = dY.copy()
+    dh2 = dY.copy()
+    g['W2'] = act.reshape(-1, D * 2).T @ dh2.reshape(-1, D)
+    g['b2'] = dh2.reshape(-1, D).sum(axis=0)
+    dact = dh2 @ blk.W2.T
+    dh1 = dact * (1 - act ** 2)
+    g['W1'] = attn_out.reshape(-1, D).T @ dh1.reshape(-1, D * 2)
+    g['b1'] = dh1.reshape(-1, D * 2).sum(axis=0)
+    dattn_out = dattn_out + dh1 @ blk.W1.T
+
+    dctx = dattn_out @ blk.Wo.T
+    dX = dattn_out.copy()  # residual 1
+    g['Wo'] = ctx.reshape(B * K, D).T @ dattn_out.reshape(B * K, D)
+
+    dctx = dctx.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
+    dv = attn.transpose(0, 1, 3, 2) @ dctx
+    dattn = dctx @ v.transpose(0, 1, 3, 2)
+    dscores = attn * (dattn - (dattn * attn).sum(axis=-1, keepdims=True))
+    dscores = np.where(m.mask, 0.0, dscores)
+    dscores = dscores / np.sqrt(HEAD)
+
+    dq = dscores @ k
+    dk = dscores.transpose(0, 1, 3, 2) @ q
+    dq = dq.transpose(0, 2, 1, 3).reshape(B, K, D)
+    dk = dk.transpose(0, 2, 1, 3).reshape(B, K, D)
+    dv = dv.transpose(0, 2, 1, 3).reshape(B, K, D)
+
+    g['Wq'] = cur.reshape(B * K, D).T @ dq.reshape(B * K, D)
+    g['Wk'] = cur.reshape(B * K, D).T @ dk.reshape(B * K, D)
+    g['Wv'] = cur.reshape(B * K, D).T @ dv.reshape(B * K, D)
+    dX = dX + dq @ blk.Wq.T + dk @ blk.Wk.T + dv @ blk.Wv.T
+    return g, dX
+
+
 def backward(m, cache, targets):
-    """Proper backprop through attention + FFN + embeddings.
-    Returns dict of gradients for all params."""
-    x, X, Q, K_, V_, q, k, v, scores, attn, ctx, attn_out, h1, act, h2, Y, last_y = cache
+    """Proper backprop through all blocks + embeddings."""
+    x, X, caches, last_y = cache
     B, K, D, H, HEAD = x.shape[0], m.K, m.D, m.H, m.HEAD
     grads = {}
 
-    # --- head: softmax CE over logits ---
     logits = last_y @ m.Wout + m.bout
     probs = np.exp(logits - logits.max(axis=-1, keepdims=True))
     probs = probs / probs.sum(axis=-1, keepdims=True)
@@ -179,55 +249,22 @@ def backward(m, cache, targets):
 
     grads['Wout'] = last_y.T @ g
     grads['bout'] = g.sum(axis=0)
-    dlast_y = g @ m.Wout.T  # (B, D)
+    dlast_y = g @ m.Wout.T
 
-    # --- residual 2: Y = attn_out + h2 ---
-    dY = np.zeros_like(Y)
+    dY = np.zeros((B, K, D))
     dY[:, -1, :] = dlast_y
-    dattn_out = dY.copy()
-    dh2 = dY.copy()
 
-    # FFN backward: h2 = act @ W2 + b2 ; act = tanh(h1) ; h1 = attn_out @ W1 + b1
-    grads['W2'] = act.reshape(-1, D * 2).T @ dh2.reshape(-1, D)
-    grads['b2'] = dh2.reshape(-1, D).sum(axis=0)
-    dact = dh2 @ m.W2.T
-    dh1 = dact * (1 - act ** 2)
-    grads['W1'] = attn_out.reshape(-1, D).T @ dh1.reshape(-1, D * 2)
-    grads['b1'] = dh1.reshape(-1, D * 2).sum(axis=0)
-    dattn_out = dattn_out + dh1 @ m.W1.T  # from FFN input path
-
-    # attention output: attn_out = X + ctx @ Wo
-    dctx = dattn_out @ m.Wo.T  # (B,K,D)
-    dX = dattn_out.copy()      # residual 1
-    dWo = ctx.reshape(B * K, D).T @ dattn_out.reshape(B * K, D)
-    grads['Wo'] = dWo
-
-    # ctx heads: (B,H,K,HEAD)
-    dctx = dctx.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
-    dv = attn.transpose(0, 1, 3, 2) @ dctx        # attn^T @ dctx
-    dattn = dctx @ v.transpose(0, 1, 3, 2)         # dctx @ v^T
-
-    # softmax backward
-    dscores = attn * (dattn - (dattn * attn).sum(axis=-1, keepdims=True))
-    dscores = np.where(m.mask, 0.0, dscores)      # masked positions have zero grad
-    dscores = dscores / np.sqrt(HEAD)
-
-    dq = dscores @ k                                # (B,H,K,HEAD)
-    dk = dscores.transpose(0, 1, 3, 2) @ q
-    dq = dq.transpose(0, 2, 1, 3).reshape(B, K, D)
-    dk = dk.transpose(0, 2, 1, 3).reshape(B, K, D)
-    dv = dv.transpose(0, 2, 1, 3).reshape(B, K, D)
-
-    # QKV projections: Q = X @ Wq etc.
-    grads['Wq'] = X.reshape(B * K, D).T @ dq.reshape(B * K, D)
-    grads['Wk'] = X.reshape(B * K, D).T @ dk.reshape(B * K, D)
-    grads['Wv'] = X.reshape(B * K, D).T @ dv.reshape(B * K, D)
-    dX = dX + dq @ m.Wq.T + dk @ m.Wk.T + dv @ m.Wv.T
+    # Backward through blocks in reverse
+    for li in range(m.L - 1, -1, -1):
+        blk = m.blocks[li]
+        g_blk, dY = block_backward(blk, caches[li], dY, m, B, K, D, H, HEAD)
+        for name, arr in g_blk.items():
+            grads[f'{li}:{name}'] = arr
 
     # embeddings: X = E_tok[x] + E_pos[pos]
     grads['E_tok'] = np.zeros_like(m.E_tok)
-    np.add.at(grads['E_tok'], x, dX)
-    grads['E_pos'] = dX.sum(axis=0)
+    np.add.at(grads['E_tok'], x, dY)
+    grads['E_pos'] = dY.sum(axis=0)
 
     return grads
 
@@ -253,27 +290,30 @@ def main():
         for t, idx in VOCAB.items():
             f.write(f'{idx}\t{t}\n')
 
-    K = 32
-    D = 32
-    H = 4
+    # ---- config (capacity is the only thing that changes between runs) ----
+    K = int(os.environ.get('M3_K', 64))
+    D = int(os.environ.get('M3_D', 48))
+    H = int(os.environ.get('M3_H', 6))
+    L = int(os.environ.get('M3_L', 2))
+    assert D % H == 0
+    BATCH = int(os.environ.get('M3_BATCH', 128))
+    STEPS = int(os.environ.get('M3_STEPS', 2000))
+    EVAL_EVERY = int(os.environ.get('M3_EVAL_EVERY', 400))
+    LR = float(os.environ.get('M3_LR', 0.005))
+    TAG = os.environ.get('M3_TAG', 'm31')
+    # ---------------------------------------------------------------------
+
     rng = np.random.RandomState(11)
-    m = M3(V, K, D, H, rng)
+    m = M3(V, K, D, H, L, rng)
     m.bout = np.log((np.bincount(np.array(big, dtype=np.int32), minlength=V) + 1.0) / len(big))
 
-    n_params = V * D + K * D + 4 * D * D + D * 2 * D + 2 * D + D * 2 * D + D + D * V + V
-    print(f'arch: K={K} D={D} H={H} V={V} params~{n_params}')
+    print(f'arch: K={K} D={D} H={H} L={L} V={V} params~{m.n_params()}')
 
     arr = np.array(big, dtype=np.int32)
     n = len(arr)
 
-    params = {name: getattr(m, name) for name in
-              ['E_tok','E_pos','Wq','Wk','Wv','Wo','W1','b1','W2','b2','Wout','bout']}
-    opt = AdamOpt(params, lr=0.005)
-
-    # Mini-batch windows: sample random start positions, windows of length K.
-    BATCH = 256
-    STEPS = 2400
-    EVAL_EVERY = 400
+    params = m.params_map()
+    opt = AdamOpt(params, lr=LR)
 
     for step in range(STEPS):
         starts = rng.randint(0, n - K, size=BATCH)
@@ -295,20 +335,11 @@ def main():
         flat = arr_.reshape(-1)
         return f'[{name}] shape={list(arr_.shape)} ' + ','.join(str(int(round(float(x) * SCALE))) for x in flat) + '\n'
 
-    with open('minds/mid_prophet_m3_w.txt', 'w') as f:
-        f.write(f'vocab={V} k={K} d={D} h={H} head={m.HEAD} scale={SCALE} arch=transformer\n')
-        f.write(dump('E_tok', m.E_tok))
-        f.write(dump('E_pos', m.E_pos))
-        f.write(dump('Wq', m.Wq))
-        f.write(dump('Wk', m.Wk))
-        f.write(dump('Wv', m.Wv))
-        f.write(dump('Wo', m.Wo))
-        f.write(dump('W1', m.W1))
-        f.write(dump('b1', m.b1))
-        f.write(dump('W2', m.W2))
-        f.write(dump('b2', m.b2))
-        f.write(dump('Wout', m.Wout))
-        f.write(dump('bout', m.bout))
+    w_path = f'minds/mid_prophet_{TAG}_w.txt'
+    with open(w_path, 'w') as f:
+        f.write(f'vocab={V} k={K} d={D} h={H} head={m.HEAD} layers={L} scale={SCALE} arch=transformer\n')
+        for name, arr_ in params.items():
+            f.write(dump(name, arr_))
 
     # Held-out
     print('\n=== held-out ===')
@@ -334,9 +365,9 @@ def main():
         print(f'  held {name}: {c}/{t} = {c*100/t:.2f}%')
     print(f'\noverall: {correct_total}/{val_total} = {correct_total*100/val_total:.2f}%')
 
-    with open('minds/mid_prophet_m3_meta.txt', 'w') as f:
-        f.write(f'V={V}\nK={K}\nD={D}\nH={H}\nHEAD={m.HEAD}\n')
-        f.write(f'train_tokens={n}\nsteps={STEPS}\nLR={opt.lr}\n')
+    with open(f'minds/mid_prophet_{TAG}_meta.txt', 'w') as f:
+        f.write(f'V={V}\nK={K}\nD={D}\nH={H}\nHEAD={m.HEAD}\nL={L}\n')
+        f.write(f'train_tokens={n}\nsteps={STEPS}\nLR={LR}\nbatch={BATCH}\n')
 
 
 if __name__ == '__main__':

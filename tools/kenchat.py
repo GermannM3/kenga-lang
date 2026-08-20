@@ -76,33 +76,46 @@ def load_tensors(path):
 
 
 def m3_forward(tensors, info, x):
-    """Forward a single batch (B, K) token ids -> logits (B, V)."""
+    """Forward a single batch (B, K) token ids -> logits (B, V).
+    Supports both single-layer (flat Wq/Wk/...) and multi-layer
+    (0:Wq, 1:Wq, ...) formats."""
     K, D = info['k'], info['d']
     H = info['h']
     HEAD = info.get('head', D // H)
     V = info['vocab']
+    L = info.get('layers', 1)
     B = x.shape[0]
     E_tok = tensors['E_tok']
     E_pos = tensors['E_pos']
     X = E_tok[x] + E_pos[np.arange(K)]
-    Q = X @ tensors['Wq']
-    K_ = X @ tensors['Wk']
-    V_ = X @ tensors['Wv']
-    q = Q.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
-    k = K_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
-    v = V_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
-    scores = q @ k.transpose(0, 1, 3, 2) / np.sqrt(HEAD)
+    cur = X
     mask = np.triu(np.ones((K, K), dtype=bool), k=1)
-    scores = scores + np.where(mask, -1e9, 0.0)
-    attn = np.exp(scores - scores.max(axis=-1, keepdims=True))
-    attn = attn / attn.sum(axis=-1, keepdims=True)
-    ctx = attn @ v
-    ctx = ctx.transpose(0, 2, 1, 3).reshape(B, K, D)
-    attn_out = X + ctx @ tensors['Wo']
-    h1 = np.tanh(attn_out @ tensors['W1'] + tensors['b1'])
-    h2 = h1 @ tensors['W2'] + tensors['b2']
-    Y = attn_out + h2
-    last_y = Y[:, -1, :]
+    for li in range(L):
+        if L == 1:
+            Wq, Wk, Wv, Wo = tensors['Wq'], tensors['Wk'], tensors['Wv'], tensors['Wo']
+            W1, b1, W2, b2 = tensors['W1'], tensors['b1'], tensors['W2'], tensors['b2']
+        else:
+            Wq = tensors[f'{li}:Wq']; Wk = tensors[f'{li}:Wk']
+            Wv = tensors[f'{li}:Wv']; Wo = tensors[f'{li}:Wo']
+            W1 = tensors[f'{li}:W1']; b1 = tensors[f'{li}:b1']
+            W2 = tensors[f'{li}:W2']; b2 = tensors[f'{li}:b2']
+        Q = cur @ Wq
+        K_ = cur @ Wk
+        V_ = cur @ Wv
+        q = Q.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
+        k = K_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
+        v = V_.reshape(B, K, H, HEAD).transpose(0, 2, 1, 3)
+        scores = q @ k.transpose(0, 1, 3, 2) / np.sqrt(HEAD)
+        scores = scores + np.where(mask, -1e9, 0.0)
+        attn = np.exp(scores - scores.max(axis=-1, keepdims=True))
+        attn = attn / attn.sum(axis=-1, keepdims=True)
+        ctx = attn @ v
+        ctx = ctx.transpose(0, 2, 1, 3).reshape(B, K, D)
+        attn_out = cur + ctx @ Wo
+        h1 = np.tanh(attn_out @ W1 + b1)
+        h2 = h1 @ W2 + b2
+        cur = attn_out + h2
+    last_y = cur[:, -1, :]
     logits = last_y @ tensors['Wout'] + tensors['bout']
     return logits
 
@@ -362,7 +375,13 @@ PROBES = [
 
 
 def make_valid_program(prompt, generated_source):
-    src = prompt + generated_source
+    # Kenga tokenizer skips whitespace; ensure a token boundary at the
+    # prompt/generated join (e.g. 'fn add' + 'mkid ...' must not merge).
+    if (prompt and prompt[-1] not in ' \t\n'
+            and generated_source and generated_source[0] not in ' \t\n('):
+        src = prompt + ' ' + generated_source
+    else:
+        src = prompt + generated_source
     # Make sure src ends with newline + a main if not present
     if 'fn main' not in src:
         src = src + '\nfn main() -> i64 { println(0); return 0; }\n'
@@ -376,7 +395,8 @@ def main():
     ap.add_argument('prompt', nargs='?', help='generate from prompt')
     ap.add_argument('--probe', action='store_true', help='run all 9 probes')
     ap.add_argument('--model', default='v01',
-                    help='v01 (K=8), k16 (K=16), or m3 (transformer K=32)')
+                    help='v01 (K=8), k16 (K=16), m3 (transformer K=32), '
+                         'm31 (transformer K=64 D=48 L=2)')
     ap.add_argument('--max-tokens', type=int, default=80)
     ap.add_argument('--temperature', type=float, default=None,
                     help='sample with temperature (default: greedy argmax)')
@@ -391,6 +411,9 @@ def main():
     elif args.model == 'm3':
         weights_path = 'minds/mid_prophet_m3_w.txt'
         label = 'kenga-prophet m3 transformer K=32'
+    elif args.model == 'm31':
+        weights_path = 'minds/mid_prophet_m31_w.txt'
+        label = 'kenga-prophet m3.1 transformer K=64 D=48 L=2'
     else:
         print('unknown model', file=sys.stderr); sys.exit(1)
 
