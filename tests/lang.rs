@@ -269,3 +269,51 @@ fn import_stdlib_and_struct() {
     let v = interpret(module).expect("run");
     assert!(matches!(v, kenga::bytecode::Value::I64(0)));
 }
+
+#[test]
+fn bitwise_ops() {
+    let v = run(
+        r#"
+        fn main() -> i64 {
+            assert((5 & 3) == 1);
+            assert((5 | 3) == 7);
+            assert((5 ^ 3) == 6);
+            assert((~0) == -1);
+            assert((1 << 4) == 16);
+            assert((16 >> 2) == 4);
+            assert((1 + 2 << 3) == 24);
+            assert((2 << 2 & 8 | 1) == 9);
+            assert((0x20 & 0xF0) == 32);
+            assert((0b1010 >> 1) == 5);
+            return 0;
+        }
+        "#,
+    );
+    assert!(matches!(v, kenga::bytecode::Value::I64(0)));
+}
+
+#[test]
+fn intrinsic_ffi_emit_c() {
+    let tokens = Lexer::new(
+        r#"
+        @intrinsic fn kf_get_boot_info() -> i64;
+        @intrinsic fn kf_str(addr: i64) -> str;
+
+        fn main() -> i64 {
+            let bi: i64 = kf_get_boot_info();
+            let a: i64 = kf_str(bi) != "";
+            return a;
+        }
+        "#,
+    )
+    .tokenize()
+    .expect("lex");
+    let program = Parser::new(tokens).parse().expect("parse");
+    let c = kenga::codegen::emit_c_freestanding(&program).expect("emit-c");
+    assert!(c.contains("int64_t k_kf_get_boot_info(void);"), "ffi prototype");
+    assert!(c.contains("const char* k_kf_str(int64_t k_addr);"), "ffi prototype 2");
+    // builtin len/ord must not get an additional extern prototype (only the
+    // runtime's own definitions may reference them)
+    assert_eq!(c.matches("k_len(").count(), 0, "builtin len must not be referenced");
+    assert_eq!(c.matches("k_ord(").count(), 1, "only the static runtime k_ord def");
+}

@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::error::{KengaError, Result};
+use crate::error::Span;
 use crate::token::{Token, TokenKind};
 
 pub struct Parser {
@@ -65,11 +66,25 @@ impl Parser {
                 ))
             }
         };
+        /* Portable desktop sources may write `import "x" as Module`.
+           Imports are currently flattened by the driver, so retain the
+           syntax and validate the alias while keeping the existing AST. */
+        if self.check_ident("as") {
+            self.bump();
+            match self.bump().kind {
+                TokenKind::Ident(_) => {}
+                _ => return Err(KengaError::at("expected import alias after 'as'", self.peek().span.clone())),
+            }
+        }
         self.expect(TokenKind::Semicolon, "expected ';' after import")?;
         Ok(Import {
             path,
             span: tok.span,
         })
+    }
+
+    fn check_ident(&self, name: &str) -> bool {
+        matches!(&self.peek().kind, TokenKind::Ident(s) if s == name)
     }
 
     fn parse_item(&mut self) -> Result<Item> {
@@ -79,10 +94,47 @@ impl Parser {
         if self.check(&TokenKind::Struct) {
             return Ok(Item::Struct(self.parse_struct()?));
         }
+        if self.check_ident("enum") {
+            return Ok(Item::Enum(self.parse_enum()?));
+        }
+        if self.check_ident("union") {
+            // Unions use the same field surface as structs for the portable
+            // ABI; the native backend lowers them to a tagged payload later.
+            self.bump();
+            return Ok(Item::Struct(self.parse_struct_body()?));
+        }
+        if self.check(&TokenKind::Const) {
+            return Ok(Item::Const(self.parse_const()?));
+        }
+        if self.check_ident("impl") {
+            return Ok(Item::Impl(self.parse_impl()?));
+        }
         if self.check(&TokenKind::On) {
             return Ok(Item::EventHandler(self.parse_on_handler()?));
         }
         Ok(Item::Function(self.parse_function()?))
+    }
+
+    fn parse_const(&mut self) -> Result<ConstDef> {
+        let tok = self.bump();
+        let name = self.expect_ident()?;
+        self.expect(TokenKind::Assign, "expected '=' after const name")?;
+        let value = self.parse_expr()?;
+        /* Newer Kenga source permits declaration-per-line style. */
+        if self.check(&TokenKind::Semicolon) { self.bump(); }
+        Ok(ConstDef { name, value, span: tok.span })
+    }
+
+    fn parse_impl(&mut self) -> Result<ImplDef> {
+        let tok = self.bump();
+        let target = self.expect_ident()?;
+        self.expect(TokenKind::LBrace, "expected '{' after impl target")?;
+        let mut methods = Vec::new();
+        while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+            methods.push(self.parse_function()?);
+        }
+        self.expect(TokenKind::RBrace, "expected '}' after impl")?;
+        Ok(ImplDef { target, methods, span: tok.span })
     }
 
     fn parse_on_handler(&mut self) -> Result<EventHandler> {
@@ -112,6 +164,16 @@ impl Parser {
     fn parse_struct(&mut self) -> Result<StructDef> {
         let tok = self.bump();
         let name = self.expect_ident()?;
+        self.parse_struct_body_named(name, tok.span)
+    }
+
+    fn parse_struct_body(&mut self) -> Result<StructDef> {
+        let tok = self.peek().span.clone();
+        let name = self.expect_ident()?;
+        self.parse_struct_body_named(name, tok)
+    }
+
+    fn parse_struct_body_named(&mut self, name: String, span: Span) -> Result<StructDef> {
         self.expect(TokenKind::LBrace, "expected '{' after struct name")?;
         let mut fields = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
@@ -121,15 +183,13 @@ impl Parser {
             fields.push(Param { name: fname, ty });
             if self.check(&TokenKind::Comma) {
                 self.bump();
-            } else {
-                break;
             }
         }
         self.expect(TokenKind::RBrace, "expected '}' after struct fields")?;
         Ok(StructDef {
             name,
             fields,
-            span: tok.span,
+            span,
         })
     }
 
@@ -184,10 +244,24 @@ impl Parser {
             return Ok(params);
         }
         loop {
+            // Method receivers use Rust-like syntax in the desktop sources.
+            // The current C ABI represents the receiver as an opaque handle;
+            // preserving it here lets the native target complete parsing
+            // while later backends can lower it to a real object pointer.
+            if self.check(&TokenKind::Amp) {
+                self.bump();
+                if self.check_ident("mut") { self.bump(); }
+                let name = self.expect_ident()?;
+                if name != "self" {
+                    return Err(KengaError::new("expected self receiver", None));
+                }
+                params.push(Param { name, ty: Type::I64 });
+            } else {
             let name = self.expect_ident()?;
             self.expect(TokenKind::Colon, "expected ':' after param name")?;
             let ty = self.parse_type()?;
             params.push(Param { name, ty });
+            }
             if self.check(&TokenKind::Comma) {
                 self.bump();
                 continue;
@@ -207,7 +281,47 @@ impl Parser {
             TokenKind::TypeTensor => Ok(Type::Tensor),
             TokenKind::TypeList => Ok(Type::List),
             TokenKind::TypeMemory => Ok(Type::Memory),
-            TokenKind::Ident(name) => Ok(Type::Named(name)),
+            TokenKind::Ident(mut name) => {
+                if (name == "array" || name == "Option" || name == "ptr") && self.check(&TokenKind::Lt) {
+                    self.bump();
+                    if name == "ptr" && self.check(&TokenKind::Fn) {
+                        self.bump();
+                        if self.check(&TokenKind::LParen) {
+                            self.bump();
+                            while !self.check(&TokenKind::RParen) && !self.check(&TokenKind::Eof) { self.bump(); }
+                            self.expect(TokenKind::RParen, "expected ')' after function pointer")?;
+                        }
+                    } else {
+                        let _ = self.parse_type()?;
+                    }
+                    if self.check(&TokenKind::Comma) {
+                        self.bump();
+                        let _ = self.bump(); // fixed capacity, represented as a list
+                    }
+                    self.expect(TokenKind::Gt, "expected '>' after array type")?;
+                    return Ok(Type::List);
+                }
+                /* Accept portable module-qualified types such as
+                   Renderer::Framebuffer and Renderer.Framebuffer. */
+                loop {
+                    if self.check(&TokenKind::Dot) {
+                        self.bump();
+                        let part = self.expect_ident()?;
+                        name.push_str("::");
+                        name.push_str(&part);
+                    } else if self.check(&TokenKind::Colon)
+                        && matches!(self.tokens.get(self.pos + 1).map(|t| &t.kind), Some(TokenKind::Colon)) {
+                        self.bump();
+                        self.bump();
+                        let part = self.expect_ident()?;
+                        name.push_str("::");
+                        name.push_str(&part);
+                    } else {
+                        break;
+                    }
+                }
+                Ok(Type::Named(name))
+            }
             _ => Err(KengaError::at("expected type name", t.span)),
         }
     }
@@ -224,26 +338,27 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Result<Stmt> {
         match self.peek_kind() {
-            TokenKind::Let => self.parse_let(),
+            TokenKind::Let | TokenKind::Var => self.parse_let(),
             TokenKind::Return => self.parse_return(),
             TokenKind::If => self.parse_if(),
             TokenKind::While => self.parse_while(),
             TokenKind::For => self.parse_for(),
+            TokenKind::Match => self.parse_match(),
             TokenKind::Break => {
                 let t = self.bump();
-                self.expect(TokenKind::Semicolon, "expected ';' after break")?;
+                self.optional_semicolon();
                 Ok(Stmt::Break(t.span))
             }
             TokenKind::Continue => {
                 let t = self.bump();
-                self.expect(TokenKind::Semicolon, "expected ';' after continue")?;
+                self.optional_semicolon();
                 Ok(Stmt::Continue(t.span))
             }
             TokenKind::Ident(_) => self.parse_assign_or_expr_stmt(),
             _ => {
                 let expr = self.parse_expr()?;
                 let span = expr.span();
-                self.expect(TokenKind::Semicolon, "expected ';'")?;
+                self.optional_semicolon();
                 Ok(Stmt::Expr { expr, span })
             }
         }
@@ -252,10 +367,29 @@ impl Parser {
     fn parse_assign_or_expr_stmt(&mut self) -> Result<Stmt> {
         let save = self.pos;
         let target_expr = self.parse_postfix_primary()?;
-        if self.check(&TokenKind::Assign) {
+        let compound = match self.peek_kind() {
+            TokenKind::Plus => Some(BinaryOp::Add),
+            TokenKind::Minus => Some(BinaryOp::Sub),
+            TokenKind::Star => Some(BinaryOp::Mul),
+            TokenKind::Slash => Some(BinaryOp::Div),
+            _ => None,
+        };
+        if self.check(&TokenKind::Assign) || compound.is_some() {
             let span = self.bump().span;
+            if let Some(op) = compound {
+                self.expect(TokenKind::Assign, "expected '=' after compound assignment")?;
+                let value = self.parse_expr()?;
+                let target = match target_expr.clone() {
+                    Expr::Ident(name, _) => AssignTarget::Name(name),
+                    Expr::Index { target, index, .. } => AssignTarget::Index { target: *target, index: *index },
+                    Expr::Field { target, field, .. } => AssignTarget::Field { target: *target, field },
+                    _ => return Err(KengaError::at("invalid assignment target", span)),
+                };
+                let lhs = target_expr;
+                return Ok(Stmt::Assign { target, value: Expr::Binary { op, left: Box::new(lhs), right: Box::new(value), span: span.clone() }, span });
+            }
             let value = self.parse_expr()?;
-            self.expect(TokenKind::Semicolon, "expected ';'")?;
+            self.optional_semicolon();
             let target = match target_expr {
                 Expr::Ident(name, _) => AssignTarget::Name(name),
                 Expr::Index { target, index, .. } => AssignTarget::Index {
@@ -282,7 +416,7 @@ impl Parser {
         self.pos = save;
         let expr = self.parse_expr()?;
         let span = expr.span();
-        self.expect(TokenKind::Semicolon, "expected ';'")?;
+        self.optional_semicolon();
         Ok(Stmt::Expr { expr, span })
     }
 
@@ -310,7 +444,7 @@ impl Parser {
         }
         self.expect(TokenKind::Assign, "expected '=' in let")?;
         let value = self.parse_expr()?;
-        self.expect(TokenKind::Semicolon, "expected ';'")?;
+        self.optional_semicolon();
         Ok(Stmt::Let {
             name,
             ty,
@@ -320,14 +454,83 @@ impl Parser {
         })
     }
 
+    fn parse_match(&mut self) -> Result<Stmt> {
+        let tok = self.bump();
+        let value = if let TokenKind::Ident(name) = self.peek().kind.clone() {
+            let t = self.bump();
+            Expr::Ident(name, t.span)
+        } else { self.parse_expr()? };
+        self.expect(TokenKind::LBrace, "expected '{' after match value")?;
+        let mut arms = Vec::new();
+        while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+            let mut path = Vec::new();
+            let mut bindings = Vec::new();
+            if self.check_ident("_") {
+                self.bump();
+            } else {
+                path.push(self.expect_ident()?);
+                while self.check(&TokenKind::Colon) {
+                    self.bump();
+                    self.expect(TokenKind::Colon, "expected '::' in match variant")?;
+                    path.push(self.expect_ident()?);
+                }
+                if self.check(&TokenKind::LBrace) {
+                    self.bump();
+                    while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+                        bindings.push(self.expect_ident()?);
+                        if self.check(&TokenKind::Comma) { self.bump(); }
+                    }
+                    self.expect(TokenKind::RBrace, "expected '}' after match bindings")?;
+                }
+            }
+            self.expect(TokenKind::FatArrow, "expected '=>' after match pattern")?;
+            let body = self.parse_block()?;
+            let pattern = if path.is_empty() { MatchPattern::Wildcard } else { MatchPattern::Variant { path, bindings } };
+            arms.push(MatchArm { pattern, body });
+            if self.check(&TokenKind::Comma) { self.bump(); }
+        }
+        self.expect(TokenKind::RBrace, "expected '}' after match")?;
+        Ok(Stmt::Match { value, arms, span: tok.span })
+    }
+
+    fn parse_enum(&mut self) -> Result<EnumDef> {
+        let tok = self.bump();
+        let name = self.expect_ident()?;
+        self.expect(TokenKind::LBrace, "expected '{' after enum name")?;
+        let mut variants = Vec::new();
+        while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+            let variant_name = self.expect_ident()?;
+            let mut fields = Vec::new();
+            if self.check(&TokenKind::LBrace) {
+                self.bump();
+                while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+                    let field_name = self.expect_ident()?;
+                    self.expect(TokenKind::Colon, "expected ':' in enum payload")?;
+                    let field_ty = self.parse_type()?;
+                    fields.push(Param { name: field_name, ty: field_ty });
+                    if self.check(&TokenKind::Comma) { self.bump(); }
+                }
+                self.expect(TokenKind::RBrace, "expected '}' after enum payload")?;
+            }
+            variants.push(EnumVariant { name: variant_name, fields });
+            if self.check(&TokenKind::Comma) { self.bump(); }
+        }
+        self.expect(TokenKind::RBrace, "expected '}' after enum")?;
+        Ok(EnumDef { name, variants, span: tok.span })
+    }
+
+    fn optional_semicolon(&mut self) {
+        if self.check(&TokenKind::Semicolon) { self.bump(); }
+    }
+
     fn parse_return(&mut self) -> Result<Stmt> {
         let tok = self.bump();
-        let value = if self.check(&TokenKind::Semicolon) {
+        let value = if self.check(&TokenKind::Semicolon) || self.check(&TokenKind::RBrace) {
             None
         } else {
             Some(self.parse_expr()?)
         };
-        self.expect(TokenKind::Semicolon, "expected ';'")?;
+        self.optional_semicolon();
         Ok(Stmt::Return {
             value,
             span: tok.span,
@@ -362,7 +565,19 @@ impl Parser {
 
     fn parse_while(&mut self) -> Result<Stmt> {
         let tok = self.bump();
-        let cond = self.parse_expr()?;
+        let cond = if self.check(&TokenKind::Let) {
+            // Optional-pattern form used by the desktop event loop:
+            // `while let Some(event) = poll()`. The current ABI represents
+            // option-like polling as its scalar condition; consume the
+            // pattern and retain the polling expression.
+            self.bump();
+            let _ = self.expect_ident()?; // Some
+            self.expect(TokenKind::LParen, "expected '(' after Some")?;
+            let _binding = self.expect_ident()?;
+            self.expect(TokenKind::RParen, "expected ')' after Some binding")?;
+            self.expect(TokenKind::Assign, "expected '=' in while let")?;
+            self.parse_expr()?
+        } else { self.parse_expr()? };
         let body = self.parse_block()?;
         Ok(Stmt::While {
             cond,
@@ -386,7 +601,16 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Result<Expr> {
-        self.parse_range()
+        let expr = self.parse_range()?;
+        // The desktop DSL permits explicit scalar casts (`value as float`).
+        // The current tagged C backend already performs the required numeric
+        // coercion, so consume the annotation while preserving the expression
+        // tree until typed cast nodes are introduced in the native ABI.
+        while self.check_ident("as") {
+            self.bump();
+            let _ = self.expect_ident()?;
+        }
+        Ok(expr)
     }
 
     fn parse_range(&mut self) -> Result<Expr> {
@@ -394,9 +618,11 @@ impl Parser {
         if self.check(&TokenKind::DotDot) {
             let span = self.bump().span;
             let end = self.parse_or()?;
+            let step = if self.check_ident("step") { self.bump(); Some(Box::new(self.parse_or()?)) } else { None };
             return Ok(Expr::Range {
                 start: Box::new(start),
                 end: Box::new(end),
+                step,
                 span,
             });
         }
@@ -610,7 +836,23 @@ impl Parser {
                     span,
                 })
             }
-            _ => self.parse_postfix_primary(),
+            TokenKind::Amp => {
+                self.bump();
+                if self.check_ident("mut") { self.bump(); }
+                // References are ABI-transparent in the current freestanding
+                // backend; retain the referenced expression for lowering.
+                self.parse_unary()
+            }
+            _ => {
+                let expr = self.parse_postfix_primary()?;
+                // Scalar casts bind to the value immediately before them,
+                // so `value as float * factor` keeps the multiplication.
+                if self.check_ident("as") {
+                    self.bump();
+                    let _ = self.expect_ident()?;
+                }
+                Ok(expr)
+            }
         }
     }
 
@@ -626,14 +868,59 @@ impl Parser {
                     index: Box::new(index),
                     span,
                 };
+            } else if self.check(&TokenKind::Colon) &&
+                      matches!(self.tokens.get(self.pos + 1).map(|t| &t.kind), Some(TokenKind::Colon)) {
+                let span = self.bump().span;
+                self.bump();
+                let method = self.expect_ident()?;
+                if self.check(&TokenKind::LParen) {
+                    self.bump();
+                    let mut args = Vec::new();
+                    if !self.check(&TokenKind::RParen) {
+                        loop {
+                            args.push(self.parse_expr()?);
+                            if self.check(&TokenKind::Comma) { self.bump(); continue; }
+                            break;
+                        }
+                    }
+                    self.expect(TokenKind::RParen, "expected ')' after static call")?;
+                    expr = Expr::Call { callee: method, args, span };
+                } else if self.check(&TokenKind::LBrace)
+                    && matches!(self.tokens.get(self.pos + 2).map(|t| &t.kind), Some(TokenKind::Colon)) {
+                    self.bump();
+                    let mut fields = Vec::new();
+                    while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+                        let field = self.expect_ident()?;
+                        self.expect(TokenKind::Colon, "expected ':' in variant payload")?;
+                        fields.push((field, self.parse_expr()?));
+                        if self.check(&TokenKind::Comma) { self.bump(); }
+                    }
+                    self.expect(TokenKind::RBrace, "expected '}' after variant payload")?;
+                    let mut path = Vec::new();
+                    if let Expr::Ident(root, _) = expr { path.push(root); }
+                    path.push(method);
+                    expr = Expr::VariantLit { path, fields, span };
+                } else {
+                    expr = Expr::Field { target: Box::new(expr), field: method, span };
+                }
             } else if self.check(&TokenKind::Dot) {
                 let span = self.bump().span;
                 let field = self.expect_ident()?;
-                expr = Expr::Field {
-                    target: Box::new(expr),
-                    field,
-                    span,
-                };
+                if self.check(&TokenKind::LParen) {
+                    self.bump();
+                    let mut args = Vec::new();
+                    if !self.check(&TokenKind::RParen) {
+                        loop {
+                            args.push(self.parse_expr()?);
+                            if self.check(&TokenKind::Comma) { self.bump(); continue; }
+                            break;
+                        }
+                    }
+                    self.expect(TokenKind::RParen, "expected ')' after method call")?;
+                    expr = Expr::Call { callee: field, args, span };
+                } else {
+                    expr = Expr::Field { target: Box::new(expr), field, span };
+                }
             } else {
                 break;
             }
@@ -768,6 +1055,15 @@ pub fn dump_program(program: &Program) -> String {
             }
             Item::Struct(s) => {
                 out.push_str(&format!("struct {} {{ ... }}\n\n", s.name));
+            }
+            Item::Const(c) => {
+                out.push_str(&format!("const {} = ...;\n\n", c.name));
+            }
+            Item::Enum(e) => {
+                out.push_str(&format!("enum {} {{ {} }}\n\n", e.name, e.variants.iter().map(|v| v.name.clone()).collect::<Vec<_>>().join(", ")));
+            }
+            Item::Impl(i) => {
+                out.push_str(&format!("impl {} {{ {} methods }}\n\n", i.target, i.methods.len()));
             }
             Item::EventHandler(h) => {
                 out.push_str(&format!(

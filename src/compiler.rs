@@ -57,6 +57,9 @@ pub fn compile_with_options(program: &Program, require_main: bool) -> Result<Mod
                 module.intrinsics.insert(i.name.clone(), i.params.len());
             }
             Item::Struct(_) => {}
+            Item::Enum(_) => {}
+            Item::Const(_) => {}
+            Item::Impl(_) => {}
             Item::EventHandler(h) => {
                 let fname = format!("__on_{}_{}", sanitize(&h.event), handler_i);
                 handler_i += 1;
@@ -322,6 +325,9 @@ fn compile_stmt(
             ops.push(Op::ContinuePlaceholder);
             loops.last_mut().unwrap().continue_patches.push(i);
         }
+        Stmt::Match { .. } => {
+            return Err(KengaError::new("match bytecode lowering is not implemented", None));
+        }
     }
     Ok(())
 }
@@ -363,6 +369,10 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                 name: name.clone(),
                 fields: names,
             });
+        }
+        Expr::VariantLit { path, fields, .. } => {
+            for (_, value) in fields { compile_expr(value, ops)?; }
+            ops.push(Op::Const(Value::Str(path.join("::"))));
         }
         Expr::Index { target, index, .. } => {
             compile_expr(target, ops)?;

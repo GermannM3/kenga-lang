@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p bin
+mkdir -p minds
 
 OUT="bin/kenga-lite"
 # On Windows Git Bash, prefer .exe so kenga (MSVC/gnu) finds it

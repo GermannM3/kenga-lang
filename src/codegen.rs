@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    AssignTarget, BinaryOp, Expr, Function, Item, Program, Stmt, Type, UnaryOp,
+    AssignTarget, BinaryOp, Block, Expr, Function, Item, MatchArm, MatchPattern, Program, Stmt, Type, UnaryOp,
 };
 use crate::error::{KengaError, Result};
 
@@ -89,6 +89,24 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             if f.name == "main" {
                 has_main = true;
             }
+        } else if let Item::Impl(i) = item {
+            for f in &i.methods {
+                let ret = map_type(&f.ret, &structs)?;
+                let params = f.params.iter().map(|p| map_type(&p.ty, &structs)).collect::<Result<Vec<_>>>()?;
+                sigs.insert(f.name.clone(), (ret, params));
+            }
+        }
+        // @intrinsic fn foo(...) -> t;  — extern/FFI declaration. Feed its
+        // signature into sigs so calls get proper arg coercion, and emit a
+        // C prototype below.
+        if let Item::Intrinsic(i) = item {
+            let ret = map_type(&i.ret, &structs)?;
+            let params = i
+                .params
+                .iter()
+                .map(|p| map_type(&p.ty, &structs))
+                .collect::<Result<Vec<_>>>()?;
+            sigs.insert(i.name.clone(), (ret, params));
         }
     }
     if !has_main {
@@ -96,6 +114,22 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
     }
 
     let mut body = String::new();
+    for item in &program.items {
+        if let Item::Const(c) = item {
+            let (_, value) = emit_const_expr(&c.value)?;
+            body.push_str(&format!("#define {} {}\n", c_ident(&c.name), value));
+        }
+    }
+    body.push('\n');
+    for item in &program.items {
+        if let Item::Enum(e) = item {
+            body.push_str(&format!("typedef int64_t {};\n", c_ident(&e.name)));
+            for (i, variant) in e.variants.iter().enumerate() {
+                body.push_str(&format!("#define {}_{} {}\n", c_ident(&e.name), c_ident(&variant.name), i));
+            }
+            body.push('\n');
+        }
+    }
     let mut names: Vec<_> = structs.keys().cloned().collect();
     names.sort();
     for name in names {
@@ -115,6 +149,26 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             }
             body.push_str(&emit_prototype(f, &structs)?);
             body.push_str(";\n");
+        } else if let Item::Impl(i) = item {
+            for f in &i.methods {
+                body.push_str(&emit_prototype(f, &structs)?);
+                body.push_str(";\n");
+            }
+        }
+        // FFI prototypes for user-declared @intrinsic fn (kernel externs).
+        if let Item::Intrinsic(i) = item {
+            if is_builtin_intrinsic(&i.name) {
+                continue;
+            }
+            let f = Function {
+                name: i.name.clone(),
+                params: i.params.clone(),
+                ret: i.ret.clone(),
+                body: Block { stmts: vec![] },
+                span: i.span.clone(),
+            };
+            body.push_str(&emit_prototype(&f, &structs)?);
+            body.push_str(";\n");
         }
     }
     body.push('\n');
@@ -123,6 +177,11 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
         if let Item::Function(f) = item {
             body.push_str(&emit_function(f, &structs, &sigs)?);
             body.push('\n');
+        } else if let Item::Impl(i) = item {
+            for f in &i.methods {
+                body.push_str(&emit_function(f, &structs, &sigs)?);
+                body.push('\n');
+            }
         }
     }
 
@@ -134,6 +193,40 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
     }
     out.push_str(&body);
     Ok(out)
+}
+
+fn emit_const_expr(expr: &Expr) -> Result<(String, String)> {
+    match expr {
+        Expr::Int(n, _) => Ok(("i64".into(), n.to_string())),
+        Expr::Float(n, _) => Ok(("f64".into(), c_float_lit(*n))),
+        Expr::Bool(b, _) => Ok(("i64".into(), if *b { "1" } else { "0" }.into())),
+        Expr::Str(s, _) => Ok(("str".into(), format!("\"{}\"", escape_c(s)))),
+        Expr::Unary { op, expr, .. } => {
+            let (_, v) = emit_const_expr(expr)?;
+            Ok(("i64".into(), format!("{}{}", unary_c(op), v)))
+        }
+        Expr::Binary { left, op, right, .. } => {
+            let (_, l) = emit_const_expr(left)?;
+            let (_, r) = emit_const_expr(right)?;
+            Ok(("i64".into(), format!("({} {} {})", l, binary_c(op), r)))
+        }
+        _ => Err(KengaError::new("const value must be compile-time literal", None)),
+    }
+}
+
+fn unary_c(op: &UnaryOp) -> &'static str {
+    match op { UnaryOp::Neg => "-", UnaryOp::Not => "!", UnaryOp::BitNot => "~" }
+}
+
+fn binary_c(op: &BinaryOp) -> &'static str {
+    match op {
+        BinaryOp::Add => "+", BinaryOp::Sub => "-", BinaryOp::Mul => "*",
+        BinaryOp::Div => "/", BinaryOp::Rem => "%", BinaryOp::Eq => "==",
+        BinaryOp::Ne => "!=", BinaryOp::Lt => "<", BinaryOp::Le => "<=",
+        BinaryOp::Gt => ">", BinaryOp::Ge => ">=", BinaryOp::And => "&&",
+        BinaryOp::Or => "||", BinaryOp::BitAnd => "&", BinaryOp::BitOr => "|",
+        BinaryOp::BitXor => "^", BinaryOp::Shl => "<<", BinaryOp::Shr => ">>",
+    }
 }
 
 fn map_type(t: &Type, structs: &HashMap<String, StructInfo>) -> Result<CTy> {
@@ -248,6 +341,21 @@ fn c_ident(name: &str) -> String {
     } else {
         format!("k_{name}")
     }
+}
+
+/// Intrinsics that emit_c special-cases inline (mmio, asm, atomic, len/ord/assert,
+/// print). They must NOT get a `k_<name>` prototype: some collide with static
+/// helpers in the emitted runtime (k_ord, k_assert, kenga_println_*). Calls to
+/// them never resolve to a real `k_<name>` symbol.
+fn is_builtin_intrinsic(name: &str) -> bool {
+    matches!(name,
+        "len" | "ord" | "assert" | "print" | "println"
+        | "mmio_read8" | "mmio_read16" | "mmio_read32" | "mmio_read64"
+        | "mmio_write8" | "mmio_write16" | "mmio_write32" | "mmio_write64"
+        | "asm_hlt" | "asm_cli" | "asm_sti" | "asm"
+        | "asm_inb" | "asm_inw" | "asm_inl"
+        | "asm_outb" | "asm_outw" | "asm_outl"
+        | "atomic_load" | "atomic_store" | "atomic_cas" | "atomic_fence")
 }
 
 fn escape_c(s: &str) -> String {
@@ -510,9 +618,43 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
         Stmt::For {
             var, iter, body, ..
         } => emit_for(var, iter, body, indent, ctx),
+        Stmt::Match { value, arms, .. } => emit_match(value, arms, indent, ctx),
         Stmt::Break(_) => Ok(format!("{pad}break;\n")),
         Stmt::Continue(_) => Ok(format!("{pad}continue;\n")),
     }
+}
+
+fn match_tag(path: &[String]) -> u64 {
+    let name = path.last().map(String::as_str).unwrap_or("_");
+    let mut h = 1469598103934665603u64;
+    for b in name.bytes() { h ^= b as u64; h = h.wrapping_mul(1099511628211); }
+    h & 0x7fff_ffff
+}
+
+fn emit_match(value: &Expr, arms: &[MatchArm], indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String> {
+    let pad = "  ".repeat(indent);
+    let (pre, expr) = emit_expr(value, ctx)?;
+    let ty = infer_expr(value, ctx)?;
+    let val = wrap_as_val(&expr, &ty);
+    let tmp = ctx.fresh("match");
+    let mut out = format!("{}{}KVal {tmp} = {val};\n", indent_pre(&pre, indent), pad);
+    for (i, arm) in arms.iter().enumerate() {
+        let cond = match &arm.pattern {
+            MatchPattern::Wildcard => "1".to_string(),
+            MatchPattern::Variant { path, .. } => format!("kval_tag({tmp}) == {}", match_tag(path)),
+        };
+        out.push_str(&format!("{pad}{}if ({cond}) {{\n", if i == 0 { "" } else { "else " }));
+        if let MatchPattern::Variant { bindings, .. } = &arm.pattern {
+            for (slot, binding) in bindings.iter().enumerate() {
+                ctx.vars.insert(binding.clone(), CTy::I64);
+                out.push_str(&format!("{}int64_t {} = kval_payload_i64({tmp}, {});\n", "  ".repeat(indent + 1), c_ident(binding), slot));
+            }
+        }
+        for st in &arm.body.stmts { out.push_str(&emit_stmt(st, indent + 1, ctx)?); }
+        out.push_str(&format!("{pad}}}"));
+    }
+    out.push('\n');
+    Ok(out)
 }
 
 fn emit_for(
@@ -524,14 +666,17 @@ fn emit_for(
 ) -> Result<String> {
     let pad = "  ".repeat(indent);
     let ip = "  ".repeat(indent + 1);
-    if let Expr::Range { start, end, .. } = iter {
+    if let Expr::Range { start, end, step, .. } = iter {
         let (pa, a) = emit_expr(start, ctx)?;
         let (pb, b) = emit_expr(end, ctx)?;
+        let (ps, step_expr) = if let Some(step) = step { emit_expr(step, ctx)? } else { (String::new(), "1".to_string()) };
         ctx.vars.insert(var.to_string(), CTy::I64);
         let mut s = format!(
-            "{}{}{pad}for (int64_t {} = {a}; {} < {b}; {}++) {{\n",
+            "{}{}{}{pad}for (int64_t {} = {a}; (({step_expr}) >= 0 ? {} < {b} : {} > {b}); {} += ({step_expr})) {{\n",
             indent_pre(&pa, indent),
             indent_pre(&pb, indent),
+            indent_pre(&ps, indent),
+            c_ident(var),
             c_ident(var),
             c_ident(var),
             c_ident(var)
@@ -676,8 +821,11 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
                 ));
             }
         }
+        Expr::VariantLit { .. } => CTy::Val,
         Expr::Call { callee, .. } => {
-            if callee == "len" {
+            if callee == "Some" || callee == "None" {
+                CTy::Val
+            } else if callee == "len" {
                 CTy::I64
             } else if callee == "push" {
                 CTy::List
@@ -773,6 +921,46 @@ fn emit_intrinsic_call(
             let code = coerce_expr(&code, &ty, &CTy::Str)?;
             let mut out = String::new();
             writeln!(out, "{p}__asm__ __volatile__({code});").unwrap();
+            Ok((out, "0".into()))
+        }
+        "asm_inb" | "asm_inw" | "asm_inl" => {
+            if args.len() != 1 {
+                return Err(KengaError::at(
+                    "asm_inb/asm_inw/asm_inl take 1 arg (port)",
+                    span.clone(),
+                ));
+            }
+            let (p, port) = emit_as_i64(&args[0], ctx)?;
+            let (var_ty, size) = match name {
+                "asm_inb" => ("uint8_t", "b"),
+                "asm_inw" => ("uint16_t", "w"),
+                _ => ("uint32_t", "l"),
+            };
+            let mut out = p;
+            out += &format!("{var_ty} _k_port_in;\n");
+            out += &format!(
+                "__asm__ __volatile__(\"in{size} %1, %0\" : \"=a\"(_k_port_in) : \"Nd\"((uint16_t)({port})));\n"
+            );
+            Ok((out, "((int64_t)_k_port_in)".into()))
+        }
+        "asm_outb" | "asm_outw" | "asm_outl" => {
+            if args.len() != 2 {
+                return Err(KengaError::at(
+                    "asm_outb/asm_outw/asm_outl take 2 args (port, val)",
+                    span.clone(),
+                ));
+            }
+            let (p1, port) = emit_as_i64(&args[0], ctx)?;
+            let (p2, val) = emit_as_i64(&args[1], ctx)?;
+            let (val_ty, size) = match name {
+                "asm_outb" => ("uint8_t", "b"),
+                "asm_outw" => ("uint16_t", "w"),
+                _ => ("uint32_t", "l"),
+            };
+            let mut out = format!("{p1}{p2}");
+            out += &format!(
+                "__asm__ __volatile__(\"out{size} %0, %1\" : : \"a\"(({val_ty})({val})), \"Nd\"((uint16_t)({port})));\n"
+            );
             Ok((out, "0".into()))
         }
         "atomic_load" => {
@@ -914,6 +1102,19 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 format!("({}){{ {} }}", struct_c_name(name), parts.join(", ")),
             ))
         }
+        Expr::VariantLit { path, fields, span } => {
+            let tag = match_tag(path);
+            let tmp = ctx.fresh("variant");
+            let mut pre = String::new();
+            pre.push_str(&format!("KVal {tmp} = kval_i64({tag}); {tmp}.tag = {tag};\n"));
+            for (i, (_, value)) in fields.iter().enumerate().take(4) {
+                let (p, e) = emit_expr(value, ctx)?;
+                let ty = infer_expr(value, ctx)?;
+                pre.push_str(&p);
+                pre.push_str(&format!("{tmp}.u.payload[{i}] = kval_as_i64({});\n", wrap_as_val(&e, &ty)));
+            }
+            Ok((pre, tmp))
+        }
         Expr::Unary { op, expr, .. } => {
             let ty = infer_expr(expr, ctx)?;
             let want = if *op == UnaryOp::Neg && ty == CTy::F64 {
@@ -1013,6 +1214,16 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             Ok((format!("{pl}{pr}"), format!("({l} {o} {r})")))
         }
         Expr::Call { callee, args, span } => match callee.as_str() {
+            "Some" => {
+                if args.len() != 1 { return Err(KengaError::at("Some takes 1 argument", span.clone())); }
+                let (p, e) = emit_expr(&args[0], ctx)?;
+                let ty = infer_expr(&args[0], ctx)?;
+                Ok((p, wrap_as_val(&e, &ty)))
+            }
+            "None" => {
+                if !args.is_empty() { return Err(KengaError::at("None takes no arguments", span.clone())); }
+                Ok((String::new(), "kval_i64(0)".into()))
+            }
             "println" => Err(KengaError::at(
                 "println must be a statement",
                 span.clone(),
@@ -1027,6 +1238,8 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             "mmio_read8"  | "mmio_read16" | "mmio_read32" | "mmio_read64"
           | "mmio_write8" | "mmio_write16"| "mmio_write32"| "mmio_write64"
           | "asm_hlt" | "asm_cli" | "asm_sti"
+          | "asm_inb" | "asm_inw" | "asm_inl"
+          | "asm_outb" | "asm_outw" | "asm_outl"
           | "atomic_load" | "atomic_store" | "atomic_cas" | "atomic_fence"
           | "asm" => {
                 emit_intrinsic_call(callee.as_str(), &args, span, ctx)
@@ -1122,6 +1335,7 @@ typedef struct {
     double f;
     const char *s;
     int64_t list_id;
+    int64_t payload[4];
   } u;
 } KVal;
 
@@ -1142,6 +1356,10 @@ static void k_die(const char *msg) {
 
 static KVal kval_i64(int64_t x) {
   KVal v; v.tag = KV_I64; v.u.i = x; return v;
+}
+static int64_t kval_tag(KVal v) { return (int64_t)v.tag; }
+static int64_t kval_payload_i64(KVal v, int64_t slot) {
+  return (slot >= 0 && slot < 4) ? v.u.payload[slot] : 0;
 }
 static KVal kval_f64(double x) {
   KVal v; v.tag = KV_F64; v.u.f = x; return v;
@@ -1429,6 +1647,7 @@ typedef struct {
     double  f;
     const char *s;
     int64_t list_id;
+    int64_t payload[4];
   } u;
 } KVal;
 
@@ -1443,6 +1662,8 @@ static size_t    g_lists_len = 0;
 static size_t    g_lists_cap = 0;
 
 static KVal kval_i64(int64_t x)     { KVal v; v.tag = KV_I64; v.u.i = x; return v; }
+static int64_t kval_tag(KVal v)     { return (int64_t)v.tag; }
+static int64_t kval_payload_i64(KVal v, int64_t slot) { return (slot >= 0 && slot < 4) ? v.u.payload[slot] : 0; }
 static KVal kval_f64(double x)      { KVal v; v.tag = KV_F64; v.u.f = x; return v; }
 static KVal kval_str(const char *s) { KVal v; v.tag = KV_STR; v.u.s = s ? s : ""; return v; }
 static KVal kval_list(int64_t id)   { KVal v; v.tag = KV_LIST; v.u.list_id = id; return v; }
@@ -1474,17 +1695,18 @@ static KListObj *klist_obj(int64_t id) {
 static void* _k_arena_alloc(size_t n) {
   /* Allocation hook order (kernel-friendly):
    *   1) weak kf_alloc(n)  — kernel provides its own allocator (kmalloc/buddy). Declare in kf_rt.h.
-   *   2) weak __builtin_malloc(n) — libc fallback.
+   *   2) weak kf_libc_malloc(n) — optional libc fallback (hosted toolchains only).
    *   3) k_die("oom") — last resort. In real kernels kf_alloc must be provided.
+   * NOTE: do not use __builtin_malloc here — clang forbids taking its address.
    */
   extern void* kf_alloc(size_t) __attribute__((weak));
   if (&kf_alloc) {
     void* p = kf_alloc(n);
     if (p) return p;
   }
-  extern void* __builtin_malloc(size_t) __attribute__((weak));
-  if (&__builtin_malloc) {
-    void* p = __builtin_malloc(n);
+  extern void* kf_libc_malloc(size_t) __attribute__((weak));
+  if (&kf_libc_malloc) {
+    void* p = kf_libc_malloc(n);
     if (p) return p;
   }
   k_die("oom");

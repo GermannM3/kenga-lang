@@ -48,8 +48,25 @@ pub enum Item {
     Function(Function),
     Intrinsic(IntrinsicDecl),
     Struct(StructDef),
+    Enum(EnumDef),
+    Const(ConstDef),
+    Impl(ImplDef),
     /// `on "event"(args) { ... }` — native agent handler
     EventHandler(EventHandler),
+}
+
+#[derive(Debug, Clone)]
+pub struct ConstDef {
+    pub name: String,
+    pub value: Expr,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImplDef {
+    pub target: String,
+    pub methods: Vec<Function>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +82,19 @@ pub struct StructDef {
     pub name: String,
     pub fields: Vec<Param>,
     pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumDef {
+    pub name: String,
+    pub variants: Vec<EnumVariant>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumVariant {
+    pub name: String,
+    pub fields: Vec<Param>,
 }
 
 #[derive(Debug, Clone)]
@@ -141,6 +171,7 @@ pub enum Stmt {
         body: Block,
         span: Span,
     },
+    Match { value: Expr, arms: Vec<MatchArm>, span: Span },
     Break(Span),
     Continue(Span),
 }
@@ -158,9 +189,11 @@ pub enum Expr {
         fields: Vec<(String, Expr)>,
         span: Span,
     },
+    VariantLit { path: Vec<String>, fields: Vec<(String, Expr)>, span: Span },
     Range {
         start: Box<Expr>,
         end: Box<Expr>,
+        step: Option<Box<Expr>>,
         span: Span,
     },
     Index {
@@ -189,6 +222,18 @@ pub enum Expr {
         right: Box<Expr>,
         span: Span,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchArm {
+    pub pattern: MatchPattern,
+    pub body: Block,
+}
+
+#[derive(Debug, Clone)]
+pub enum MatchPattern {
+    Wildcard,
+    Variant { path: Vec<String>, bindings: Vec<String> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -230,6 +275,7 @@ impl Expr {
             | Expr::Ident(_, s)
             | Expr::List(_, s) => s.clone(),
             Expr::StructLit { span, .. }
+            | Expr::VariantLit { span, .. }
             | Expr::Range { span, .. }
             | Expr::Index { span, .. }
             | Expr::Field { span, .. }

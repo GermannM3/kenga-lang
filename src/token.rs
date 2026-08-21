@@ -5,6 +5,7 @@ pub enum TokenKind {
     // keywords
     Fn,
     Let,
+    Var,
     Return,
     If,
     Else,
@@ -13,6 +14,7 @@ pub enum TokenKind {
     In,
     Break,
     Continue,
+    Match,
     Struct,
     Import,
     On,
@@ -20,6 +22,7 @@ pub enum TokenKind {
     False,
     Ttl,
     Intrinsic,
+    Const,
 
     // types
     TypeI64,
@@ -47,6 +50,7 @@ pub enum TokenKind {
     Colon,
     Semicolon,
     Arrow,
+    FatArrow,
     Assign,
     Dot,
     DotDot,
