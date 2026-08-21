@@ -1,5 +1,6 @@
 use crate::ast::*;
 use crate::error::{KengaError, Result};
+use crate::error::Span;
 use crate::token::{Token, TokenKind};
 
 pub struct Parser {
@@ -96,6 +97,12 @@ impl Parser {
         if self.check_ident("enum") {
             return Ok(Item::Enum(self.parse_enum()?));
         }
+        if self.check_ident("union") {
+            // Unions use the same field surface as structs for the portable
+            // ABI; the native backend lowers them to a tagged payload later.
+            self.bump();
+            return Ok(Item::Struct(self.parse_struct_body()?));
+        }
         if self.check(&TokenKind::Const) {
             return Ok(Item::Const(self.parse_const()?));
         }
@@ -157,6 +164,16 @@ impl Parser {
     fn parse_struct(&mut self) -> Result<StructDef> {
         let tok = self.bump();
         let name = self.expect_ident()?;
+        self.parse_struct_body_named(name, tok.span)
+    }
+
+    fn parse_struct_body(&mut self) -> Result<StructDef> {
+        let tok = self.peek().span.clone();
+        let name = self.expect_ident()?;
+        self.parse_struct_body_named(name, tok)
+    }
+
+    fn parse_struct_body_named(&mut self, name: String, span: Span) -> Result<StructDef> {
         self.expect(TokenKind::LBrace, "expected '{' after struct name")?;
         let mut fields = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
@@ -172,7 +189,7 @@ impl Parser {
         Ok(StructDef {
             name,
             fields,
-            span: tok.span,
+            span,
         })
     }
 
@@ -268,6 +285,10 @@ impl Parser {
                 if name == "array" && self.check(&TokenKind::Lt) {
                     self.bump();
                     let _ = self.parse_type()?;
+                    if self.check(&TokenKind::Comma) {
+                        self.bump();
+                        let _ = self.bump(); // fixed capacity, represented as a list
+                    }
                     self.expect(TokenKind::Gt, "expected '>' after array type")?;
                     return Ok(Type::List);
                 }
