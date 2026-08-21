@@ -332,7 +332,7 @@ impl Parser {
             TokenKind::If => self.parse_if(),
             TokenKind::While => self.parse_while(),
             TokenKind::For => self.parse_for(),
-            TokenKind::Ident(name) if name == "match" => self.parse_match(),
+            TokenKind::Match => self.parse_match(),
             TokenKind::Break => {
                 let t = self.bump();
                 self.optional_semicolon();
@@ -455,8 +455,10 @@ impl Parser {
                 self.bump();
             } else {
                 path.push(self.expect_ident()?);
-                while self.check(&TokenKind::Colon) && self.tokens.get(self.pos + 1).map(|t| matches!(t.kind, TokenKind::Colon)).unwrap_or(false) {
-                    self.bump(); self.bump(); path.push(self.expect_ident()?);
+                while self.check(&TokenKind::Colon) {
+                    self.bump();
+                    self.expect(TokenKind::Colon, "expected '::' in match variant")?;
+                    path.push(self.expect_ident()?);
                 }
                 if self.check(&TokenKind::LBrace) {
                     self.bump();

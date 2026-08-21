@@ -14,6 +14,7 @@ pub enum TokenKind {
     In,
     Break,
     Continue,
+    Match,
     Struct,
     Import,
     On,

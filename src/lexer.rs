@@ -234,6 +234,7 @@ impl<'a> Lexer<'a> {
             "in" => TokenKind::In,
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
+            "match" => TokenKind::Match,
             "struct" => TokenKind::Struct,
             "import" => TokenKind::Import,
             "on" => TokenKind::On,
