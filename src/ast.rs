@@ -48,6 +48,7 @@ pub enum Item {
     Function(Function),
     Intrinsic(IntrinsicDecl),
     Struct(StructDef),
+    Enum(EnumDef),
     Const(ConstDef),
     Impl(ImplDef),
     /// `on "event"(args) { ... }` — native agent handler
@@ -80,6 +81,13 @@ pub struct EventHandler {
 pub struct StructDef {
     pub name: String,
     pub fields: Vec<Param>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumDef {
+    pub name: String,
+    pub variants: Vec<String>,
     pub span: Span,
 }
 

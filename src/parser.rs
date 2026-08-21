@@ -93,6 +93,9 @@ impl Parser {
         if self.check(&TokenKind::Struct) {
             return Ok(Item::Struct(self.parse_struct()?));
         }
+        if self.check_ident("enum") {
+            return Ok(Item::Enum(self.parse_enum()?));
+        }
         if self.check(&TokenKind::Const) {
             return Ok(Item::Const(self.parse_const()?));
         }
@@ -407,6 +410,19 @@ impl Parser {
             value,
             span: let_tok.span,
         })
+    }
+
+    fn parse_enum(&mut self) -> Result<EnumDef> {
+        let tok = self.bump();
+        let name = self.expect_ident()?;
+        self.expect(TokenKind::LBrace, "expected '{' after enum name")?;
+        let mut variants = Vec::new();
+        while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+            variants.push(self.expect_ident()?);
+            if self.check(&TokenKind::Comma) { self.bump(); }
+        }
+        self.expect(TokenKind::RBrace, "expected '}' after enum")?;
+        Ok(EnumDef { name, variants, span: tok.span })
     }
 
     fn optional_semicolon(&mut self) {
@@ -917,6 +933,9 @@ pub fn dump_program(program: &Program) -> String {
             }
             Item::Const(c) => {
                 out.push_str(&format!("const {} = ...;\n\n", c.name));
+            }
+            Item::Enum(e) => {
+                out.push_str(&format!("enum {} {{ {} }}\n\n", e.name, e.variants.join(", ")));
             }
             Item::Impl(i) => {
                 out.push_str(&format!("impl {} {{ {} methods }}\n\n", i.target, i.methods.len()));
