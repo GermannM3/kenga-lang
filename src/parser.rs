@@ -322,8 +322,27 @@ impl Parser {
     fn parse_assign_or_expr_stmt(&mut self) -> Result<Stmt> {
         let save = self.pos;
         let target_expr = self.parse_postfix_primary()?;
-        if self.check(&TokenKind::Assign) {
+        let compound = match self.peek_kind() {
+            TokenKind::Plus => Some(BinaryOp::Add),
+            TokenKind::Minus => Some(BinaryOp::Sub),
+            TokenKind::Star => Some(BinaryOp::Mul),
+            TokenKind::Slash => Some(BinaryOp::Div),
+            _ => None,
+        };
+        if self.check(&TokenKind::Assign) || compound.is_some() {
             let span = self.bump().span;
+            if let Some(op) = compound {
+                self.expect(TokenKind::Assign, "expected '=' after compound assignment")?;
+                let value = self.parse_expr()?;
+                let target = match target_expr.clone() {
+                    Expr::Ident(name, _) => AssignTarget::Name(name),
+                    Expr::Index { target, index, .. } => AssignTarget::Index { target: *target, index: *index },
+                    Expr::Field { target, field, .. } => AssignTarget::Field { target: *target, field },
+                    _ => return Err(KengaError::at("invalid assignment target", span)),
+                };
+                let lhs = target_expr;
+                return Ok(Stmt::Assign { target, value: Expr::Binary { op, left: Box::new(lhs), right: Box::new(value), span: span.clone() }, span });
+            }
             let value = self.parse_expr()?;
             self.optional_semicolon();
             let target = match target_expr {
@@ -436,7 +455,19 @@ impl Parser {
 
     fn parse_while(&mut self) -> Result<Stmt> {
         let tok = self.bump();
-        let cond = self.parse_expr()?;
+        let cond = if self.check(&TokenKind::Let) {
+            // Optional-pattern form used by the desktop event loop:
+            // `while let Some(event) = poll()`. The current ABI represents
+            // option-like polling as its scalar condition; consume the
+            // pattern and retain the polling expression.
+            self.bump();
+            let _ = self.expect_ident()?; // Some
+            self.expect(TokenKind::LParen, "expected '(' after Some")?;
+            let _binding = self.expect_ident()?;
+            self.expect(TokenKind::RParen, "expected ')' after Some binding")?;
+            self.expect(TokenKind::Assign, "expected '=' in while let")?;
+            self.parse_expr()?
+        } else { self.parse_expr()? };
         let body = self.parse_block()?;
         Ok(Stmt::While {
             cond,
@@ -460,7 +491,16 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Result<Expr> {
-        self.parse_range()
+        let expr = self.parse_range()?;
+        // The desktop DSL permits explicit scalar casts (`value as float`).
+        // The current tagged C backend already performs the required numeric
+        // coercion, so consume the annotation while preserving the expression
+        // tree until typed cast nodes are introduced in the native ABI.
+        while self.check_ident("as") {
+            self.bump();
+            let _ = self.expect_ident()?;
+        }
+        Ok(expr)
     }
 
     fn parse_range(&mut self) -> Result<Expr> {
