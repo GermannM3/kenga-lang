@@ -645,9 +645,9 @@ fn emit_match(value: &Expr, arms: &[MatchArm], indent: usize, ctx: &mut EmitCtx<
         };
         out.push_str(&format!("{pad}{}if ({cond}) {{\n", if i == 0 { "" } else { "else " }));
         if let MatchPattern::Variant { bindings, .. } = &arm.pattern {
-            for binding in bindings {
+            for (slot, binding) in bindings.iter().enumerate() {
                 ctx.vars.insert(binding.clone(), CTy::I64);
-                out.push_str(&format!("{}int64_t {} = kval_as_i64({tmp});\n", "  ".repeat(indent + 1), c_ident(binding)));
+                out.push_str(&format!("{}int64_t {} = kval_payload_i64({tmp}, {});\n", "  ".repeat(indent + 1), c_ident(binding), slot));
             }
         }
         for st in &arm.body.stmts { out.push_str(&emit_stmt(st, indent + 1, ctx)?); }
@@ -1321,6 +1321,7 @@ typedef struct {
     double f;
     const char *s;
     int64_t list_id;
+    int64_t payload[4];
   } u;
 } KVal;
 
@@ -1343,6 +1344,9 @@ static KVal kval_i64(int64_t x) {
   KVal v; v.tag = KV_I64; v.u.i = x; return v;
 }
 static int64_t kval_tag(KVal v) { return (int64_t)v.tag; }
+static int64_t kval_payload_i64(KVal v, int64_t slot) {
+  return (slot >= 0 && slot < 4) ? v.u.payload[slot] : 0;
+}
 static KVal kval_f64(double x) {
   KVal v; v.tag = KV_F64; v.u.f = x; return v;
 }
@@ -1629,6 +1633,7 @@ typedef struct {
     double  f;
     const char *s;
     int64_t list_id;
+    int64_t payload[4];
   } u;
 } KVal;
 
@@ -1644,6 +1649,7 @@ static size_t    g_lists_cap = 0;
 
 static KVal kval_i64(int64_t x)     { KVal v; v.tag = KV_I64; v.u.i = x; return v; }
 static int64_t kval_tag(KVal v)     { return (int64_t)v.tag; }
+static int64_t kval_payload_i64(KVal v, int64_t slot) { return (slot >= 0 && slot < 4) ? v.u.payload[slot] : 0; }
 static KVal kval_f64(double x)      { KVal v; v.tag = KV_F64; v.u.f = x; return v; }
 static KVal kval_str(const char *s) { KVal v; v.tag = KV_STR; v.u.s = s ? s : ""; return v; }
 static KVal kval_list(int64_t id)   { KVal v; v.tag = KV_LIST; v.u.list_id = id; return v; }
