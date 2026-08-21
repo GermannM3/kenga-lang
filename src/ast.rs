@@ -177,6 +177,7 @@ pub enum Expr {
     Range {
         start: Box<Expr>,
         end: Box<Expr>,
+        step: Option<Box<Expr>>,
         span: Span,
     },
     Index {

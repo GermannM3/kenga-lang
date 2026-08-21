@@ -468,9 +468,11 @@ impl Parser {
         if self.check(&TokenKind::DotDot) {
             let span = self.bump().span;
             let end = self.parse_or()?;
+            let step = if self.check_ident("step") { self.bump(); Some(Box::new(self.parse_or()?)) } else { None };
             return Ok(Expr::Range {
                 start: Box::new(start),
                 end: Box::new(end),
+                step,
                 span,
             });
         }

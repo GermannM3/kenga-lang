@@ -623,14 +623,17 @@ fn emit_for(
 ) -> Result<String> {
     let pad = "  ".repeat(indent);
     let ip = "  ".repeat(indent + 1);
-    if let Expr::Range { start, end, .. } = iter {
+    if let Expr::Range { start, end, step, .. } = iter {
         let (pa, a) = emit_expr(start, ctx)?;
         let (pb, b) = emit_expr(end, ctx)?;
+        let (ps, step_expr) = if let Some(step) = step { emit_expr(step, ctx)? } else { (String::new(), "1".to_string()) };
         ctx.vars.insert(var.to_string(), CTy::I64);
         let mut s = format!(
-            "{}{}{pad}for (int64_t {} = {a}; {} < {b}; {}++) {{\n",
+            "{}{}{}{pad}for (int64_t {} = {a}; (({step_expr}) >= 0 ? {} < {b} : {} > {b}); {} += ({step_expr})) {{\n",
             indent_pre(&pa, indent),
             indent_pre(&pb, indent),
+            indent_pre(&ps, indent),
+            c_ident(var),
             c_ident(var),
             c_ident(var),
             c_ident(var)
