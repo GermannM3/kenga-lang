@@ -1009,7 +1009,7 @@ impl Parser {
                         }
                     }
                     self.expect(TokenKind::RParen, "expected ')' after method call")?;
-                    if field == "len" { args.insert(0, receiver); }
+                    if field == "len" || field == "push" { args.insert(0, receiver); }
                     expr = Expr::Call { callee: field, args, span };
                 } else {
                     expr = Expr::Field { target: Box::new(expr), field, span };
@@ -1045,6 +1045,7 @@ impl Parser {
                 Ok(Expr::List(elems, tok.span))
             }
             TokenKind::Ident(name) => {
+                if name == "null" || name == "None" { return Ok(Expr::Int(0, tok.span)); }
                 if self.check(&TokenKind::LParen) {
                     self.bump();
                     let mut args = Vec::new();

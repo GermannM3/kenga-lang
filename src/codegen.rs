@@ -796,6 +796,11 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
             field,
             span,
         } => {
+            if let Expr::Ident(root, _) = target.as_ref() {
+                if root.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
+                    return Ok(CTy::I64);
+                }
+            }
             let t = infer_expr(target, ctx)?;
             match t {
                 CTy::Struct(n) => {
@@ -1075,6 +1080,11 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             }
         }
         Expr::Field { target, field, .. } => {
+            if let Expr::Ident(root, _) = target.as_ref() {
+                if root.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
+                    return Ok((String::new(), "0".to_string()));
+                }
+            }
             let (p, t) = emit_expr(target, ctx)?;
             Ok((p, format!("{}.{}", t, c_ident(field))))
         }
