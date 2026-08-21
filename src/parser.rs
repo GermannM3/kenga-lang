@@ -332,6 +332,7 @@ impl Parser {
             TokenKind::If => self.parse_if(),
             TokenKind::While => self.parse_while(),
             TokenKind::For => self.parse_for(),
+            TokenKind::Ident(name) if name == "match" => self.parse_match(),
             TokenKind::Break => {
                 let t = self.bump();
                 self.optional_semicolon();
@@ -440,6 +441,40 @@ impl Parser {
             value,
             span: let_tok.span,
         })
+    }
+
+    fn parse_match(&mut self) -> Result<Stmt> {
+        let tok = self.bump();
+        let value = self.parse_expr()?;
+        self.expect(TokenKind::LBrace, "expected '{' after match value")?;
+        let mut arms = Vec::new();
+        while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+            let mut path = Vec::new();
+            let mut bindings = Vec::new();
+            if self.check_ident("_") {
+                self.bump();
+            } else {
+                path.push(self.expect_ident()?);
+                while self.check(&TokenKind::Colon) && self.tokens.get(self.pos + 1).map(|t| matches!(t.kind, TokenKind::Colon)).unwrap_or(false) {
+                    self.bump(); self.bump(); path.push(self.expect_ident()?);
+                }
+                if self.check(&TokenKind::LBrace) {
+                    self.bump();
+                    while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+                        bindings.push(self.expect_ident()?);
+                        if self.check(&TokenKind::Comma) { self.bump(); }
+                    }
+                    self.expect(TokenKind::RBrace, "expected '}' after match bindings")?;
+                }
+            }
+            self.expect(TokenKind::FatArrow, "expected '=>' after match pattern")?;
+            let body = self.parse_block()?;
+            let pattern = if path.is_empty() { MatchPattern::Wildcard } else { MatchPattern::Variant { path, bindings } };
+            arms.push(MatchArm { pattern, body });
+            if self.check(&TokenKind::Comma) { self.bump(); }
+        }
+        self.expect(TokenKind::RBrace, "expected '}' after match")?;
+        Ok(Stmt::Match { value, arms, span: tok.span })
     }
 
     fn parse_enum(&mut self) -> Result<EnumDef> {

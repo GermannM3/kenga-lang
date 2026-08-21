@@ -150,6 +150,9 @@ impl<'a> Lexer<'a> {
                 if self.peek() == Some('=') {
                     self.bump();
                     TokenKind::Eq
+                } else if self.peek() == Some('>') {
+                    self.bump();
+                    TokenKind::FatArrow
                 } else {
                     TokenKind::Assign
                 }

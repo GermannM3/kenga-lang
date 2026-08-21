@@ -171,6 +171,7 @@ pub enum Stmt {
         body: Block,
         span: Span,
     },
+    Match { value: Expr, arms: Vec<MatchArm>, span: Span },
     Break(Span),
     Continue(Span),
 }
@@ -220,6 +221,18 @@ pub enum Expr {
         right: Box<Expr>,
         span: Span,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchArm {
+    pub pattern: MatchPattern,
+    pub body: Block,
+}
+
+#[derive(Debug, Clone)]
+pub enum MatchPattern {
+    Wildcard,
+    Variant { path: Vec<String>, bindings: Vec<String> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

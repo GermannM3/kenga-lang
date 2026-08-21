@@ -325,6 +325,9 @@ fn compile_stmt(
             ops.push(Op::ContinuePlaceholder);
             loops.last_mut().unwrap().continue_patches.push(i);
         }
+        Stmt::Match { .. } => {
+            return Err(KengaError::new("match bytecode lowering is not implemented", None));
+        }
     }
     Ok(())
 }

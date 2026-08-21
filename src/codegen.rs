@@ -618,6 +618,7 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
         Stmt::For {
             var, iter, body, ..
         } => emit_for(var, iter, body, indent, ctx),
+        Stmt::Match { .. } => Err(KengaError::new("emit-c: match lowering is not enabled for this target yet", None)),
         Stmt::Break(_) => Ok(format!("{pad}break;\n")),
         Stmt::Continue(_) => Ok(format!("{pad}continue;\n")),
     }
