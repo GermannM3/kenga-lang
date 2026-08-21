@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    AssignTarget, BinaryOp, Block, Expr, Function, Item, Program, Stmt, Type, UnaryOp,
+    AssignTarget, BinaryOp, Block, Expr, Function, Item, MatchArm, MatchPattern, Program, Stmt, Type, UnaryOp,
 };
 use crate::error::{KengaError, Result};
 
@@ -618,10 +618,43 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
         Stmt::For {
             var, iter, body, ..
         } => emit_for(var, iter, body, indent, ctx),
-        Stmt::Match { .. } => Err(KengaError::new("emit-c: match lowering is not enabled for this target yet", None)),
+        Stmt::Match { value, arms, .. } => emit_match(value, arms, indent, ctx),
         Stmt::Break(_) => Ok(format!("{pad}break;\n")),
         Stmt::Continue(_) => Ok(format!("{pad}continue;\n")),
     }
+}
+
+fn match_tag(path: &[String]) -> u64 {
+    let name = path.last().map(String::as_str).unwrap_or("_");
+    let mut h = 1469598103934665603u64;
+    for b in name.bytes() { h ^= b as u64; h = h.wrapping_mul(1099511628211); }
+    h & 0x7fff_ffff
+}
+
+fn emit_match(value: &Expr, arms: &[MatchArm], indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String> {
+    let pad = "  ".repeat(indent);
+    let (pre, expr) = emit_expr(value, ctx)?;
+    let ty = infer_expr(value, ctx)?;
+    let val = wrap_as_val(&expr, &ty);
+    let tmp = ctx.fresh("match");
+    let mut out = format!("{}{}KVal {tmp} = {val};\n", indent_pre(&pre, indent), pad);
+    for (i, arm) in arms.iter().enumerate() {
+        let cond = match &arm.pattern {
+            MatchPattern::Wildcard => "1".to_string(),
+            MatchPattern::Variant { path, .. } => format!("kval_tag({tmp}) == {}", match_tag(path)),
+        };
+        out.push_str(&format!("{pad}{}if ({cond}) {{\n", if i == 0 { "" } else { "else " }));
+        if let MatchPattern::Variant { bindings, .. } = &arm.pattern {
+            for binding in bindings {
+                ctx.vars.insert(binding.clone(), CTy::I64);
+                out.push_str(&format!("{}int64_t {} = kval_as_i64({tmp});\n", "  ".repeat(indent + 1), c_ident(binding)));
+            }
+        }
+        for st in &arm.body.stmts { out.push_str(&emit_stmt(st, indent + 1, ctx)?); }
+        out.push_str(&format!("{pad}}}"));
+    }
+    out.push('\n');
+    Ok(out)
 }
 
 fn emit_for(
@@ -1309,6 +1342,7 @@ static void k_die(const char *msg) {
 static KVal kval_i64(int64_t x) {
   KVal v; v.tag = KV_I64; v.u.i = x; return v;
 }
+static int64_t kval_tag(KVal v) { return (int64_t)v.tag; }
 static KVal kval_f64(double x) {
   KVal v; v.tag = KV_F64; v.u.f = x; return v;
 }
@@ -1609,6 +1643,7 @@ static size_t    g_lists_len = 0;
 static size_t    g_lists_cap = 0;
 
 static KVal kval_i64(int64_t x)     { KVal v; v.tag = KV_I64; v.u.i = x; return v; }
+static int64_t kval_tag(KVal v)     { return (int64_t)v.tag; }
 static KVal kval_f64(double x)      { KVal v; v.tag = KV_F64; v.u.f = x; return v; }
 static KVal kval_str(const char *s) { KVal v; v.tag = KV_STR; v.u.s = s ? s : ""; return v; }
 static KVal kval_list(int64_t id)   { KVal v; v.tag = KV_LIST; v.u.list_id = id; return v; }
