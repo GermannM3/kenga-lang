@@ -59,6 +59,17 @@ fn resolve_import(base: &Path, spec: &str) -> Result<PathBuf> {
     if candidate.exists() {
         return Ok(candidate);
     }
+    // Imports in a desktop module are rooted at the source tree (for
+    // example graphics/renderer.kg importing kernel/hardware.kg), so walk
+    // the source ancestors before falling back to the process cwd.
+    let mut root = base;
+    while let Some(parent) = root.parent() {
+        let candidate = parent.join(spec);
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+        root = parent;
+    }
     // try from cwd / repo root style
     let cwd = PathBuf::from(spec);
     if cwd.exists() {

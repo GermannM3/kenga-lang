@@ -265,6 +265,13 @@ impl Parser {
                 }
                 params.push(Param { name, ty: Type::I64 });
             } else {
+            if self.check_ident("self") {
+                let tok = self.bump();
+                params.push(Param { name: "self".to_string(), ty: Type::I64 });
+                if self.check(&TokenKind::Comma) { self.bump(); continue; }
+                if self.check(&TokenKind::RParen) { break; }
+                return Err(KengaError::at("expected ',' after self parameter", tok.span));
+            }
             let name = self.expect_ident()?;
             self.expect(TokenKind::Colon, "expected ':' after param name")?;
             if self.check(&TokenKind::Amp) {
@@ -293,6 +300,14 @@ impl Parser {
             TokenKind::TypeTensor => Ok(Type::Tensor),
             TokenKind::TypeList => Ok(Type::List),
             TokenKind::TypeMemory => Ok(Type::Memory),
+            TokenKind::Fn => {
+                if self.check(&TokenKind::LParen) {
+                    self.bump();
+                    while !self.check(&TokenKind::RParen) && !self.check(&TokenKind::Eof) { self.bump(); }
+                    self.expect(TokenKind::RParen, "expected ')' after function type")?;
+                }
+                Ok(Type::Named("fn".to_string()))
+            }
             TokenKind::Ident(mut name) => {
                 if (name == "array" || name == "Option" || name == "ptr") && self.check(&TokenKind::Lt) {
                     self.bump();
@@ -892,7 +907,16 @@ impl Parser {
                 // so `value as float * factor` keeps the multiplication.
                 if self.check_ident("as") {
                     self.bump();
-                    let _ = self.expect_ident()?;
+                    if self.check(&TokenKind::Fn) {
+                        self.bump();
+                        if self.check(&TokenKind::LParen) {
+                            self.bump();
+                            while !self.check(&TokenKind::RParen) && !self.check(&TokenKind::Eof) { self.bump(); }
+                            self.expect(TokenKind::RParen, "expected ')' after function cast")?;
+                        }
+                    } else {
+                        let _ = self.expect_ident()?;
+                    }
                     if self.check(&TokenKind::Lt) {
                         while !self.check(&TokenKind::Gt) && !self.check(&TokenKind::Eof) { self.bump(); }
                         self.expect(TokenKind::Gt, "expected '>' after cast type")?;
