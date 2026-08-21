@@ -445,7 +445,10 @@ impl Parser {
 
     fn parse_match(&mut self) -> Result<Stmt> {
         let tok = self.bump();
-        let value = self.parse_expr()?;
+        let value = if let TokenKind::Ident(name) = self.peek().kind.clone() {
+            let t = self.bump();
+            Expr::Ident(name, t.span)
+        } else { self.parse_expr()? };
         self.expect(TokenKind::LBrace, "expected '{' after match value")?;
         let mut arms = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
