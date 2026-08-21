@@ -222,6 +222,7 @@ impl<'a> Lexer<'a> {
         let kind = match s.as_str() {
             "fn" => TokenKind::Fn,
             "let" => TokenKind::Let,
+            "var" => TokenKind::Var,
             "return" => TokenKind::Return,
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
@@ -237,6 +238,7 @@ impl<'a> Lexer<'a> {
             "false" => TokenKind::False,
             "ttl" => TokenKind::Ttl,
             "intrinsic" => TokenKind::Intrinsic,
+            "const" => TokenKind::Const,
             "i64" => TokenKind::TypeI64,
             "f64" => TokenKind::TypeF64,
             "bool" => TokenKind::TypeBool,

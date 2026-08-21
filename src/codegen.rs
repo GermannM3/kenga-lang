@@ -89,6 +89,12 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             if f.name == "main" {
                 has_main = true;
             }
+        } else if let Item::Impl(i) = item {
+            for f in &i.methods {
+                let ret = map_type(&f.ret, &structs)?;
+                let params = f.params.iter().map(|p| map_type(&p.ty, &structs)).collect::<Result<Vec<_>>>()?;
+                sigs.insert(f.name.clone(), (ret, params));
+            }
         }
         // @intrinsic fn foo(...) -> t;  — extern/FFI declaration. Feed its
         // signature into sigs so calls get proper arg coercion, and emit a
@@ -108,6 +114,13 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
     }
 
     let mut body = String::new();
+    for item in &program.items {
+        if let Item::Const(c) = item {
+            let (_, value) = emit_const_expr(&c.value)?;
+            body.push_str(&format!("#define {} {}\n", c_ident(&c.name), value));
+        }
+    }
+    body.push('\n');
     let mut names: Vec<_> = structs.keys().cloned().collect();
     names.sort();
     for name in names {
@@ -127,6 +140,11 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             }
             body.push_str(&emit_prototype(f, &structs)?);
             body.push_str(";\n");
+        } else if let Item::Impl(i) = item {
+            for f in &i.methods {
+                body.push_str(&emit_prototype(f, &structs)?);
+                body.push_str(";\n");
+            }
         }
         // FFI prototypes for user-declared @intrinsic fn (kernel externs).
         if let Item::Intrinsic(i) = item {
@@ -150,6 +168,11 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
         if let Item::Function(f) = item {
             body.push_str(&emit_function(f, &structs, &sigs)?);
             body.push('\n');
+        } else if let Item::Impl(i) = item {
+            for f in &i.methods {
+                body.push_str(&emit_function(f, &structs, &sigs)?);
+                body.push('\n');
+            }
         }
     }
 
@@ -161,6 +184,40 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
     }
     out.push_str(&body);
     Ok(out)
+}
+
+fn emit_const_expr(expr: &Expr) -> Result<(String, String)> {
+    match expr {
+        Expr::Int(n, _) => Ok(("i64".into(), n.to_string())),
+        Expr::Float(n, _) => Ok(("f64".into(), c_float_lit(*n))),
+        Expr::Bool(b, _) => Ok(("i64".into(), if *b { "1" } else { "0" }.into())),
+        Expr::Str(s, _) => Ok(("str".into(), format!("\"{}\"", escape_c(s)))),
+        Expr::Unary { op, expr, .. } => {
+            let (_, v) = emit_const_expr(expr)?;
+            Ok(("i64".into(), format!("{}{}", unary_c(op), v)))
+        }
+        Expr::Binary { left, op, right, .. } => {
+            let (_, l) = emit_const_expr(left)?;
+            let (_, r) = emit_const_expr(right)?;
+            Ok(("i64".into(), format!("({} {} {})", l, binary_c(op), r)))
+        }
+        _ => Err(KengaError::new("const value must be compile-time literal", None)),
+    }
+}
+
+fn unary_c(op: &UnaryOp) -> &'static str {
+    match op { UnaryOp::Neg => "-", UnaryOp::Not => "!", UnaryOp::BitNot => "~" }
+}
+
+fn binary_c(op: &BinaryOp) -> &'static str {
+    match op {
+        BinaryOp::Add => "+", BinaryOp::Sub => "-", BinaryOp::Mul => "*",
+        BinaryOp::Div => "/", BinaryOp::Rem => "%", BinaryOp::Eq => "==",
+        BinaryOp::Ne => "!=", BinaryOp::Lt => "<", BinaryOp::Le => "<=",
+        BinaryOp::Gt => ">", BinaryOp::Ge => ">=", BinaryOp::And => "&&",
+        BinaryOp::Or => "||", BinaryOp::BitAnd => "&", BinaryOp::BitOr => "|",
+        BinaryOp::BitXor => "^", BinaryOp::Shl => "<<", BinaryOp::Shr => ">>",
+    }
 }
 
 fn map_type(t: &Type, structs: &HashMap<String, StructInfo>) -> Result<CTy> {

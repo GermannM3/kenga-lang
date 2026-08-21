@@ -93,10 +93,38 @@ impl Parser {
         if self.check(&TokenKind::Struct) {
             return Ok(Item::Struct(self.parse_struct()?));
         }
+        if self.check(&TokenKind::Const) {
+            return Ok(Item::Const(self.parse_const()?));
+        }
+        if self.check_ident("impl") {
+            return Ok(Item::Impl(self.parse_impl()?));
+        }
         if self.check(&TokenKind::On) {
             return Ok(Item::EventHandler(self.parse_on_handler()?));
         }
         Ok(Item::Function(self.parse_function()?))
+    }
+
+    fn parse_const(&mut self) -> Result<ConstDef> {
+        let tok = self.bump();
+        let name = self.expect_ident()?;
+        self.expect(TokenKind::Assign, "expected '=' after const name")?;
+        let value = self.parse_expr()?;
+        /* Newer Kenga source permits declaration-per-line style. */
+        if self.check(&TokenKind::Semicolon) { self.bump(); }
+        Ok(ConstDef { name, value, span: tok.span })
+    }
+
+    fn parse_impl(&mut self) -> Result<ImplDef> {
+        let tok = self.bump();
+        let target = self.expect_ident()?;
+        self.expect(TokenKind::LBrace, "expected '{' after impl target")?;
+        let mut methods = Vec::new();
+        while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+            methods.push(self.parse_function()?);
+        }
+        self.expect(TokenKind::RBrace, "expected '}' after impl")?;
+        Ok(ImplDef { target, methods, span: tok.span })
     }
 
     fn parse_on_handler(&mut self) -> Result<EventHandler> {
@@ -135,8 +163,6 @@ impl Parser {
             fields.push(Param { name: fname, ty });
             if self.check(&TokenKind::Comma) {
                 self.bump();
-            } else {
-                break;
             }
         }
         self.expect(TokenKind::RBrace, "expected '}' after struct fields")?;
@@ -198,10 +224,24 @@ impl Parser {
             return Ok(params);
         }
         loop {
+            // Method receivers use Rust-like syntax in the desktop sources.
+            // The current C ABI represents the receiver as an opaque handle;
+            // preserving it here lets the native target complete parsing
+            // while later backends can lower it to a real object pointer.
+            if self.check(&TokenKind::Amp) {
+                self.bump();
+                if self.check_ident("mut") { self.bump(); }
+                let name = self.expect_ident()?;
+                if name != "self" {
+                    return Err(KengaError::new("expected self receiver", None));
+                }
+                params.push(Param { name, ty: Type::I64 });
+            } else {
             let name = self.expect_ident()?;
             self.expect(TokenKind::Colon, "expected ':' after param name")?;
             let ty = self.parse_type()?;
             params.push(Param { name, ty });
+            }
             if self.check(&TokenKind::Comma) {
                 self.bump();
                 continue;
@@ -221,7 +261,23 @@ impl Parser {
             TokenKind::TypeTensor => Ok(Type::Tensor),
             TokenKind::TypeList => Ok(Type::List),
             TokenKind::TypeMemory => Ok(Type::Memory),
-            TokenKind::Ident(name) => Ok(Type::Named(name)),
+            TokenKind::Ident(mut name) => {
+                if name == "array" && self.check(&TokenKind::Lt) {
+                    self.bump();
+                    let _ = self.parse_type()?;
+                    self.expect(TokenKind::Gt, "expected '>' after array type")?;
+                    return Ok(Type::List);
+                }
+                /* Accept portable module-qualified types such as
+                   Renderer::Framebuffer and Renderer.Framebuffer. */
+                if self.check(&TokenKind::Dot) {
+                    self.bump();
+                    let part = self.expect_ident()?;
+                    name.push_str("::");
+                    name.push_str(&part);
+                }
+                Ok(Type::Named(name))
+            }
             _ => Err(KengaError::at("expected type name", t.span)),
         }
     }
@@ -238,26 +294,26 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Result<Stmt> {
         match self.peek_kind() {
-            TokenKind::Let => self.parse_let(),
+            TokenKind::Let | TokenKind::Var => self.parse_let(),
             TokenKind::Return => self.parse_return(),
             TokenKind::If => self.parse_if(),
             TokenKind::While => self.parse_while(),
             TokenKind::For => self.parse_for(),
             TokenKind::Break => {
                 let t = self.bump();
-                self.expect(TokenKind::Semicolon, "expected ';' after break")?;
+                self.optional_semicolon();
                 Ok(Stmt::Break(t.span))
             }
             TokenKind::Continue => {
                 let t = self.bump();
-                self.expect(TokenKind::Semicolon, "expected ';' after continue")?;
+                self.optional_semicolon();
                 Ok(Stmt::Continue(t.span))
             }
             TokenKind::Ident(_) => self.parse_assign_or_expr_stmt(),
             _ => {
                 let expr = self.parse_expr()?;
                 let span = expr.span();
-                self.expect(TokenKind::Semicolon, "expected ';'")?;
+                self.optional_semicolon();
                 Ok(Stmt::Expr { expr, span })
             }
         }
@@ -269,7 +325,7 @@ impl Parser {
         if self.check(&TokenKind::Assign) {
             let span = self.bump().span;
             let value = self.parse_expr()?;
-            self.expect(TokenKind::Semicolon, "expected ';'")?;
+            self.optional_semicolon();
             let target = match target_expr {
                 Expr::Ident(name, _) => AssignTarget::Name(name),
                 Expr::Index { target, index, .. } => AssignTarget::Index {
@@ -296,7 +352,7 @@ impl Parser {
         self.pos = save;
         let expr = self.parse_expr()?;
         let span = expr.span();
-        self.expect(TokenKind::Semicolon, "expected ';'")?;
+        self.optional_semicolon();
         Ok(Stmt::Expr { expr, span })
     }
 
@@ -324,7 +380,7 @@ impl Parser {
         }
         self.expect(TokenKind::Assign, "expected '=' in let")?;
         let value = self.parse_expr()?;
-        self.expect(TokenKind::Semicolon, "expected ';'")?;
+        self.optional_semicolon();
         Ok(Stmt::Let {
             name,
             ty,
@@ -334,6 +390,10 @@ impl Parser {
         })
     }
 
+    fn optional_semicolon(&mut self) {
+        if self.check(&TokenKind::Semicolon) { self.bump(); }
+    }
+
     fn parse_return(&mut self) -> Result<Stmt> {
         let tok = self.bump();
         let value = if self.check(&TokenKind::Semicolon) {
@@ -341,7 +401,7 @@ impl Parser {
         } else {
             Some(self.parse_expr()?)
         };
-        self.expect(TokenKind::Semicolon, "expected ';'")?;
+        self.optional_semicolon();
         Ok(Stmt::Return {
             value,
             span: tok.span,
@@ -640,14 +700,44 @@ impl Parser {
                     index: Box::new(index),
                     span,
                 };
+            } else if self.check(&TokenKind::Colon) &&
+                      matches!(self.tokens.get(self.pos + 1).map(|t| &t.kind), Some(TokenKind::Colon)) {
+                let span = self.bump().span;
+                self.bump();
+                let method = self.expect_ident()?;
+                if self.check(&TokenKind::LParen) {
+                    self.bump();
+                    let mut args = Vec::new();
+                    if !self.check(&TokenKind::RParen) {
+                        loop {
+                            args.push(self.parse_expr()?);
+                            if self.check(&TokenKind::Comma) { self.bump(); continue; }
+                            break;
+                        }
+                    }
+                    self.expect(TokenKind::RParen, "expected ')' after static call")?;
+                    expr = Expr::Call { callee: method, args, span };
+                } else {
+                    expr = Expr::Field { target: Box::new(expr), field: method, span };
+                }
             } else if self.check(&TokenKind::Dot) {
                 let span = self.bump().span;
                 let field = self.expect_ident()?;
-                expr = Expr::Field {
-                    target: Box::new(expr),
-                    field,
-                    span,
-                };
+                if self.check(&TokenKind::LParen) {
+                    self.bump();
+                    let mut args = Vec::new();
+                    if !self.check(&TokenKind::RParen) {
+                        loop {
+                            args.push(self.parse_expr()?);
+                            if self.check(&TokenKind::Comma) { self.bump(); continue; }
+                            break;
+                        }
+                    }
+                    self.expect(TokenKind::RParen, "expected ')' after method call")?;
+                    expr = Expr::Call { callee: field, args, span };
+                } else {
+                    expr = Expr::Field { target: Box::new(expr), field, span };
+                }
             } else {
                 break;
             }
@@ -782,6 +872,12 @@ pub fn dump_program(program: &Program) -> String {
             }
             Item::Struct(s) => {
                 out.push_str(&format!("struct {} {{ ... }}\n\n", s.name));
+            }
+            Item::Const(c) => {
+                out.push_str(&format!("const {} = ...;\n\n", c.name));
+            }
+            Item::Impl(i) => {
+                out.push_str(&format!("impl {} {{ {} methods }}\n\n", i.target, i.methods.len()));
             }
             Item::EventHandler(h) => {
                 out.push_str(&format!(

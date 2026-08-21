@@ -5,6 +5,7 @@ pub enum TokenKind {
     // keywords
     Fn,
     Let,
+    Var,
     Return,
     If,
     Else,
@@ -20,6 +21,7 @@ pub enum TokenKind {
     False,
     Ttl,
     Intrinsic,
+    Const,
 
     // types
     TypeI64,
