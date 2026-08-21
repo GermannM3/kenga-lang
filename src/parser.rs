@@ -303,11 +303,22 @@ impl Parser {
                 }
                 /* Accept portable module-qualified types such as
                    Renderer::Framebuffer and Renderer.Framebuffer. */
-                if self.check(&TokenKind::Dot) {
-                    self.bump();
-                    let part = self.expect_ident()?;
-                    name.push_str("::");
-                    name.push_str(&part);
+                loop {
+                    if self.check(&TokenKind::Dot) {
+                        self.bump();
+                        let part = self.expect_ident()?;
+                        name.push_str("::");
+                        name.push_str(&part);
+                    } else if self.check(&TokenKind::Colon)
+                        && matches!(self.tokens.get(self.pos + 1).map(|t| &t.kind), Some(TokenKind::Colon)) {
+                        self.bump();
+                        self.bump();
+                        let part = self.expect_ident()?;
+                        name.push_str("::");
+                        name.push_str(&part);
+                    } else {
+                        break;
+                    }
                 }
                 Ok(Type::Named(name))
             }
@@ -825,7 +836,23 @@ impl Parser {
                     span,
                 })
             }
-            _ => self.parse_postfix_primary(),
+            TokenKind::Amp => {
+                self.bump();
+                if self.check_ident("mut") { self.bump(); }
+                // References are ABI-transparent in the current freestanding
+                // backend; retain the referenced expression for lowering.
+                self.parse_unary()
+            }
+            _ => {
+                let expr = self.parse_postfix_primary()?;
+                // Scalar casts bind to the value immediately before them,
+                // so `value as float * factor` keeps the multiplication.
+                if self.check_ident("as") {
+                    self.bump();
+                    let _ = self.expect_ident()?;
+                }
+                Ok(expr)
+            }
         }
     }
 
@@ -858,7 +885,8 @@ impl Parser {
                     }
                     self.expect(TokenKind::RParen, "expected ')' after static call")?;
                     expr = Expr::Call { callee: method, args, span };
-                } else if self.check(&TokenKind::LBrace) {
+                } else if self.check(&TokenKind::LBrace)
+                    && matches!(self.tokens.get(self.pos + 2).map(|t| &t.kind), Some(TokenKind::Colon)) {
                     self.bump();
                     let mut fields = Vec::new();
                     while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
