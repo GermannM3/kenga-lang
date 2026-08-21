@@ -549,21 +549,17 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
                 ))
             }
             AssignTarget::Field { target, field } => {
+                let (pt, te) = emit_expr(target, ctx)?;
                 let (pv, ve) = emit_expr(value, ctx)?;
-                if let Expr::Ident(n, _) = target {
-                    Ok(format!(
-                        "{}{pad}{}.{} = {};\n",
-                        indent_pre(&pv, indent),
-                        c_ident(n),
-                        c_ident(field),
-                        ve
-                    ))
-                } else {
-                    Err(KengaError::at(
-                        "emit-c: field assign only on named vars",
-                        span.clone(),
-                    ))
-                }
+                Ok(format!(
+                    "{}{}{}{pad}{}.{} = {};\n",
+                    indent_pre(&pt, indent),
+                    indent_pre(&pv, indent),
+                    "",
+                    te,
+                    c_ident(field),
+                    ve
+                ))
             }
         },
         Stmt::Expr { expr, .. } => {
@@ -753,7 +749,7 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
         Expr::Ident(name, span) => ctx.vars.get(name).cloned().or_else(|| {
             if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
                 Some(CTy::I64)
-            } else { None }
+            } else { Some(CTy::I64) }
         }).ok_or_else(|| KengaError::at(format!("unknown variable '{name}'"), span.clone()))?,
         Expr::Index { .. } => CTy::Val,
         Expr::Unary { op, expr, .. } => {
