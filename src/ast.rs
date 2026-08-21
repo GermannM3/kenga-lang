@@ -189,6 +189,7 @@ pub enum Expr {
         fields: Vec<(String, Expr)>,
         span: Span,
     },
+    VariantLit { path: Vec<String>, fields: Vec<(String, Expr)>, span: Span },
     Range {
         start: Box<Expr>,
         end: Box<Expr>,
@@ -274,6 +275,7 @@ impl Expr {
             | Expr::Ident(_, s)
             | Expr::List(_, s) => s.clone(),
             Expr::StructLit { span, .. }
+            | Expr::VariantLit { span, .. }
             | Expr::Range { span, .. }
             | Expr::Index { span, .. }
             | Expr::Field { span, .. }

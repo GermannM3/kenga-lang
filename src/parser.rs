@@ -855,6 +855,20 @@ impl Parser {
                     }
                     self.expect(TokenKind::RParen, "expected ')' after static call")?;
                     expr = Expr::Call { callee: method, args, span };
+                } else if self.check(&TokenKind::LBrace) {
+                    self.bump();
+                    let mut fields = Vec::new();
+                    while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+                        let field = self.expect_ident()?;
+                        self.expect(TokenKind::Colon, "expected ':' in variant payload")?;
+                        fields.push((field, self.parse_expr()?));
+                        if self.check(&TokenKind::Comma) { self.bump(); }
+                    }
+                    self.expect(TokenKind::RBrace, "expected '}' after variant payload")?;
+                    let mut path = Vec::new();
+                    if let Expr::Ident(root, _) = expr { path.push(root); }
+                    path.push(method);
+                    expr = Expr::VariantLit { path, fields, span };
                 } else {
                     expr = Expr::Field { target: Box::new(expr), field: method, span };
                 }

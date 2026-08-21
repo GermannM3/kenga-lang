@@ -821,6 +821,7 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
                 ));
             }
         }
+        Expr::VariantLit { .. } => CTy::Val,
         Expr::Call { callee, .. } => {
             if callee == "Some" || callee == "None" {
                 CTy::Val
@@ -1100,6 +1101,19 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 pre,
                 format!("({}){{ {} }}", struct_c_name(name), parts.join(", ")),
             ))
+        }
+        Expr::VariantLit { path, fields, span } => {
+            let tag = match_tag(path);
+            let tmp = ctx.fresh("variant");
+            let mut pre = String::new();
+            pre.push_str(&format!("KVal {tmp} = kval_i64({tag}); {tmp}.tag = {tag};\n"));
+            for (i, (_, value)) in fields.iter().enumerate().take(4) {
+                let (p, e) = emit_expr(value, ctx)?;
+                let ty = infer_expr(value, ctx)?;
+                pre.push_str(&p);
+                pre.push_str(&format!("{tmp}.u.payload[{i}] = kval_as_i64({});\n", wrap_as_val(&e, &ty)));
+            }
+            Ok((pre, tmp))
         }
         Expr::Unary { op, expr, .. } => {
             let ty = infer_expr(expr, ctx)?;

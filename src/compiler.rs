@@ -370,6 +370,10 @@ fn compile_expr(expr: &Expr, ops: &mut Vec<Op>) -> Result<()> {
                 fields: names,
             });
         }
+        Expr::VariantLit { path, fields, .. } => {
+            for (_, value) in fields { compile_expr(value, ops)?; }
+            ops.push(Op::Const(Value::Str(path.join("::"))));
+        }
         Expr::Index { target, index, .. } => {
             compile_expr(target, ops)?;
             compile_expr(index, ops)?;
