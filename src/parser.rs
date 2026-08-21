@@ -267,6 +267,10 @@ impl Parser {
             } else {
             let name = self.expect_ident()?;
             self.expect(TokenKind::Colon, "expected ':' after param name")?;
+            if self.check(&TokenKind::Amp) {
+                self.bump();
+                if self.check_ident("mut") { self.bump(); }
+            }
             let ty = self.parse_type()?;
             params.push(Param { name, ty });
             }
@@ -889,6 +893,10 @@ impl Parser {
                 if self.check_ident("as") {
                     self.bump();
                     let _ = self.expect_ident()?;
+                    if self.check(&TokenKind::Lt) {
+                        while !self.check(&TokenKind::Gt) && !self.check(&TokenKind::Eof) { self.bump(); }
+                        self.expect(TokenKind::Gt, "expected '>' after cast type")?;
+                    }
                 }
                 Ok(expr)
             }
@@ -912,6 +920,22 @@ impl Parser {
                 let span = self.bump().span;
                 self.bump();
                 let method = self.expect_ident()?;
+                // Generic call arguments are compile-time type metadata for
+                // the current C ABI, so consume the type list before parsing
+                // the runtime argument list (e.g. alloc_array<float>(n)).
+                if self.check(&TokenKind::Lt) {
+                    let mut depth = 0usize;
+                    while !self.check(&TokenKind::Eof) {
+                        if self.check(&TokenKind::Lt) { depth += 1; }
+                        if self.check(&TokenKind::Gt) {
+                            depth -= 1;
+                            self.bump();
+                            if depth == 0 { break; }
+                            continue;
+                        }
+                        self.bump();
+                    }
+                }
                 if self.check(&TokenKind::LParen) {
                     self.bump();
                     let mut args = Vec::new();
@@ -1034,6 +1058,7 @@ impl Parser {
                     Ok(Expr::Ident(name, tok.span))
                 }
             }
+            TokenKind::TypeMemory => Ok(Expr::Ident("Memory".to_string(), tok.span)),
             TokenKind::LParen => {
                 let expr = self.parse_expr()?;
                 self.expect(TokenKind::RParen, "expected ')'")?;
