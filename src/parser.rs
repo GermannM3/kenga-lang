@@ -439,7 +439,20 @@ impl Parser {
         self.expect(TokenKind::LBrace, "expected '{' after enum name")?;
         let mut variants = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
-            variants.push(self.expect_ident()?);
+            let variant_name = self.expect_ident()?;
+            let mut fields = Vec::new();
+            if self.check(&TokenKind::LBrace) {
+                self.bump();
+                while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
+                    let field_name = self.expect_ident()?;
+                    self.expect(TokenKind::Colon, "expected ':' in enum payload")?;
+                    let field_ty = self.parse_type()?;
+                    fields.push(Param { name: field_name, ty: field_ty });
+                    if self.check(&TokenKind::Comma) { self.bump(); }
+                }
+                self.expect(TokenKind::RBrace, "expected '}' after enum payload")?;
+            }
+            variants.push(EnumVariant { name: variant_name, fields });
             if self.check(&TokenKind::Comma) { self.bump(); }
         }
         self.expect(TokenKind::RBrace, "expected '}' after enum")?;
@@ -956,7 +969,7 @@ pub fn dump_program(program: &Program) -> String {
                 out.push_str(&format!("const {} = ...;\n\n", c.name));
             }
             Item::Enum(e) => {
-                out.push_str(&format!("enum {} {{ {} }}\n\n", e.name, e.variants.join(", ")));
+                out.push_str(&format!("enum {} {{ {} }}\n\n", e.name, e.variants.iter().map(|v| v.name.clone()).collect::<Vec<_>>().join(", ")));
             }
             Item::Impl(i) => {
                 out.push_str(&format!("impl {} {{ {} methods }}\n\n", i.target, i.methods.len()));

@@ -87,8 +87,14 @@ pub struct StructDef {
 #[derive(Debug, Clone)]
 pub struct EnumDef {
     pub name: String,
-    pub variants: Vec<String>,
+    pub variants: Vec<EnumVariant>,
     pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumVariant {
+    pub name: String,
+    pub fields: Vec<Param>,
 }
 
 #[derive(Debug, Clone)]

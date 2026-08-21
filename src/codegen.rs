@@ -125,7 +125,7 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
         if let Item::Enum(e) = item {
             body.push_str(&format!("typedef int64_t {};\n", c_ident(&e.name)));
             for (i, variant) in e.variants.iter().enumerate() {
-                body.push_str(&format!("#define {}_{} {}\n", c_ident(&e.name), c_ident(variant), i));
+                body.push_str(&format!("#define {}_{} {}\n", c_ident(&e.name), c_ident(&variant.name), i));
             }
             body.push('\n');
         }
