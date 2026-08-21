@@ -388,6 +388,9 @@ fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
     if from == to {
         return Ok(expr.to_string());
     }
+    if matches!(to, CTy::Void) {
+        return Ok("0".to_string());
+    }
     if is_numeric(from) && is_numeric(to) {
         return Ok(if matches!(to, CTy::F64) {
             format!("((double)({expr}))")
@@ -403,10 +406,13 @@ fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
             => format!("((int64_t)kval_as_i64({expr}))"),
         (CTy::Val, CTy::Str) => format!("kval_as_str({expr})"),
         (CTy::Val, CTy::List) => format!("kval_as_list({expr})"),
+        (CTy::Val, CTy::Void) => "0".to_string(),
+        (CTy::I64, CTy::Void) | (CTy::F64, CTy::Void) => "0".to_string(),
         (CTy::I64, CTy::Val) => format!("kval_i64({expr})"),
         (CTy::F64, CTy::Val) => format!("kval_f64({expr})"),
         (CTy::I64, CTy::F64) => format!("((double)({expr}))"),
         (CTy::F64, CTy::I64) => format!("((int64_t)({expr}))"),
+        (CTy::Str, CTy::I64) => "0".to_string(),
         (CTy::I64, CTy::Struct(_)) => format!("({}){{0}}", c_type(to)),
         (CTy::Struct(_), CTy::I64) => "0".to_string(),
         (CTy::I64, CTy::Str) => format!("kstr_from_i64({expr})"),
@@ -745,7 +751,7 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
         Expr::List(_, _) => CTy::List,
         Expr::Range { .. } => CTy::List,
         Expr::Ident(name, span) => ctx.vars.get(name).cloned().or_else(|| {
-            if name.chars().all(|c| c.is_ascii_uppercase() || c == '_' || c.is_ascii_digit()) {
+            if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
                 Some(CTy::I64)
             } else { None }
         }).ok_or_else(|| KengaError::at(format!("unknown variable '{name}'"), span.clone()))?,
@@ -797,7 +803,7 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
             span,
         } => {
             if let Expr::Ident(root, _) = target.as_ref() {
-                if root.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
+                if root.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
                     return Ok(CTy::I64);
                 }
             }
@@ -1081,7 +1087,7 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
         }
         Expr::Field { target, field, .. } => {
             if let Expr::Ident(root, _) = target.as_ref() {
-                if root.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
+                if root.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
                     return Ok((String::new(), "0".to_string()));
                 }
             }
