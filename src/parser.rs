@@ -84,7 +84,7 @@ impl Parser {
             }
             self.bump();
         }
-        self.expect(TokenKind::Semicolon, "expected ';' after import")?;
+        if self.check(&TokenKind::Semicolon) { self.bump(); }
         Ok(Import {
             path,
             span: tok.span,
@@ -291,6 +291,10 @@ impl Parser {
     }
 
     fn parse_type(&mut self) -> Result<Type> {
+        if self.check(&TokenKind::Amp) {
+            self.bump();
+            if self.check_ident("mut") { self.bump(); }
+        }
         let t = self.bump();
         match t.kind {
             TokenKind::TypeI64 => Ok(Type::I64),
