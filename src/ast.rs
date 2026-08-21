@@ -233,6 +233,7 @@ pub struct MatchArm {
 #[derive(Debug, Clone)]
 pub enum MatchPattern {
     Wildcard,
+    Literal(i64),
     Variant { path: Vec<String>, bindings: Vec<String> },
 }
 

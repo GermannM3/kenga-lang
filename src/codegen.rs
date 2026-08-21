@@ -641,6 +641,7 @@ fn emit_match(value: &Expr, arms: &[MatchArm], indent: usize, ctx: &mut EmitCtx<
     for (i, arm) in arms.iter().enumerate() {
         let cond = match &arm.pattern {
             MatchPattern::Wildcard => "1".to_string(),
+            MatchPattern::Literal(value) => format!("kval_as_i64({tmp}) == {value}"),
             MatchPattern::Variant { path, .. } => format!("kval_tag({tmp}) == {}", match_tag(path)),
         };
         out.push_str(&format!("{pad}{}if ({cond}) {{\n", if i == 0 { "" } else { "else " }));

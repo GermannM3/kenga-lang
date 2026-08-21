@@ -19,6 +19,12 @@ impl Parser {
         while !self.check(&TokenKind::Eof) {
             if self.check(&TokenKind::Import) {
                 imports.push(self.parse_import()?);
+            } else if self.check_ident("export") {
+                // Module export directives are link-time metadata; the
+                // freestanding C backend has no separate export table yet.
+                self.bump();
+                self.expect_ident()?;
+                if self.check(&TokenKind::Semicolon) { self.bump(); }
             } else {
                 items.push(self.parse_item()?);
             }
@@ -71,10 +77,12 @@ impl Parser {
            syntax and validate the alias while keeping the existing AST. */
         if self.check_ident("as") {
             self.bump();
-            match self.bump().kind {
-                TokenKind::Ident(_) => {}
-                _ => return Err(KengaError::at("expected import alias after 'as'", self.peek().span.clone())),
+            // Aliases may intentionally use names that are also built-in type
+            // words (for example `Memory`), so consume the alias token here.
+            if self.check(&TokenKind::Semicolon) || self.check(&TokenKind::Eof) {
+                return Err(KengaError::at("expected import alias after 'as'", self.peek().span.clone()));
             }
+            self.bump();
         }
         self.expect(TokenKind::Semicolon, "expected ';' after import")?;
         Ok(Import {
@@ -337,6 +345,22 @@ impl Parser {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt> {
+        if self.check_ident("loop") {
+            let tok = self.bump();
+            let body = self.parse_block()?;
+            return Ok(Stmt::While {
+                cond: Expr::Bool(true, tok.span.clone()),
+                body,
+                span: tok.span,
+            });
+        }
+        if self.check_ident("asm") {
+            let tok = self.bump();
+            self.expect(TokenKind::LBrace, "expected '{' after asm")?;
+            while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) { self.bump(); }
+            self.expect(TokenKind::RBrace, "expected '}' after asm")?;
+            return Ok(Stmt::Expr { expr: Expr::Int(0, tok.span.clone()), span: tok.span });
+        }
         match self.peek_kind() {
             TokenKind::Let | TokenKind::Var => self.parse_let(),
             TokenKind::Return => self.parse_return(),
@@ -467,6 +491,17 @@ impl Parser {
             let mut bindings = Vec::new();
             if self.check_ident("_") {
                 self.bump();
+            } else if let TokenKind::Int(value) = self.peek().kind.clone() {
+                self.bump();
+                self.expect(TokenKind::FatArrow, "expected '=>' after literal pattern")?;
+                let body = if self.check(&TokenKind::LBrace) {
+                    self.parse_block()?
+                } else {
+                    Block { stmts: vec![self.parse_stmt()?] }
+                };
+                arms.push(MatchArm { pattern: MatchPattern::Literal(value), body });
+                if self.check(&TokenKind::Comma) { self.bump(); }
+                continue;
             } else {
                 path.push(self.expect_ident()?);
                 while self.check(&TokenKind::Colon) {
@@ -484,7 +519,11 @@ impl Parser {
                 }
             }
             self.expect(TokenKind::FatArrow, "expected '=>' after match pattern")?;
-            let body = self.parse_block()?;
+            let body = if self.check(&TokenKind::LBrace) {
+                self.parse_block()?
+            } else {
+                Block { stmts: vec![self.parse_stmt()?] }
+            };
             let pattern = if path.is_empty() { MatchPattern::Wildcard } else { MatchPattern::Variant { path, bindings } };
             arms.push(MatchArm { pattern, body });
             if self.check(&TokenKind::Comma) { self.bump(); }
