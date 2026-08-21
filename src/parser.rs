@@ -65,11 +65,25 @@ impl Parser {
                 ))
             }
         };
+        /* Portable desktop sources may write `import "x" as Module`.
+           Imports are currently flattened by the driver, so retain the
+           syntax and validate the alias while keeping the existing AST. */
+        if self.check_ident("as") {
+            self.bump();
+            match self.bump().kind {
+                TokenKind::Ident(_) => {}
+                _ => return Err(KengaError::at("expected import alias after 'as'", self.peek().span.clone())),
+            }
+        }
         self.expect(TokenKind::Semicolon, "expected ';' after import")?;
         Ok(Import {
             path,
             span: tok.span,
         })
+    }
+
+    fn check_ident(&self, name: &str) -> bool {
+        matches!(&self.peek().kind, TokenKind::Ident(s) if s == name)
     }
 
     fn parse_item(&mut self) -> Result<Item> {
