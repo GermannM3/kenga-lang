@@ -788,7 +788,9 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
             }
         }
         Expr::Call { callee, .. } => {
-            if callee == "len" {
+            if callee == "Some" || callee == "None" {
+                CTy::Val
+            } else if callee == "len" {
                 CTy::I64
             } else if callee == "push" {
                 CTy::List
@@ -1164,6 +1166,16 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             Ok((format!("{pl}{pr}"), format!("({l} {o} {r})")))
         }
         Expr::Call { callee, args, span } => match callee.as_str() {
+            "Some" => {
+                if args.len() != 1 { return Err(KengaError::at("Some takes 1 argument", span.clone())); }
+                let (p, e) = emit_expr(&args[0], ctx)?;
+                let ty = infer_expr(&args[0], ctx)?;
+                Ok((p, wrap_as_val(&e, &ty)))
+            }
+            "None" => {
+                if !args.is_empty() { return Err(KengaError::at("None takes no arguments", span.clone())); }
+                Ok((String::new(), "kval_i64(0)".into()))
+            }
             "println" => Err(KengaError::at(
                 "println must be a statement",
                 span.clone(),
