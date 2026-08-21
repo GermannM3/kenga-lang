@@ -398,6 +398,9 @@ fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
     Ok(match (from, to) {
         (CTy::Val, CTy::I64) => format!("kval_as_i64({expr})"),
         (CTy::Val, CTy::F64) => format!("kval_as_f64({expr})"),
+        (CTy::Val, CTy::I32) | (CTy::Val, CTy::I16) | (CTy::Val, CTy::I8)
+        | (CTy::Val, CTy::U64) | (CTy::Val, CTy::U32) | (CTy::Val, CTy::U16) | (CTy::Val, CTy::U8)
+            => format!("((int64_t)kval_as_i64({expr}))"),
         (CTy::Val, CTy::Str) => format!("kval_as_str({expr})"),
         (CTy::Val, CTy::List) => format!("kval_as_list({expr})"),
         (CTy::I64, CTy::Val) => format!("kval_i64({expr})"),

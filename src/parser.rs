@@ -1000,6 +1000,7 @@ impl Parser {
                 if self.check(&TokenKind::LParen) {
                     self.bump();
                     let mut args = Vec::new();
+                    let receiver = expr.clone();
                     if !self.check(&TokenKind::RParen) {
                         loop {
                             args.push(self.parse_expr()?);
@@ -1008,6 +1009,7 @@ impl Parser {
                         }
                     }
                     self.expect(TokenKind::RParen, "expected ')' after method call")?;
+                    if field == "len" { args.insert(0, receiver); }
                     expr = Expr::Call { callee: field, args, span };
                 } else {
                     expr = Expr::Field { target: Box::new(expr), field, span };
