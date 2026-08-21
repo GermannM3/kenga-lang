@@ -511,7 +511,7 @@ impl Parser {
 
     fn parse_return(&mut self) -> Result<Stmt> {
         let tok = self.bump();
-        let value = if self.check(&TokenKind::Semicolon) {
+        let value = if self.check(&TokenKind::Semicolon) || self.check(&TokenKind::RBrace) {
             None
         } else {
             Some(self.parse_expr()?)
