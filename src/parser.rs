@@ -282,9 +282,18 @@ impl Parser {
             TokenKind::TypeList => Ok(Type::List),
             TokenKind::TypeMemory => Ok(Type::Memory),
             TokenKind::Ident(mut name) => {
-                if name == "array" && self.check(&TokenKind::Lt) {
+                if (name == "array" || name == "Option" || name == "ptr") && self.check(&TokenKind::Lt) {
                     self.bump();
-                    let _ = self.parse_type()?;
+                    if name == "ptr" && self.check(&TokenKind::Fn) {
+                        self.bump();
+                        if self.check(&TokenKind::LParen) {
+                            self.bump();
+                            while !self.check(&TokenKind::RParen) && !self.check(&TokenKind::Eof) { self.bump(); }
+                            self.expect(TokenKind::RParen, "expected ')' after function pointer")?;
+                        }
+                    } else {
+                        let _ = self.parse_type()?;
+                    }
                     if self.check(&TokenKind::Comma) {
                         self.bump();
                         let _ = self.bump(); // fixed capacity, represented as a list
