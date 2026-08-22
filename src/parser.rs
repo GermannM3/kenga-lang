@@ -139,7 +139,9 @@ impl Parser {
         self.expect(TokenKind::LBrace, "expected '{' after impl target")?;
         let mut methods = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.check(&TokenKind::Eof) {
-            methods.push(self.parse_function()?);
+            let mut method = self.parse_function()?;
+            method.name = format!("{}_{}", target, method.name);
+            methods.push(method);
         }
         self.expect(TokenKind::RBrace, "expected '}' after impl")?;
         Ok(ImplDef { target, methods, span: tok.span })
@@ -975,7 +977,10 @@ impl Parser {
                         }
                     }
                     self.expect(TokenKind::RParen, "expected ')' after static call")?;
-                    expr = Expr::Call { callee: method, args, span };
+                    let callee = if let Expr::Ident(root, _) = &expr {
+                        format!("{}_{}", root, method)
+                    } else { method };
+                    expr = Expr::Call { callee, args, span };
                 } else if self.check(&TokenKind::LBrace)
                     && matches!(self.tokens.get(self.pos + 2).map(|t| &t.kind), Some(TokenKind::Colon)) {
                     self.bump();
