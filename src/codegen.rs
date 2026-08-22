@@ -139,11 +139,11 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             if f.name == "main" {
                 continue;
             }
-            body.push_str(&emit_prototype(f, &structs)?);
+            body.push_str(&emit_prototype(f, &structs, None)?);
             body.push_str(";\n");
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
-                body.push_str(&emit_prototype(f, &structs)?);
+                body.push_str(&emit_prototype(f, &structs, Some(&i.target))?);
                 body.push_str(";\n");
             }
         }
@@ -159,7 +159,7 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
                 body: Block { stmts: vec![] },
                 span: i.span.clone(),
             };
-            body.push_str(&emit_prototype(&f, &structs)?);
+            body.push_str(&emit_prototype(&f, &structs, None)?);
             body.push_str(";\n");
         }
     }
@@ -167,11 +167,11 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
 
     for item in &program.items {
         if let Item::Function(f) = item {
-            body.push_str(&emit_function(f, &structs, &sigs)?);
+            body.push_str(&emit_function(f, &structs, &sigs, None)?);
             body.push('\n');
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
-                body.push_str(&emit_function(f, &structs, &sigs)?);
+                body.push_str(&emit_function(f, &structs, &sigs, Some(&i.target))?);
                 body.push('\n');
             }
         }
@@ -431,7 +431,7 @@ fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
     })
 }
 
-fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>) -> Result<String> {
+fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>, owner: Option<&String>) -> Result<String> {
     let ret = map_type(&f.ret, structs)?;
     let mut s = format!("{} {}(", c_type(&ret), c_ident(&f.name));
     if f.params.is_empty() {
@@ -441,7 +441,7 @@ fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>) -> Result
             if i > 0 {
                 s.push_str(", ");
             }
-            let ty = map_type(&p.ty, structs)?;
+            let ty = if owner.is_some() && p.name == "self" { CTy::Struct(owner.unwrap().clone()) } else { map_type(&p.ty, structs)? };
             s.push_str(&format!("{} {}", c_type(&ty), c_ident(&p.name)));
         }
     }
@@ -453,6 +453,7 @@ fn emit_function(
     f: &Function,
     structs: &HashMap<String, StructInfo>,
     sigs: &HashMap<String, (CTy, Vec<CTy>)>,
+    owner: Option<&String>,
 ) -> Result<String> {
     let (ret, _) = sigs
         .get(&f.name)
@@ -473,7 +474,7 @@ fn emit_function(
             if i > 0 {
                 s.push_str(", ");
             }
-            let ty = map_type(&p.ty, structs)?;
+            let ty = if owner.is_some() && p.name == "self" { CTy::Struct(owner.unwrap().clone()) } else { map_type(&p.ty, structs)? };
             ctx.vars.insert(p.name.clone(), ty.clone());
             s.push_str(&format!("{} {}", c_type(&ty), c_ident(&p.name)));
         }
