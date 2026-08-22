@@ -1016,7 +1016,10 @@ impl Parser {
                         }
                     }
                     self.expect(TokenKind::RParen, "expected ')' after method call")?;
-                    if field == "len" || field == "push" { args.insert(0, receiver); }
+                    // Methods are lowered as ordinary C functions; preserve
+                    // the receiver as the first ABI argument for every dot
+                    // call, not only collection helpers.
+                    args.insert(0, receiver);
                     expr = Expr::Call { callee: field, args, span };
                 } else {
                     expr = Expr::Field { target: Box::new(expr), field, span };

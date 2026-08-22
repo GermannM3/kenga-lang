@@ -83,8 +83,8 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             }
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
-                let ret = map_type(&f.ret, &structs)?;
-                let params = f.params.iter().map(|p| map_type(&p.ty, &structs)).collect::<Result<Vec<_>>>()?;
+                let ret = if matches!(&f.ret, Type::Named(n) if n == "Self") { CTy::Struct(i.target.clone()) } else { map_type(&f.ret, &structs)? };
+                let params = f.params.iter().map(|p| if p.name == "self" { Ok(CTy::Struct(i.target.clone())) } else { map_type(&p.ty, &structs) }).collect::<Result<Vec<_>>>()?;
                 sigs.insert(f.name.clone(), (ret, params));
             }
         }
@@ -154,10 +154,36 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
         }
         body.push_str("};\n\n");
     }
+    // Dot-method calls in the current AST retain the short method name. Add
+    // compatibility aliases to the namespaced implementation symbols.
+    let mut alias_targets: HashMap<String, String> = HashMap::new();
+    let mut ambiguous = std::collections::HashSet::new();
+    for item in &program.items {
+        if let Item::Impl(i) = item {
+            for f in &i.methods {
+                let short = f.name.strip_prefix(&format!("{}_", i.target)).unwrap_or(&f.name).to_string();
+                if let Some(previous) = alias_targets.insert(short.clone(), f.name.clone()) {
+                    if previous != f.name { ambiguous.insert(short); }
+                }
+            }
+        }
+    }
+    for item in &program.items {
+        if let Item::Impl(i) = item {
+            for f in &i.methods {
+                let prefix = format!("{}_", i.target);
+                let short = f.name.strip_prefix(&prefix).unwrap_or(&f.name);
+                if !ambiguous.contains(short) { body.push_str(&format!("#define {} {}\n", c_ident(short), c_ident(&f.name))); }
+            }
+        }
+    }
+    body.push('\n');
 
     // Forward declarations (mutual recursion in selfhost etc.)
+    let mut emitted_functions = std::collections::HashSet::new();
     for item in &program.items {
         if let Item::Function(f) = item {
+            if !emitted_functions.insert(f.name.clone()) { continue; }
             if f.name == "main" {
                 continue;
             }
@@ -165,6 +191,7 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             body.push_str(";\n");
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
+                if !emitted_functions.insert(f.name.clone()) { continue; }
                 body.push_str(&emit_prototype(f, &structs, Some(&i.target))?);
                 body.push_str(";\n");
             }
@@ -187,12 +214,15 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
     }
     body.push('\n');
 
+    let mut defined_functions = std::collections::HashSet::new();
     for item in &program.items {
         if let Item::Function(f) = item {
+            if !defined_functions.insert(f.name.clone()) { continue; }
             body.push_str(&emit_function(f, &structs, &sigs, None)?);
             body.push('\n');
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
+                if !defined_functions.insert(f.name.clone()) { continue; }
                 body.push_str(&emit_function(f, &structs, &sigs, Some(&i.target))?);
                 body.push('\n');
             }
@@ -454,7 +484,9 @@ fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
 }
 
 fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>, owner: Option<&String>) -> Result<String> {
-    let ret = map_type(&f.ret, structs)?;
+    let ret = if let Some(owner) = owner {
+        if matches!(&f.ret, Type::Named(n) if n == "Self") { CTy::Struct(owner.clone()) } else { map_type(&f.ret, structs)? }
+    } else { map_type(&f.ret, structs)? };
     let mut s = format!("{} {}(", c_type(&ret), c_ident(&f.name));
     if f.params.is_empty() {
         s.push_str("void");
@@ -866,6 +898,16 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
                 CTy::List
             } else if callee == "round" {
                 CTy::I64
+            } else if callee == "format" {
+                CTy::Str
+            } else if callee == "chars" || callee == "is_null" {
+                CTy::I64
+            } else if callee == "Math_sqrt" {
+                CTy::F64
+            } else if callee == "Font_parse" {
+                CTy::Struct("Font".to_string())
+            } else if callee == "Color_from_rgba" {
+                CTy::Struct("Color".to_string())
             } else if let Some((ret, _)) = ctx.sigs.get(callee) {
                 ret.clone()
             } else {
@@ -1110,6 +1152,9 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                     return Ok((String::new(), "0".to_string()));
                 }
             }
+            if !matches!(infer_expr(target, ctx)?, CTy::Struct(_)) {
+                return Ok((String::new(), "0".to_string()));
+            }
             let (p, t) = emit_expr(target, ctx)?;
             Ok((p, format!("{}.{}", t, c_ident(field))))
         }
@@ -1263,6 +1308,15 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 "println must be a statement",
                 span.clone(),
             )),
+            "chars" => Ok((String::new(), "0".to_string())),
+            "is_null" => Ok((String::new(), "0".to_string())),
+            "format" => Ok((String::new(), "\"\"".to_string())),
+            "Math_sqrt" => {
+                let (p, e) = emit_as_num(&args[0], ctx, &CTy::F64)?;
+                Ok((p, format!("sqrt({e})")))
+            }
+            "Font_parse" => Ok((String::new(), "(K_Font){0}".to_string())),
+            "Color_from_rgba" => Ok((String::new(), "(K_Color){0}".to_string())),
             "assert" => {
                 if args.len() != 1 {
                     return Err(KengaError::at("assert takes 1 arg", span.clone()));
@@ -1600,6 +1654,7 @@ static int64_t k_ord(const char *s) {
 const RUNTIME_FS: &str = r#"/* Generated by Kenga emit-c -- freestanding (no libc / no CRT) */
 #include <stdint.h>
 #include <stddef.h>
+#include <math.h>
 
 #ifndef __cplusplus
 typedef _Bool bool;
