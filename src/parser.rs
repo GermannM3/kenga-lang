@@ -978,7 +978,9 @@ impl Parser {
                     }
                     self.expect(TokenKind::RParen, "expected ')' after static call")?;
                     let callee = if let Expr::Ident(root, _) = &expr {
-                        format!("{}_{}", root, method)
+                        if root == "Hardware" || root == "Memory" { method.clone() } else {
+                            format!("{}_{}", root, method)
+                        }
                     } else { method };
                     expr = Expr::Call { callee, args, span };
                 } else if self.check(&TokenKind::LBrace)

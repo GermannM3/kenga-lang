@@ -124,13 +124,35 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
     }
     let mut names: Vec<_> = structs.keys().cloned().collect();
     names.sort();
-    for name in names {
+    let mut ordered = Vec::new();
+    let mut pending = names;
+    while !pending.is_empty() {
+        let mut progressed = false;
+        let mut i = 0;
+        while i < pending.len() {
+            let info = &structs[&pending[i]];
+            let ready = info.fields.iter().all(|(_, ty)| match ty {
+                CTy::Struct(dep) => ordered.iter().any(|n: &String| n == dep),
+                _ => true,
+            });
+            if ready {
+                ordered.push(pending.remove(i));
+                progressed = true;
+            } else { i += 1; }
+        }
+        if !progressed { ordered.extend(pending.drain(..)); }
+    }
+    for name in &ordered {
+        body.push_str(&format!("typedef struct {} {};\n", struct_c_name(name), struct_c_name(name)));
+    }
+    body.push('\n');
+    for name in ordered {
         let info = &structs[&name];
-        body.push_str("typedef struct {\n");
+        body.push_str(&format!("struct {} {{\n", struct_c_name(&name)));
         for (fname, fty) in &info.fields {
             body.push_str(&format!("  {} {};\n", c_type(fty), c_ident(fname)));
         }
-        body.push_str(&format!("}} {};\n\n", struct_c_name(&name)));
+        body.push_str("};\n\n");
     }
 
     // Forward declarations (mutual recursion in selfhost etc.)
