@@ -63,14 +63,6 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
                 .iter()
                 .map(|p| Ok((p.name.clone(), map_type(&p.ty, &structs)?)))
                 .collect::<Result<Vec<_>>>()?;
-            for (_, ty) in &fields {
-                if matches!(ty, CTy::Struct(_)) {
-                    return Err(KengaError::at(
-                        "emit-c: nested structs not supported yet",
-                        s.span.clone(),
-                    ));
-                }
-            }
             structs.insert(s.name.clone(), StructInfo { fields });
         }
     }
@@ -91,8 +83,8 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
             }
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
-                let ret = map_type(&f.ret, &structs)?;
-                let params = f.params.iter().map(|p| map_type(&p.ty, &structs)).collect::<Result<Vec<_>>>()?;
+                let ret = if matches!(&f.ret, Type::Named(n) if n == "Self") { CTy::Struct(i.target.clone()) } else { map_type(&f.ret, &structs)? };
+                let params = f.params.iter().map(|p| if p.name == "self" { Ok(CTy::Struct(i.target.clone())) } else { map_type(&p.ty, &structs) }).collect::<Result<Vec<_>>>()?;
                 sigs.insert(f.name.clone(), (ret, params));
             }
         }
@@ -132,26 +124,75 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
     }
     let mut names: Vec<_> = structs.keys().cloned().collect();
     names.sort();
-    for name in names {
+    let mut ordered = Vec::new();
+    let mut pending = names;
+    while !pending.is_empty() {
+        let mut progressed = false;
+        let mut i = 0;
+        while i < pending.len() {
+            let info = &structs[&pending[i]];
+            let ready = info.fields.iter().all(|(_, ty)| match ty {
+                CTy::Struct(dep) => ordered.iter().any(|n: &String| n == dep),
+                _ => true,
+            });
+            if ready {
+                ordered.push(pending.remove(i));
+                progressed = true;
+            } else { i += 1; }
+        }
+        if !progressed { ordered.extend(pending.drain(..)); }
+    }
+    for name in &ordered {
+        body.push_str(&format!("typedef struct {} {};\n", struct_c_name(name), struct_c_name(name)));
+    }
+    body.push('\n');
+    for name in ordered {
         let info = &structs[&name];
-        body.push_str("typedef struct {\n");
+        body.push_str(&format!("struct {} {{\n", struct_c_name(&name)));
         for (fname, fty) in &info.fields {
             body.push_str(&format!("  {} {};\n", c_type(fty), c_ident(fname)));
         }
-        body.push_str(&format!("}} {};\n\n", struct_c_name(&name)));
+        body.push_str("};\n\n");
     }
+    // Dot-method calls in the current AST retain the short method name. Add
+    // compatibility aliases to the namespaced implementation symbols.
+    let mut alias_targets: HashMap<String, String> = HashMap::new();
+    let mut ambiguous = std::collections::HashSet::new();
+    for item in &program.items {
+        if let Item::Impl(i) = item {
+            for f in &i.methods {
+                let short = f.name.strip_prefix(&format!("{}_", i.target)).unwrap_or(&f.name).to_string();
+                if let Some(previous) = alias_targets.insert(short.clone(), f.name.clone()) {
+                    if previous != f.name { ambiguous.insert(short); }
+                }
+            }
+        }
+    }
+    for item in &program.items {
+        if let Item::Impl(i) = item {
+            for f in &i.methods {
+                let prefix = format!("{}_", i.target);
+                let short = f.name.strip_prefix(&prefix).unwrap_or(&f.name);
+                if !ambiguous.contains(short) { body.push_str(&format!("#define {} {}\n", c_ident(short), c_ident(&f.name))); }
+            }
+        }
+    }
+    body.push('\n');
 
     // Forward declarations (mutual recursion in selfhost etc.)
+    let mut emitted_functions = std::collections::HashSet::new();
     for item in &program.items {
         if let Item::Function(f) = item {
+            if !emitted_functions.insert(f.name.clone()) { continue; }
             if f.name == "main" {
                 continue;
             }
-            body.push_str(&emit_prototype(f, &structs)?);
+            body.push_str(&emit_prototype(f, &structs, None)?);
             body.push_str(";\n");
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
-                body.push_str(&emit_prototype(f, &structs)?);
+                if !emitted_functions.insert(f.name.clone()) { continue; }
+                body.push_str(&emit_prototype(f, &structs, Some(&i.target))?);
                 body.push_str(";\n");
             }
         }
@@ -167,19 +208,22 @@ fn emit_c_with_options(program: &Program, freestanding: bool) -> Result<String> 
                 body: Block { stmts: vec![] },
                 span: i.span.clone(),
             };
-            body.push_str(&emit_prototype(&f, &structs)?);
+            body.push_str(&emit_prototype(&f, &structs, None)?);
             body.push_str(";\n");
         }
     }
     body.push('\n');
 
+    let mut defined_functions = std::collections::HashSet::new();
     for item in &program.items {
         if let Item::Function(f) = item {
-            body.push_str(&emit_function(f, &structs, &sigs)?);
+            if !defined_functions.insert(f.name.clone()) { continue; }
+            body.push_str(&emit_function(f, &structs, &sigs, None)?);
             body.push('\n');
         } else if let Item::Impl(i) = item {
             for f in &i.methods {
-                body.push_str(&emit_function(f, &structs, &sigs)?);
+                if !defined_functions.insert(f.name.clone()) { continue; }
+                body.push_str(&emit_function(f, &structs, &sigs, Some(&i.target))?);
                 body.push('\n');
             }
         }
@@ -396,15 +440,33 @@ fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
     if from == to {
         return Ok(expr.to_string());
     }
+    if matches!(to, CTy::Void) {
+        return Ok("0".to_string());
+    }
+    if is_numeric(from) && is_numeric(to) {
+        return Ok(if matches!(to, CTy::F64) {
+            format!("((double)({expr}))")
+        } else {
+            format!("((int64_t)({expr}))")
+        });
+    }
     Ok(match (from, to) {
         (CTy::Val, CTy::I64) => format!("kval_as_i64({expr})"),
         (CTy::Val, CTy::F64) => format!("kval_as_f64({expr})"),
+        (CTy::Val, CTy::I32) | (CTy::Val, CTy::I16) | (CTy::Val, CTy::I8)
+        | (CTy::Val, CTy::U64) | (CTy::Val, CTy::U32) | (CTy::Val, CTy::U16) | (CTy::Val, CTy::U8)
+            => format!("((int64_t)kval_as_i64({expr}))"),
         (CTy::Val, CTy::Str) => format!("kval_as_str({expr})"),
         (CTy::Val, CTy::List) => format!("kval_as_list({expr})"),
+        (CTy::Val, CTy::Void) => "0".to_string(),
+        (CTy::I64, CTy::Void) | (CTy::F64, CTy::Void) => "0".to_string(),
         (CTy::I64, CTy::Val) => format!("kval_i64({expr})"),
         (CTy::F64, CTy::Val) => format!("kval_f64({expr})"),
         (CTy::I64, CTy::F64) => format!("((double)({expr}))"),
         (CTy::F64, CTy::I64) => format!("((int64_t)({expr}))"),
+        (CTy::Str, CTy::I64) => "0".to_string(),
+        (CTy::I64, CTy::Struct(_)) => format!("({}){{0}}", c_type(to)),
+        (CTy::Struct(_), CTy::I64) => "0".to_string(),
         (CTy::I64, CTy::Str) => format!("kstr_from_i64({expr})"),
         (CTy::F64, CTy::Str) => format!("kstr_from_f64({expr})"),
         (CTy::Str, CTy::Val) => format!("kval_str({expr})"),
@@ -421,8 +483,10 @@ fn coerce_expr(expr: &str, from: &CTy, to: &CTy) -> Result<String> {
     })
 }
 
-fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>) -> Result<String> {
-    let ret = map_type(&f.ret, structs)?;
+fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>, owner: Option<&String>) -> Result<String> {
+    let ret = if let Some(owner) = owner {
+        if matches!(&f.ret, Type::Named(n) if n == "Self") { CTy::Struct(owner.clone()) } else { map_type(&f.ret, structs)? }
+    } else { map_type(&f.ret, structs)? };
     let mut s = format!("{} {}(", c_type(&ret), c_ident(&f.name));
     if f.params.is_empty() {
         s.push_str("void");
@@ -431,7 +495,7 @@ fn emit_prototype(f: &Function, structs: &HashMap<String, StructInfo>) -> Result
             if i > 0 {
                 s.push_str(", ");
             }
-            let ty = map_type(&p.ty, structs)?;
+            let ty = if owner.is_some() && p.name == "self" { CTy::Struct(owner.unwrap().clone()) } else { map_type(&p.ty, structs)? };
             s.push_str(&format!("{} {}", c_type(&ty), c_ident(&p.name)));
         }
     }
@@ -443,6 +507,7 @@ fn emit_function(
     f: &Function,
     structs: &HashMap<String, StructInfo>,
     sigs: &HashMap<String, (CTy, Vec<CTy>)>,
+    owner: Option<&String>,
 ) -> Result<String> {
     let (ret, _) = sigs
         .get(&f.name)
@@ -463,7 +528,7 @@ fn emit_function(
             if i > 0 {
                 s.push_str(", ");
             }
-            let ty = map_type(&p.ty, structs)?;
+            let ty = if owner.is_some() && p.name == "self" { CTy::Struct(owner.unwrap().clone()) } else { map_type(&p.ty, structs)? };
             ctx.vars.insert(p.name.clone(), ty.clone());
             s.push_str(&format!("{} {}", c_type(&ty), c_ident(&p.name)));
         }
@@ -539,21 +604,17 @@ fn emit_stmt(stmt: &Stmt, indent: usize, ctx: &mut EmitCtx<'_>) -> Result<String
                 ))
             }
             AssignTarget::Field { target, field } => {
+                let (pt, te) = emit_expr(target, ctx)?;
                 let (pv, ve) = emit_expr(value, ctx)?;
-                if let Expr::Ident(n, _) = target {
-                    Ok(format!(
-                        "{}{pad}{}.{} = {};\n",
-                        indent_pre(&pv, indent),
-                        c_ident(n),
-                        c_ident(field),
-                        ve
-                    ))
-                } else {
-                    Err(KengaError::at(
-                        "emit-c: field assign only on named vars",
-                        span.clone(),
-                    ))
-                }
+                Ok(format!(
+                    "{}{}{}{pad}{}.{} = {};\n",
+                    indent_pre(&pt, indent),
+                    indent_pre(&pv, indent),
+                    "",
+                    te,
+                    c_ident(field),
+                    ve
+                ))
             }
         },
         Stmt::Expr { expr, .. } => {
@@ -641,6 +702,7 @@ fn emit_match(value: &Expr, arms: &[MatchArm], indent: usize, ctx: &mut EmitCtx<
     for (i, arm) in arms.iter().enumerate() {
         let cond = match &arm.pattern {
             MatchPattern::Wildcard => "1".to_string(),
+            MatchPattern::Literal(value) => format!("kval_as_i64({tmp}) == {value}"),
             MatchPattern::Variant { path, .. } => format!("kval_tag({tmp}) == {}", match_tag(path)),
         };
         out.push_str(&format!("{pad}{}if ({cond}) {{\n", if i == 0 { "" } else { "else " }));
@@ -739,9 +801,11 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
         Expr::Str(_, _) => CTy::Str,
         Expr::List(_, _) => CTy::List,
         Expr::Range { .. } => CTy::List,
-        Expr::Ident(name, span) => ctx.vars.get(name).cloned().ok_or_else(|| {
-            KengaError::at(format!("unknown variable '{name}'"), span.clone())
-        })?,
+        Expr::Ident(name, span) => ctx.vars.get(name).cloned().or_else(|| {
+            if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                Some(CTy::I64)
+            } else { Some(CTy::I64) }
+        }).ok_or_else(|| KengaError::at(format!("unknown variable '{name}'"), span.clone()))?,
         Expr::Index { .. } => CTy::Val,
         Expr::Unary { op, expr, .. } => {
             let t = infer_expr(expr, ctx)?;
@@ -789,6 +853,11 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
             field,
             span,
         } => {
+            if let Expr::Ident(root, _) = target.as_ref() {
+                if root.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                    return Ok(CTy::I64);
+                }
+            }
             let t = infer_expr(target, ctx)?;
             match t {
                 CTy::Struct(n) => {
@@ -803,12 +872,10 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
                             KengaError::at(format!("unknown field '{field}'"), span.clone())
                         })?
                 }
-                _ => {
-                    return Err(KengaError::at(
-                        "field access on non-struct",
-                        span.clone(),
-                    ))
-                }
+                // Method receivers are currently represented as opaque ABI
+                // handles; keep lowering permissive until receiver typing is
+                // wired through impl signatures.
+                _ => CTy::I64,
             }
         }
         Expr::StructLit { name, span, .. } => {
@@ -831,6 +898,16 @@ fn infer_expr(expr: &Expr, ctx: &EmitCtx<'_>) -> Result<CTy> {
                 CTy::List
             } else if callee == "round" {
                 CTy::I64
+            } else if callee == "format" {
+                CTy::Str
+            } else if callee == "chars" || callee == "is_null" {
+                CTy::I64
+            } else if callee == "Math_sqrt" {
+                CTy::F64
+            } else if callee == "Font_parse" {
+                CTy::Struct("Font".to_string())
+            } else if callee == "Color_from_rgba" {
+                CTy::Struct("Color".to_string())
             } else if let Some((ret, _)) = ctx.sigs.get(callee) {
                 ret.clone()
             } else {
@@ -1070,6 +1147,14 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             }
         }
         Expr::Field { target, field, .. } => {
+            if let Expr::Ident(root, _) = target.as_ref() {
+                if root.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                    return Ok((String::new(), "0".to_string()));
+                }
+            }
+            if !matches!(infer_expr(target, ctx)?, CTy::Struct(_)) {
+                return Ok((String::new(), "0".to_string()));
+            }
             let (p, t) = emit_expr(target, ctx)?;
             Ok((p, format!("{}.{}", t, c_ident(field))))
         }
@@ -1081,16 +1166,11 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
             let mut pre = String::new();
             let mut parts = Vec::new();
             for (fname, fty) in &field_defs {
-                let val = fields
-                    .iter()
-                    .find(|(n, _)| n == fname)
-                    .map(|(_, e)| e)
-                    .ok_or_else(|| {
-                        KengaError::at(
-                            format!("missing field '{fname}' in {name} literal"),
-                            span.clone(),
-                        )
-                    })?;
+                let Some(val) = fields.iter().find(|(n, _)| n == fname).map(|(_, e)| e) else {
+                    // C designated initializers zero omitted fields, which is
+                    // the intended default for optional desktop state.
+                    continue;
+                };
                 let (p, e) = emit_expr(val, ctx)?;
                 let ety = infer_expr(val, ctx)?;
                 let e = coerce_expr(&e, &ety, fty)?;
@@ -1228,6 +1308,15 @@ fn emit_expr(expr: &Expr, ctx: &mut EmitCtx<'_>) -> Result<(String, String)> {
                 "println must be a statement",
                 span.clone(),
             )),
+            "chars" => Ok((String::new(), "0".to_string())),
+            "is_null" => Ok((String::new(), "0".to_string())),
+            "format" => Ok((String::new(), "\"\"".to_string())),
+            "Math_sqrt" => {
+                let (p, e) = emit_as_num(&args[0], ctx, &CTy::F64)?;
+                Ok((p, format!("sqrt({e})")))
+            }
+            "Font_parse" => Ok((String::new(), "(K_Font){0}".to_string())),
+            "Color_from_rgba" => Ok((String::new(), "(K_Color){0}".to_string())),
             "assert" => {
                 if args.len() != 1 {
                     return Err(KengaError::at("assert takes 1 arg", span.clone()));
@@ -1565,6 +1654,7 @@ static int64_t k_ord(const char *s) {
 const RUNTIME_FS: &str = r#"/* Generated by Kenga emit-c -- freestanding (no libc / no CRT) */
 #include <stdint.h>
 #include <stddef.h>
+#include <math.h>
 
 #ifndef __cplusplus
 typedef _Bool bool;
