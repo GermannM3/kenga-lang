@@ -29,8 +29,15 @@ def candidates(gen_src):
 
 
 def try_fix(prompt, gen_src, want, codec, weights, max_tokens, temperature,
-            seed, k_budget):
+            seed, k_budget, standalone=False):
+    """Marker mode: the generation IS the fixed program -> run standalone.
+    Legacy mode (no marker): candidate = prompt + slice of continuation."""
     tried = 0
+    if standalone:
+        full = gen_src.lstrip()
+        rc, out, _ = kenchat.run_via_kenga_lite(full, timeout=8)
+        first = out.strip().split('\n')[0] if out.strip() else ''
+        return (rc == 0 and first == want), 1
     for cand in candidates(gen_src):
         full = prompt + '\n' + cand
         rc, out, _ = kenchat.run_via_kenga_lite(full, timeout=8)
@@ -45,14 +52,17 @@ def try_fix(prompt, gen_src, want, codec, weights, max_tokens, temperature,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--model', required=True)
-    ap.add_argument('--eval', default='minds/repair_corpus/test_mutants.jsonl')
+    ap.add_argument('--codec', default='minds/kenga_full.pkl')
+    ap.add_argument('--marker', default='',
+                    help="boundary marker appended to prompt (e.g. FIX)")
+    ap.add_argument('--eval', default='minds/repair_test_mutants.jsonl')
     ap.add_argument('--limit', type=int, default=100)
     ap.add_argument('--max-tokens', type=int, default=260)
     ap.add_argument('-k', type=int, default=4)
     args = ap.parse_args()
 
     weights = f'minds/mid_prophet_{args.model}_w.txt'
-    codec = kenchat.load_codec_vocab('minds/kenga_full.pkl')
+    codec = kenchat.load_codec_vocab(args.codec)
 
     recs = []
     for line in open(args.eval, encoding='utf-8'):
@@ -65,10 +75,13 @@ def main():
     modes = {}
     for r in recs:
         prompt = r['broken'].rstrip()
+        if args.marker:
+            prompt += '\n' + args.marker
         _, g1 = kenchat.gen_tokens(prompt, weights, max_tokens=args.max_tokens,
                                    temperature=None, codec=codec)
+        std = bool(args.marker)
         f1, _ = try_fix(prompt, g1, r['out'], codec, weights,
-                        args.max_tokens, None, 0, None)
+                        args.max_tokens, None, 0, None, standalone=std)
         fk = f1
         tries = 4
         if not fk:
@@ -77,7 +90,7 @@ def main():
                                            max_tokens=args.max_tokens,
                                            temperature=1.0, codec=codec, seed=i)
                 ok, used = try_fix(prompt, gs, r['out'], codec, weights,
-                                   args.max_tokens, 1.0, i, tries)
+                                   args.max_tokens, 1.0, i, tries, standalone=bool(args.marker))
                 if ok:
                     fk = True
                     break
