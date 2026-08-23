@@ -399,12 +399,10 @@ def gen_tokens(prompt, weights_path, max_tokens=80, temperature=None, codec=None
         elif nxt == T_RPAR:
             paren -= 1
         if len(generated) > 4 and brace == 0 and paren == 0:
-            # stop only when THIS generation completes a main; the prompt
-            # itself may legitimately contain one (e.g. repair tasks)
-            db_gen = detokenize(generated, codec)
-            if 'fn main' in db_gen:
-                idx = db_gen.index('fn main')
-                if db_gen.find('}', idx) != -1:
+            db = detokenize(buf, codec)
+            if 'fn main' in db:
+                idx = db.index('fn main')
+                if db.find('}', idx) != -1:
                     break
     return generated, detokenize(generated, codec)
 

@@ -2,15 +2,8 @@
 fn add(a: i64, b: i64) -> i64 {
     return a + b;
 }
-fn mul(a: i64, b: i64) -> i64 {
-    return a * b;
-}
-fn sub(a: i64, b: i64) -> i64 {
-    return a - b;
-}
 fn main() -> i64 {
     let x = add(2, 3);
-    let y = mul(x, 1);
-    println(y);
+    println(x);
     return 0;
 }

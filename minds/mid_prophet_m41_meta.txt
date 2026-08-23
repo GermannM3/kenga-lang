@@ -1,0 +1,10 @@
+V=128
+K=64
+D=128
+H=8
+HEAD=16
+L=6
+train_tokens=493256
+steps=2400
+LR=0.003
+batch=128

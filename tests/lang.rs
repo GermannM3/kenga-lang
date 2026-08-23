@@ -317,3 +317,137 @@ fn intrinsic_ffi_emit_c() {
     assert_eq!(c.matches("k_len(").count(), 0, "builtin len must not be referenced");
     assert_eq!(c.matches("k_ord(").count(), 1, "only the static runtime k_ord def");
 }
+
+// ==== docs/KENGA_RESOURCE_SPEC.md · Фаза A: parse-only скелеты ====
+// TODO(parser): снять #[ignore], когда lexer/parser получат токены
+// pool/place/budget/adapt/checkpoint/grow/pin/evict/rest/every/by + Size-литералы.
+// До тех пор эти программы обязаны падать на parse — поэтому ignore, а не assert.
+
+#[allow(dead_code)]
+fn parses(src: &str) {
+    let tokens = Lexer::new(src).tokenize().expect("lex");
+    Parser::new(tokens).parse().expect("parse");
+}
+
+#[test]
+#[ignore = "TODO(parser): pool"] // docs/KENGA_RESOURCE_SPEC.md §2.1
+fn resource_pool_decl() {
+    parses(
+        r#"
+        pool desk {
+            cpu: auto,
+            ram: 24GiB,
+            gpu: none
+        }
+        pool peer {
+            cpu: 8,
+            ram: 16GiB,
+            gpu: auto
+        }
+        fn main() -> i64 {
+            return 0;
+        }
+        "#,
+    );
+}
+
+#[test]
+#[ignore = "TODO(parser): place/pin/evict"] // docs/KENGA_RESOURCE_SPEC.md §2.2
+fn resource_place_pin_evict() {
+    parses(
+        r#"
+        pool home { cpu: auto, ram: 24GiB, gpu: none }
+        pool lab { cpu: 16, ram: 64GiB, gpu: auto }
+        let w = t_from([8, 4096, 4096], weights);
+        place w on home(4GiB) evict;
+        fn migrate_to_lab() -> i64 {
+            place w on lab(12GiB) pin;
+            return 0;
+        }
+        fn main() -> i64 {
+            return migrate_to_lab();
+        }
+        "#,
+    );
+}
+
+#[test]
+#[ignore = "TODO(parser): budget/rest"] // docs/KENGA_RESOURCE_SPEC.md §2.3
+fn resource_budget_slots() {
+    parses(
+        r#"
+        budget moe {
+            hot_experts: 10GiB,
+            kv: 6GiB,
+            other: rest
+        }
+        fn main() -> i64 {
+            return 0;
+        }
+        "#,
+    );
+}
+
+#[test]
+#[ignore = "TODO(parser): budget slot assign"] // docs/KENGA_RESOURCE_SPEC.md §2.3
+fn resource_budget_rebalance() {
+    parses(
+        r#"
+        budget moe {
+            hot_experts: 10GiB,
+            kv: 6GiB,
+            other: rest
+        }
+        pool desk { cpu: auto, ram: 24GiB, gpu: none }
+        place experts on desk(moe.hot_experts) evict;
+        place kv on desk(moe.kv) pin;
+        fn main() -> i64 {
+            moe.kv = 7GiB;
+            return 0;
+        }
+        "#,
+    );
+}
+
+#[test]
+#[ignore = "TODO(parser): adapt"] // docs/KENGA_RESOURCE_SPEC.md §2.4
+fn resource_adapt_link_policy() {
+    parses(
+        r#"
+        adapt laptop_to_rack {
+            min_bw: 80MiBps,
+            prefer: remote
+        }
+        fn main() -> i64 {
+            return 0;
+        }
+        "#,
+    );
+}
+
+#[test]
+#[ignore = "TODO(parser): checkpoint/load checkpoint"] // docs/KENGA_RESOURCE_SPEC.md §2.5
+fn resource_checkpoint_roundtrip() {
+    parses(
+        r#"
+        checkpoint semantic "sessions/chat_a" every 200;
+        fn main() -> i64 {
+            load checkpoint "sessions/chat_a";
+            return 0;
+        }
+        "#,
+    );
+}
+
+#[test]
+#[ignore = "TODO(parser): grow ... by"] // docs/KENGA_RESOURCE_SPEC.md §2.6, reserved
+fn resource_grow_zspace_reserved() {
+    parses(
+        r#"
+        fn main() -> i64 {
+            grow zspace by 2;
+            return 0;
+        }
+        "#,
+    );
+}

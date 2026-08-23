@@ -26,7 +26,6 @@ Run:
   /c/Python314/python tools/train_m3.py
 """
 import os
-import subprocess
 import numpy as np
 
 KEYWORDS = {'fn','return','let','if','else','while','for','i64','println'}
@@ -161,17 +160,6 @@ def make_codec_tokenize(codec):
 
 
 def collect_corpus():
-    extra = os.environ.get('M3_EXTRA_DIR')
-    if os.environ.get('M3_ONLY_EXTRA', '0') == '1' and extra:
-        parts = []
-        for f in sorted(os.listdir(extra)):
-            p = os.path.join(extra, f)
-            try:
-                open(p, encoding='utf-8', errors='replace').read()
-                parts.append(('train', p))
-            except Exception:
-                pass
-        return parts
     if os.environ.get('M3_ONLY_FACTORY', '0') == '1':
         return []
     parts = []
@@ -476,17 +464,6 @@ def main():
     params = m.params_map()
     opt = AdamOpt(params, lr=LR)
 
-    SCALE = 1000
-    def dump(name, arr_):
-        flat = arr_.reshape(-1)
-        return f'[{name}] shape={list(arr_.shape)} ' + ','.join(str(int(round(float(x) * SCALE))) for x in flat) + '\n'
-
-    def write_weights(path):
-        with open(path, 'w') as f:
-            f.write(f'vocab={V} k={K} d={D} h={H} head={m.HEAD} layers={L} scale={SCALE} arch=transformer\n')
-            for name, arr_ in params.items():
-                f.write(dump(name, arr_))
-
     for step in range(STEPS):
         starts = rng.randint(0, n - K, size=BATCH)
         xs = np.stack([arr[s:s + K] for s in starts])
@@ -500,11 +477,18 @@ def main():
             preds = logits.argmax(axis=-1)
             acc = (preds == targets).mean() * 100
             print(f'  step {step:>4d}: batch-train-acc = {acc:.2f}%')
-            # rolling snapshot: crash/reboot loses at most EVAL_EVERY steps
-            write_weights(f'minds/mid_prophet_{TAG}_snap_w.txt')
+
+    # Save weights
+    SCALE = 1000
+    def dump(name, arr_):
+        flat = arr_.reshape(-1)
+        return f'[{name}] shape={list(arr_.shape)} ' + ','.join(str(int(round(float(x) * SCALE))) for x in flat) + '\n'
 
     w_path = f'minds/mid_prophet_{TAG}_w.txt'
-    write_weights(w_path)
+    with open(w_path, 'w') as f:
+        f.write(f'vocab={V} k={K} d={D} h={H} head={m.HEAD} layers={L} scale={SCALE} arch=transformer\n')
+        for name, arr_ in params.items():
+            f.write(dump(name, arr_))
 
     # Held-out
     print('\n=== held-out ===')
@@ -532,7 +516,6 @@ def main():
         print(f'factory holdout: {factory_holdout} ({len(parts_h)} programs, combined stream)')
     val_total = 0
     correct_total = 0
-    heldout_results = []
     for name, text in held_docs:
         tok = tokenize(text)
         if len(tok) < K + 1: continue
@@ -551,7 +534,6 @@ def main():
             t_sum += int(preds.size)
         val_total += t_sum
         correct_total += c_sum
-        heldout_results.append((name, c_sum, t_sum))
         print(f'  held {name}: {c_sum}/{t_sum} = {c_sum*100/max(1,t_sum):.2f}%')
     if val_total:
         print(f'\noverall: {correct_total}/{val_total} = {correct_total*100/val_total:.2f}%')
@@ -561,56 +543,6 @@ def main():
     with open(f'minds/mid_prophet_{TAG}_meta.txt', 'w') as f:
         f.write(f'V={V}\nK={K}\nD={D}\nH={H}\nHEAD={m.HEAD}\nL={L}\n')
         f.write(f'train_tokens={n}\nsteps={STEPS}\nLR={LR}\nbatch={BATCH}\n')
-
-    # ---- run manifest: reproducible experiment artifact -----------------
-    import hashlib
-    import json
-    import time
-
-    def sha256_file(path, _buf=1 << 20):
-        h = hashlib.sha256()
-        try:
-            with open(path, 'rb') as fh:
-                while True:
-                    b = fh.read(_buf)
-                    if not b:
-                        break
-                    h.update(b)
-            return h.hexdigest()
-        except OSError:
-            return None
-
-    try:
-        git_commit = subprocess.check_output(
-            ['git', 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL,
-        ).decode().strip()
-    except Exception:
-        git_commit = None
-
-    manifest = {
-        'tag': TAG,
-        'finished': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'git_commit': git_commit,
-        'arch': {'V': V, 'K': K, 'D': D, 'H': H, 'L': L,
-                 'params': m.n_params()},
-        'train': {'tokens': n, 'steps': STEPS, 'lr': LR, 'batch': BATCH,
-                  'clip': os.environ.get('M3_CLIP'),
-                  'codec_file': os.environ.get('M3_CODEC_FILE'),
-                  'codec_sha256': sha256_file(os.environ.get('M3_CODEC_FILE', '')),
-                  'factory': os.environ.get('M3_FACTORY'),
-                  'factory_sha256': sha256_file(os.environ.get('M3_FACTORY', '')),
-                  'real_split': os.environ.get('M3_REAL_SPLIT'),
-                  'include_big': os.environ.get('M3_INCLUDE_BIG'),
-                  'extra_dir': os.environ.get('M3_EXTRA_DIR')},
-        'heldout': {name: round(100 * c / max(1, t), 2)
-                    for name, c, t in heldout_results},
-        'weights': w_path,
-        'weights_sha256': sha256_file(w_path),
-        'snapshot': f'minds/mid_prophet_{TAG}_snap_w.txt',
-    }
-    with open(f'minds/mid_prophet_{TAG}_run.json', 'w', encoding='utf-8') as f:
-        json.dump(manifest, f, indent=2)
-    print(f'run manifest: minds/mid_prophet_{TAG}_run.json')
 
 
 if __name__ == '__main__':
