@@ -88,9 +88,10 @@ def make_codec():
     id_to_token = tokens
     token_to_id = {t: i for i, t in enumerate(tokens)}
     merge_set = set(a + b for a, b in merges)
+    keywords = KEYWORDS | ({'FIX'} if 'FIX' in token_to_id else set())
 
     def encode_word(w):
-        if w in KEYWORDS:
+        if w in keywords:
             return [token_to_id[w]]
         spellable = all(ch in token_to_id for ch in w)
         if not spellable:
@@ -117,9 +118,11 @@ def make_codec():
 
 
 def make_codec_tokenize(codec):
-    """Tokenizer that uses the codec for identifiers, syntax as usual."""
+    """Tokenizer that uses the codec for identifiers, syntax as usual.
+    M3_KEEP_COMMENTS=1 keeps // comment text as word tokens (NL->code)."""
     token_to_id = codec['token_to_id']
     encode_word = codec['encode_word']
+    keep_comments = os.environ.get('M3_KEEP_COMMENTS', '0') == '1'
 
     def tokenize_codec(src):
         out = []
@@ -130,7 +133,21 @@ def make_codec_tokenize(codec):
             if c in ' \t\n\r':
                 i += 1; continue
             if c == '/' and i+1 < n and src[i+1] == '/':
-                while i < n and src[i] != '\n': i += 1
+                if not keep_comments:
+                    while i < n and src[i] != '\n': i += 1
+                    continue
+                i += 2
+                j = i
+                while j < n and src[j] != '\n':
+                    if src[j].isalnum() or src[j] == '_':
+                        e = j
+                        while e < n and (src[e].isalnum() or src[e] == '_'):
+                            e += 1
+                        out.extend(encode_word(src[j:e]))
+                        j = e
+                    else:
+                        j += 1
+                i = j
                 continue
             two = src[i:i+2]
             if two in TWO_CHAR:
@@ -499,7 +516,13 @@ def main():
         if step % EVAL_EVERY == 0 or step == STEPS - 1:
             preds = logits.argmax(axis=-1)
             acc = (preds == targets).mean() * 100
-            print(f'  step {step:>4d}: batch-train-acc = {acc:.2f}%')
+            logp = np.log(np.exp(logits - logits.max(axis=-1, keepdims=True))
+                          .sum(axis=-1, keepdims=True))
+            nll = -(np.take_along_axis(
+                logits - logits.max(axis=-1, keepdims=True)
+                - logp, targets[..., None], axis=-1)).mean()
+            print(f'  step {step:>4d}: batch-train-acc = {acc:.2f}%  '
+                  f'loss = {float(nll):.4f}')
             # rolling snapshot: crash/reboot loses at most EVAL_EVERY steps
             write_weights(f'minds/mid_prophet_{TAG}_snap_w.txt')
 
