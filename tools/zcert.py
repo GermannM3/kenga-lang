@@ -1,9 +1,13 @@
 """tools/zcert.py — issue/verify Z-certificates for Kenga weight files.
 
-Provenance: tolerance-certificate semantics follow the Z-system
-exp_TELEPORT / F202 ("допуск, не хеш", Hermann directive 24.08); unified
-z_verify_unified interface lives in tools/zcore.py (single implementation,
-two modes). This CLI is a thin wrapper for .km/.kt-style text weights.
+Provenance / convergence note (Hermann directive 24.08):
+  Certificate layer is CANONICAL in tools/zmind.py (Z-agent: .km/.kt
+  parsers, spectral_marker, tolerance canon F202). This CLI is a thin
+  adapter: it delegates issuing/verification to zmind.make_zmind_cert /
+  zmind.verify_artifact, which themselves route through the single
+  interface zcore.z_verify_unified (exact | tolerant).
+  Mid-training issuance is valid: measured L(snap->final)=1.0000
+  (ZK-2, minds/corpus_factory/Z_LINEAGE.md).
 
 Commands:
   python tools/zcert.py issue  <weights.txt> [--k 32] [--out cert.json]
@@ -16,35 +20,19 @@ import argparse
 import json
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kenchat
-import zcore
-
-PROVENANCE = ('certificate semantics: tolerance per Z-system F202/'
-              'exp_TELEPORT; exact hash per Kenga marker round(W,3); '
-              'unified interface zcore.z_verify_unified')
+import zmind
 
 
 def cmd_issue(args):
     _, tensors = kenchat.load_tensors(args.weights)
-    z_full = zcore.z_encode(tensors, 10 ** 9)
-    spectra_full = {n: [round(float(x), 8) for x in it['S']]
-                    for n, it in z_full['data'].items() if 'S' in it}
-    cert = {
-        'type': 'zcert-v1',
-        'provenance': PROVENANCE,
-        'weights_file': args.weights,
-        'marker': zcore.z_marker(tensors),
-        'k': args.k,
-        'created': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'spectra': {n: v[:8] for n, v in spectra_full.items()},
-        'spectra_full': spectra_full,
-    }
+    cert = zmind.make_zmind_cert(tensors, source_path=args.weights, k=args.k)
     with open(args.out, 'w', encoding='utf-8') as f:
         json.dump(cert, f, indent=1)
-    print(f'issued {args.out}: marker={cert["marker"]} tensors={len(spectra_full)}')
+    print(f"issued {args.out}: marker={cert['marker']} "
+          f"spectral={cert['spectral_marker']} tensors={len(cert['tensors'])}")
     return 0
 
 
@@ -52,15 +40,8 @@ def cmd_verify(args):
     _, tensors = kenchat.load_tensors(args.weights)
     with open(args.cert, encoding='utf-8') as f:
         cert = json.load(f)
-    if args.mode == 'exact':
-        # point identity uses RAW weights: SVD roundtrip perturbs values
-        # at rounding boundaries and breaks bit-hash by design (F202)
-        ok = cert['marker'] == zcore.z_marker(tensors)
-    else:
-        z_k = zcore.z_encode(tensors, cert.get('k', 32))
-        ok = zcore.z_verify_unified(z_k, cert, mode='tolerant')
-    print(('VERIFIED' if ok else 'MISMATCH'), f'({args.mode})',
-          cert.get('marker', ''))
+    ok, detail = zmind.verify_artifact(tensors, cert, mode=args.mode)
+    print(('VERIFIED' if ok else 'MISMATCH'), f'({args.mode})', detail)
     return 0 if ok else 1
 
 

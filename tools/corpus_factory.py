@@ -47,6 +47,57 @@ def pick_distinct(rng, pool, n):
     return out
 
 
+# ------------------------------------------------------------------- nl ----
+# M6 (NL->code): every program carries a task comment. The comment IS the
+# spec — tokenizer keeps it when M3_KEEP_COMMENTS=1, so the model learns
+# description -> implementation.
+
+def nl_for(rng, kind, **kw):
+    T = {
+        'arith': ['// task: compute {e}',
+                  '// calculate this expression of {p} numbers',
+                  '// evaluate the formula over the arguments',
+                  '// math helper: combine inputs and constants'],
+        'loop': ['// task: sum values from a to b',
+                 '// accumulate over the range with a while loop',
+                 '// walk indices and add them into an accumulator',
+                 '// total up every step across [a, b]'],
+        'rec': ['// task: recursive {shape} over n, plus its loop form',
+                '// self-recursive function and an equivalent iteration',
+                '// recursion with base case; loop version included',
+                '// define deep recursion and run same by while'],
+        'chain': ['// task: chain of calls f0 then next until main prints',
+                  "// pipeline: each function feeds the next; main prints last",
+                  '// compose helpers so main output flows through all of them',
+                  '// call chain ending in println of final value'],
+        'bind': ['// task: main must call the right function by name',
+                 '// several functions share the signature; use the correct one',
+                 '// pick the intended definition for the call inside main',
+                 '// binding drill: ignore decoys, call target only'],
+        'str_build': ['// task: build a string of {n} letters by loop',
+                      '// accumulate characters into a string n times',
+                      '// grow a text buffer inside a while loop to length {n}',
+                      '// repeat one symbol n times into a string'],
+        'str_misc': ['// task: string length and comparison drill',
+                     '// measure text and compare against another literal',
+                     '// report size of a word or check if equal',
+                     '// len and equality check on short strings'],
+        'list_sum': ['// task: sum all elements of the list by index',
+                     '// add every number stored in the list',
+                     '// walk positions 0..len-1 accumulating xs[i]',
+                     '// reduce list contents into one total'],
+        'list_get': ['// task: read one element of the list by index',
+                     '// fetch position k from fixed data and print it',
+                     '// index access drill on a constant list',
+                     '// take single item out of the array'],
+    }[kind]
+    s = rng.choice(T)
+    try:
+        return s.format(**kw)
+    except KeyError:
+        return s
+
+
 # ---------------------------------------------------------------- arith ----
 
 def gen_arith(rng):
@@ -90,7 +141,8 @@ def gen_arith(rng):
     rng.shuffle(bodies)
 
     def mk(body):
-        return (f'fn {fname}({sig}) -> i64 {{\n    {body}\n}}\n'
+        hdr = nl_for(rng, 'arith', p=npar)
+        return (hdr + '\n' + f'fn {fname}({sig}) -> i64 {{\n    {body}\n}}\n'
                 f'fn main() -> i64 {{\n'
                 f'    let r = {fname}({callargs});\n    println(r);\n    return 0;\n}}\n')
 
@@ -130,7 +182,8 @@ def gen_loop(rng):
         var = None
 
     def mk(fnbody):
-        return (f'fn {fname}(a: i64, b: i64) -> i64 {{\n    {fnbody}\n}}\n'
+        hdr = nl_for(rng, 'loop')
+        return (hdr + '\n' + f'fn {fname}(a: i64, b: i64) -> i64 {{\n    {fnbody}\n}}\n'
                 f'fn main() -> i64 {{\n'
                 f'    let r = {fname}({a}, {b});\n    println(r);\n    return 0;\n}}\n')
 
@@ -203,7 +256,8 @@ def gen_rec(rng):
     it_fn = f'fn {iname}(n: i64) -> i64 {{\n    {it}\n}}'
 
     def mk(caller_body):
-        return (rec_fn + '\n' + it_fn + '\n'
+        hdr = nl_for(rng, 'rec', shape=shape)
+        return (hdr + '\n' + rec_fn + '\n' + it_fn + '\n'
                 f'fn main() -> i64 {{\n'
                 f'    {caller_body}\n    return 0;\n}}\n')
 
@@ -241,7 +295,8 @@ def gen_chain(rng):
     lr = pick(rng, LOCAL_POOL)
     lines.append(f'fn main() -> i64 {{\n    let {lr} = {prev}({arg});\n'
                  f'    println({lr});\n    return 0;\n}}')
-    return '\n'.join(lines) + '\n', []
+    hdr = nl_for(rng, 'chain') + '\n'
+    return hdr + '\n'.join(lines) + '\n', []
 
 
 # ----------------------------------------------------------------- bind ----
@@ -284,8 +339,78 @@ def gen_bind(rng):
     else:
         main_body = (f'let {l1} = {target}({args});\n'
                      f'    let {l2} = {l1} + 0;\n    println({l2});')
-    src = (text_defs + '\n'
+    src = (nl_for(rng, 'bind') + '\n' + text_defs + '\n'
            f'fn main() -> i64 {{\n    {main_body}\n    return 0;\n}}\n')
+    return src, []
+
+
+# ------------------------------------------------------------ str/list ----
+
+def gen_str_build(rng):
+    n = rng.randint(1, 12)
+    ch = rng.choice(['x', 'o', '#', '*', 'a'])
+    fname = pick(rng, FN_POOL)
+    ls, li = pick_distinct(rng, LOCAL_POOL, 2)
+    body = (f'let {ls}: str = "";\n'
+            f'    let {li} = 0;\n'
+            f'    while {li} < n {{\n        {ls} = {ls} + "{ch}";\n        {li} = {li} + 1;\n    }}\n'
+            f'    return {ls};')
+    hdr = nl_for(rng, 'str_build', n=n)
+    return (hdr + f'\nfn {fname}(n: i64) -> str {{\n    {body}\n}}\n'
+            f'fn main() -> i64 {{\n'
+            f'    let s: str = {fname}({n});\n'
+            f'    println(len(s));\n    return 0;\n}}\n'), []
+
+
+def gen_str_misc(rng):
+    kind = rng.choice(['len', 'cmp', 'index'])
+    w = rng.choice(['cat', 'dog', 'sun', 'box', 'red', 'tea'])
+    other = rng.choice([w] + ['moon', 'sky', 'jar'])
+    hdr = nl_for(rng, 'str_misc') + '\n'
+    if kind == 'len':
+        core = (f'fn main() -> i64 {{\n    let w: str = "{w}";\n'
+                f'    println(len(w));\n    return 0;\n}}\n')
+    elif kind == 'cmp':
+        eq = other == w
+        core = (f'fn main() -> i64 {{\n    let a: str = "{w}";\n'
+                f'    let b: str = "{other}";\n'
+                f'    if a == b {{ println(1); }} else {{ println(0); }}\n'
+                f'    return 0;\n}}\n')
+    else:
+        k = rng.randint(0, len(w) - 1)
+        core = (f'fn main() -> i64 {{\n    let w: str = "{w}";\n'
+                f'    println(w[{k}]);\n    return 0;\n}}\n')
+    return hdr + core, []
+
+
+def gen_list_sum(rng):
+    xs = [rng.randint(-9, 9) for _ in range(rng.randint(3, 6))]
+    lit = ', '.join(str(v) for v in xs)
+    fname = pick(rng, FN_POOL)
+    ls, li = pick_distinct(rng, LOCAL_POOL, 2)
+    hdr = nl_for(rng, 'list_sum')
+    src = (hdr + f'\nfn {fname}(xs: list) -> i64 {{\n'
+           f'    let {ls} = 0;\n    let {li} = 0;\n'
+           f'    while {li} < len(xs) {{\n'
+           f'        {ls} = {ls} + xs[{li}];\n        {li} = {li} + 1;\n    }}\n'
+           f'    return {ls};\n}}\n'
+           f'fn main() -> i64 {{\n    let data: list = [{lit}];\n'
+           f'    println({fname}(data));\n    return 0;\n}}\n')
+    return src, []
+
+
+def gen_list_get(rng):
+    xs = [rng.randint(-9, 9) for _ in range(rng.randint(3, 7))]
+    k = rng.randrange(len(xs))
+    lit = ', '.join(str(v) for v in xs)
+    fname = pick(rng, FN_POOL)
+    lr = pick(rng, LOCAL_POOL)
+    hdr = nl_for(rng, 'list_get')
+    src = (hdr + f'\nfn {fname}(xs: list, k: i64) -> i64 {{\n'
+           f'    return xs[k];\n}}\n'
+           f'fn main() -> i64 {{\n    let data: list = [{lit}];\n'
+           f'    let {lr} = {fname}(data, {k});\n'
+           f'    println({lr});\n    return 0;\n}}\n')
     return src, []
 
 
@@ -335,16 +460,22 @@ def mutate(src, rng):
 # ------------------------------------------------------------------ main ---
 
 GENS = {'arith': gen_arith, 'loop': gen_loop, 'rec': gen_rec,
-        'chain': gen_chain, 'bind': gen_bind}
+        'chain': gen_chain, 'bind': gen_bind, 'str_build': gen_str_build,
+        'str_misc': gen_str_misc, 'list_sum': gen_list_sum,
+        'list_get': gen_list_get}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--arith', type=int, default=7500)
-    ap.add_argument('--loop', type=int, default=2200)
-    ap.add_argument('--rec', type=int, default=450)
-    ap.add_argument('--chain', type=int, default=2600)
-    ap.add_argument('--bind', type=int, default=1800)
+    ap.add_argument('--arith', type=int, default=6000)
+    ap.add_argument('--loop', type=int, default=1800)
+    ap.add_argument('--rec', type=int, default=400)
+    ap.add_argument('--chain', type=int, default=2200)
+    ap.add_argument('--bind', type=int, default=1600)
+    ap.add_argument('--str-build', type=int, default=900)
+    ap.add_argument('--str-misc', type=int, default=700)
+    ap.add_argument('--list-sum', type=int, default=900)
+    ap.add_argument('--list-get', type=int, default=500)
     ap.add_argument('--max-mutants', type=int, default=1)
     ap.add_argument('--seed', type=int, default=13)
     ap.add_argument('--out', default='minds/corpus_factory/manifest.jsonl')
@@ -354,7 +485,9 @@ def main():
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
 
     counts = {'arith': args.arith, 'loop': args.loop,
-              'rec': args.rec, 'chain': args.chain, 'bind': args.bind}
+              'rec': args.rec, 'chain': args.chain, 'bind': args.bind,
+              'str_build': args.str_build, 'str_misc': args.str_misc,
+              'list_sum': args.list_sum, 'list_get': args.list_get}
     seen = set()
     stats = {'kept': 0, 'dropped_primary': 0, 'variants_kept': 0,
              'variants_dropped': 0, 'mut_run': 0, 'mut_value': 0,

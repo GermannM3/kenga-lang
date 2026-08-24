@@ -9,6 +9,11 @@ Candidate D8: L >= threshold => "same lineage". Threshold is calibrated
 against a random-matrix null (two independent gaussian models of the same
 shapes) — see printed report.
 
+D8 lineage score formula (one line):
+L(a,b) = mean_t [ cos(log1p(S_a^t), log1p(S_b^t)) * (1 - mean_theta_t/90deg) ],
+where S^t = top-32 singular values and theta_t = principal angles between
+top-32 left singular subspaces U_a^t, U_b^t of shared-shape tensor t.
+
 Usage:
   python tools/zlineage.py            # runs full family matrix + temporal
 """
