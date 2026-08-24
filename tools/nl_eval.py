@@ -41,7 +41,16 @@ def main():
 
     st = collections.defaultdict(lambda: [0, 0, 0])
     n = 0
+    import os as _os
+    done = set()
+    if _os.path.exists(args.test + '.nl_progress'):
+        for l in open(args.test + '.nl_progress', encoding='utf-8'):
+            if l.startswith('DONE '):
+                done.add(l.split()[1])
+    prog = open(args.test + '.nl_progress', 'a', encoding='utf-8')
     for r in recs:
+        if r['id'] in done:
+            continue
         prompt = r['src'].split('\n')[0]  # comment line only
         _, g = kenchat.gen_tokens(prompt, weights, max_tokens=args.max_tokens,
                                   temperature=None, codec=codec)
@@ -65,6 +74,8 @@ def main():
         s = st[r['category']]
         s[0] += int(okc); s[1] += int(okm); s[2] += int(pk)
         n += 1
+        prog.write("DONE " + r["id"] + "\n"); prog.flush()
+        print(f'{r["id"]} compile={okc} match={okm} pass@k={pk}', flush=True)
 
     tot = [0, 0, 0]
     print(f'NL->code: model={args.model} programs={n} pass@{args.k}')

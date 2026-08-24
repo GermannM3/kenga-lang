@@ -26,6 +26,7 @@ CODECS = {
     'm5': 'minds/kenga_full.pkl',
     'm52': 'minds/kenga_full.pkl',
     'm53': 'minds/kenga_full.pkl',
+    'm6': 'minds/kenga_full.pkl',
 }
 WEIGHTS = {m: f'minds/mid_prophet_{m}_w.txt' for m in CODECS}
 
@@ -99,6 +100,7 @@ def main():
         st[2] += int(ok_match)
         st[3] += int(passed_k)
         n += 1
+        prog.write("DONE " + r["id"] + "\n"); prog.flush()
 
     tot = [0, 0, 0, 0]
     print(f'model={args.model} test={args.test} programs={n} pass@{args.k}')
