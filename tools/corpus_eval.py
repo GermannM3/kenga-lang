@@ -110,7 +110,7 @@ def main():
         st[2] += int(ok_match)
         st[3] += int(passed_k)
         n += 1
-        prog.write("DONE " + r["id"] + "\n"); prog.flush()
+        _prog.write("DONE " + r["id"] + "\n"); _prog.flush()
 
     tot = [0, 0, 0, 0]
     print(f'model={args.model} test={args.test} programs={n} pass@{args.k}')

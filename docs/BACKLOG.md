@@ -9,10 +9,11 @@
 - [ ] Measure encode/decode overhead numbers for pitch slide 6
 
 ## Kenga-lane (this machine, CPU)
-- [ ] M6 evals → Genesis gate verdict (auto: M6_REPORT.md)
+- [x] Z x Kenga Etap 0 (corpus_eval prog->_prog) + Etap 1: zcore.py (11 ops), 14/14 unit tests, passports for m53/m6 (.passport.json), test_zcore.py
 - [ ] If match T1 in 7–10%: Genesis dry-run (buffer accumulation, no train)
 - [ ] If OPEN: branch A (Base control) first, then B/C/D
-- [ ] HF publish M6 + rp1 after four logs (card: A/B rp0→rp1, NL axis,
+- [ ] HF publish M6 + rp1 after four logs
+- [ ] Z-lane Etap 2+: lexer z_* keywords, VM builtins, Factory Z1-Z5, Genesis z_verify gate (spec v0.1+v0.2) (card: A/B rp0→rp1, NL axis,
       K=512 effect, ladder table)
 - [ ] Language lane: lexer P0 fixes (`.` dropped, `&|^~`→ID, `=>` split),
       parser_laxity tests un-ignore, dialect inconsistencies list
