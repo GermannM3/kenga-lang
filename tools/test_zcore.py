@@ -114,8 +114,15 @@ def main():
     agr = agreement(hyb, a_dec)
     check('compose_functional', agr >= 0.85, f'agreement={agr:.3f}')
     mk_hyb_ok = zcore.z_verify(zc, zcore.z_marker(hyb))
-    mk_foreign = zcore.z_verify(zc, mk1)
-    check('compose_identity_new', mk_hyb_ok and not mk_foreign)
+    # BOTH parent markers must be rejected by the hybrid (new identity),
+    # and the two parents must differ from each other.
+    mk_a = zcore.z_marker(zcore.z_decode(za))
+    mk_b = zcore.z_marker(zcore.z_decode(zb))
+    check('compose_identity_new',
+          mk_hyb_ok and mk_a != mk_b
+          and not zcore.z_verify(zc, mk_a)
+          and not zcore.z_verify(zc, mk_b),
+          f'A={mk_a[:8]} B={mk_b[:8]} hybrid={zcore.z_marker(hyb)[:8]}')
 
     # 10. grow: from truncated state, capacity grows, function unchanged
     small = zcore.z_decode(zcore.z_encode(m, 4))
