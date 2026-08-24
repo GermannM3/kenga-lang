@@ -50,6 +50,9 @@ def load_codec_vocab(path='minds/kenga_bpe.pkl'):
     token_to_id = {t: i for i, t in enumerate(tokens)}
     merge_set = set(a + b for a, b in merges)
     KEYWORDS = {'fn','return','let','if','else','while','for','i64','println'}
+    if 'FIX' in token_to_id:
+        # task-boundary marker token (repair models) must survive as itself
+        KEYWORDS = KEYWORDS | {'FIX'}
 
     def encode_word(w):
         if w in KEYWORDS:
@@ -76,7 +79,7 @@ def load_codec_vocab(path='minds/kenga_bpe.pkl'):
     }
 
 
-def tokenize(src, codec=None):
+def tokenize(src, codec=None, keep_comments=False):
     KEYWORDS = {'fn','return','let','if','else','while','for','i64','println'}
     TWO_CHAR = {'->','==','<=','>=','!=','&&','||','<<','>>','&','|','^','~'}
     if codec:
@@ -90,7 +93,26 @@ def tokenize(src, codec=None):
         c = src[i]
         if c in ' \t\n\r': i += 1; continue
         if c == '/' and i+1 < n and src[i+1] == '/':
-            while i < n and src[i] != '\n': i += 1
+            if not keep_comments:
+                while i < n and src[i] != '\n': i += 1
+                continue
+            # NL mode: keep comment text as word tokens (the comment IS the spec)
+            i += 2
+            j = i
+            while j < n and src[j] != '\n':
+                if src[j].isalnum() or src[j] == '_':
+                    e = j
+                    while e < n and (src[e].isalnum() or src[e] == '_'):
+                        e += 1
+                    w = src[j:e]
+                    if codec:
+                        out.extend(codec['encode_word'](w))
+                    else:
+                        out.append(VOCAB_MAP[w] if w in KEYWORDS else VOCAB_MAP['ID'])
+                    j = e
+                else:
+                    j += 1
+            i = j
             continue
         two = src[i:i+2]
         if two in TWO_CHAR:
@@ -291,7 +313,7 @@ def predict_m3(tensors, info, window, temperature=None, rng=None, pad_mask=None,
 
 
 def gen_tokens(prompt, weights_path, max_tokens=80, temperature=None, codec=None,
-               seed=None):
+               seed=None, keep_comments=False):
     """Generate token ids + source for a prompt.
 
     Transformer path uses a left-aligned real-token window with right-padding
@@ -318,7 +340,7 @@ def gen_tokens(prompt, weights_path, max_tokens=80, temperature=None, codec=None
         for v, arr in arr_dict.items():
             W_arr[v, :arr.shape[0]] = arr[:row0.shape[0]]
 
-    toks = tokenize(prompt, codec)
+    toks = tokenize(prompt, codec, keep_comments=keep_comments)
     ID_IDX = codec['token_to_id']['ID'] if codec else VOCAB_TOKENS.index('ID')
 
     T_OPEN, T_CLOSE, T_LPAR, T_RPAR = (

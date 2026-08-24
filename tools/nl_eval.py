@@ -16,6 +16,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kenchat
 
+KEEP = os.environ.get('NL_KEEP_COMMENTS','1')=='1'
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -53,7 +55,8 @@ def main():
             continue
         prompt = r['src'].split('\n')[0]  # comment line only
         _, g = kenchat.gen_tokens(prompt, weights, max_tokens=args.max_tokens,
-                                  temperature=None, codec=codec)
+                                  temperature=None, codec=codec,
+                                  keep_comments=KEEP)
         full = kenchat.make_valid_program(prompt + '\n', g)
         rc, out, _ = kenchat.run_via_kenga_lite(full, timeout=10)
         first = out.strip().split('\n')[0] if out.strip() else ''
@@ -64,7 +67,8 @@ def main():
             for i in range(args.k - 1):
                 _, gs = kenchat.gen_tokens(prompt, weights,
                                            max_tokens=args.max_tokens,
-                                           temperature=1.0, codec=codec, seed=i)
+                                           temperature=1.0, codec=codec, seed=i,
+                                           keep_comments=KEEP)
                 f2 = kenchat.make_valid_program(prompt + '\n', gs)
                 rc2, out2, _ = kenchat.run_via_kenga_lite(f2, timeout=10)
                 f2o = out2.strip().split('\n')[0] if out2.strip() else ''

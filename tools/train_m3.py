@@ -481,7 +481,7 @@ def main():
     TAG = os.environ.get('M3_TAG', 'm31')
     # ---------------------------------------------------------------------
 
-    rng = np.random.RandomState(11)
+    rng = np.random.RandomState(int(os.environ.get('M3_SEED', '11')))
     m = M3(V, K, D, H, L, rng)
     m.bout = np.log((np.bincount(np.array(big, dtype=np.int32), minlength=V) + 1.0) / len(big))
 

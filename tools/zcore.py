@@ -138,12 +138,63 @@ def z_verify(z, marker):
     full-rank model, because truncation perturbs W beyond the round(3)
     quantum. That fragility is intentional and mirrors F208 (identity
     is far more fragile than function). Lineage/kinship across models
-    is a different relation: see tools/zlineage.py (candidate D8).
+    is a different relation: see tools/zlineage.py (candidate D8) and
+    the unified interface z_verify_unified below.
     """
     try:
         return z_marker(z_decode(z)) == marker
     except Exception:
         return False
+
+
+def z_verify_unified(z, reference, mode='exact', tol_s=5e-5, cos_min=0.9999):
+    """Unified verification interface (Hermann directive, 24.08).
+
+    mode='exact'    : reference = 16-hex marker string; exact round(W,3)
+                      hash semantics (point identity, anti-spoofing).
+    mode='tolerant' : reference = passport/certificate dict with per-tensor
+                      singular values ('spectra_full' preferred, falls back
+                      to 'spectra' top-8). Tolerance semantics per
+                      exp_TELEPORT / F202: spectrum identity within
+                      tolerance instead of bit-hash. Known blind spot:
+                      shuffle-of-S breaks function while S matches
+                      (F31/F41) — tolerant certifies the SPECTRUM; use
+                      exact for anti-spoofing.
+    """
+    if mode == 'exact':
+        return z_verify(z, reference)
+    if mode != 'tolerant':
+        raise ValueError(f'unknown mode {mode!r}')
+    try:
+        dec = z_decode(z)
+    except Exception:
+        return False
+    zref = z_encode(dec, 10 ** 9)
+    for name, item in z['data'].items():
+        if 'S' not in item:
+            continue
+        ref_list = None
+        if isinstance(reference, dict):
+            full = reference.get('spectra_full', {}) or {}
+            sp = full.get(name)
+            if sp is None:
+                sp = (reference.get('spectra', {}) or {}).get(name)
+            ref_list = sp
+        if ref_list is None:
+            ref_list = list(item['S'])
+        s_new = item['S']
+        n = min(len(ref_list), len(s_new))
+        if n == 0:
+            continue
+        r1 = np.asarray(ref_list[:n], dtype=np.float64)
+        r2 = np.asarray(s_new[:n], dtype=np.float64)
+        denom = max(float(np.linalg.norm(r1)), 1e-30)
+        rel = float(np.linalg.norm(r1 - r2)) / denom
+        cos = float(r1 @ r2 / ((np.linalg.norm(r1) * np.linalg.norm(r2)) + 1e-30))
+        if rel > tol_s * max(1.0, float(np.mean(np.abs(r1)))) * len(r1) \
+                or cos < cos_min:
+            return False
+    return True
 
 
 def z_rank(z):
