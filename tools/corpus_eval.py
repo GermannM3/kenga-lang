@@ -71,7 +71,17 @@ def main():
 
     stats = collections.defaultdict(lambda: [0, 0, 0, 0])  # compile,run,match,passk
     n = 0
+    import os as _os
+    _prog_path = args.test + '.progress'
+    _done = set()
+    if _os.path.exists(_prog_path):
+        for l in open(_prog_path, encoding='utf-8'):
+            if l.startswith('DONE '):
+                _done.add(l.split()[1])
+    _prog = open(_prog_path, 'a', encoding='utf-8')
     for r in recs:
+        if r['id'] in _done:
+            continue
         prompt = first_fn_block(r['src'])
         # greedy
         _, gsrc = kenchat.gen_tokens(prompt, weights, max_tokens=args.max_tokens,
