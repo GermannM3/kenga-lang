@@ -15,3 +15,6 @@
 Не продаём: работающий Genesis (realgen T1 утром 25.08 = 0%), Grok, каузальный слайд без двух сидов.
 
 https://github.com/GermannM3/kenga-lang
+
+Грамматика (Linguist / TextMate): https://github.com/GermannM3/kenga-grammar
+Пересобрать колоды: `python sell/_build_pptx.py`

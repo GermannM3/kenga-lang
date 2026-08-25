@@ -21,3 +21,6 @@ docs/SPEC.md, docs/TOUR.md, docs/INDEPENDENCE.md, docs/FOR_FRIENDS.md, docs/REPL
 ## Честно
 
 Self-host без C host не закрыт. src/ Rust — legacy. Не LLVM, не CUDA.
+
+Грамматика для GitHub Linguist: https://github.com/GermannM3/kenga-grammar
+PR в Linguist не открываем, пока мало чужих `.kenga`.

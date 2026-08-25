@@ -254,6 +254,42 @@
       }
     },
     {
+      "type": "github",
+      "ru": {
+        "kicker": "GitHub",
+        "title": "Грамматика залита. Linguist — нет",
+        "lines": [
+          "Подсветка в редакторе: Marketplace, VSIX 3.13.0. Это не github.com.",
+          "TextMate-грамматика: github.com/GermannM3/kenga-grammar (MIT, source.kenga).",
+          "Полоска языка на GitHub появится после PR в github-linguist. Порог: ≥2000 публичных .kenga за год, не с одного аккаунта.",
+          "Пока файлов мало — PR не открываем. Грамматику для него уже можно указать."
+        ],
+        "note": "Не обещай, что github.com завтра подсветит .kenga. Если спросят «когда», ответ: когда появятся чужие репозитории с кодом, не когда мы ещё раз запушим грамматику."
+      },
+      "en": {
+        "kicker": "GitHub",
+        "title": "The grammar is up. Linguist is not",
+        "lines": [
+          "Editor highlighting is the Marketplace VSIX 3.13.0. That is not github.com.",
+          "TextMate grammar: github.com/GermannM3/kenga-grammar (MIT, source.kenga).",
+          "The GitHub language bar needs a github-linguist PR. Threshold: at least 2000 public .kenga files in a year, not one account.",
+          "We do not open that PR yet. The grammar URL is ready when usage exists."
+        ],
+        "note": "Do not promise github.com highlighting tomorrow. If they ask when: when other people publish .kenga, not when we push the grammar again."
+      },
+      "zh": {
+        "kicker": "GitHub",
+        "title": "语法仓库已上。Linguist 还没有",
+        "lines": [
+          "编辑器高亮是 Marketplace VSIX 3.13.0。那不是 github.com。",
+          "TextMate 语法：github.com/GermannM3/kenga-grammar（MIT，source.kenga）。",
+          "GitHub 语言条要等 github-linguist 的 PR。门槛：一年内 ≥2000 个公开 .kenga，不能全是同一个账号。",
+          "现在先不提这个 PR。语法的 URL 已经给得出。"
+        ],
+        "note": "别保证明天 github.com 就会高亮 .kenga。问「什么时候」：等别人公开写 Kenga，不是再推一次语法。"
+      }
+    },
+    {
       "type": "repro",
       "ru": {
         "kicker": "Воспроизведение",

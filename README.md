@@ -36,7 +36,7 @@ fn main() -> i64 {
 
 Справочник: [docs/LANGUAGE.md](docs/LANGUAGE.md) · спека: [docs/SPEC.md](docs/SPEC.md) · self-host: [docs/SELFHOST.md](docs/SELFHOST.md). Подсветка `.kenga` — [Marketplace](https://marketplace.visualstudio.com/items?itemName=Kenga-ai.kenga) (3.13.0). Unix: [docs/UNIX.md](docs/UNIX.md).
 
-GitHub Linguist ещё не знает `.kenga` (порог: тысячи публичных файлов у разных авторов). Грамматика и черновик PR: `editors/linguist/`. Пока полоска репо не пишет «Kenga» — это их правило, не дыра в языке.
+GitHub Linguist ещё не знает `.kenga` (порог: тысячи публичных файлов у разных авторов). TextMate-грамматика уже отдельно: [kenga-grammar](https://github.com/GermannM3/kenga-grammar). Черновик PR: `editors/linguist/`. Полоска «Kenga» на github.com появится после их релиза, не после нашего пуша.
 
 ---
 
