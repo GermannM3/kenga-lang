@@ -34,45 +34,100 @@ static size_t emit_sum(const char *s, size_t i, size_t n, I64A *code, StrA *vnam
   }
   return i;
 }
+static size_t emit_shift(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+                        StrA *fnames, I64A *faddrs, I64A *fargc) {
+  i = emit_sum(s, i, n, code, vnames, fnames, faddrs, fargc);
+  for (;;) {
+    i = skip(s, i, n);
+    if (i >= n) break;
+    if (starts_with(s, i, n, "<<")) {
+      i = emit_sum(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_SHL);
+    } else if (starts_with(s, i, n, ">>")) {
+      i = emit_sum(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_SHR);
+    } else break;
+  }
+  return i;
+}
 static size_t emit_rel(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
                       StrA *fnames, I64A *faddrs, I64A *fargc) {
-  i = emit_sum(s, i, n, code, vnames, fnames, faddrs, fargc);
+  i = emit_shift(s, i, n, code, vnames, fnames, faddrs, fargc);
   i = skip(s, i, n);
   if (i >= n) return i;
   if (starts_with(s, i, n, "<=")) {
-    i = emit_sum(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+    i = emit_shift(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
     i64a_push(code, OP_LE); return i;
   }
   if (starts_with(s, i, n, ">=")) {
-    i = emit_sum(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+    i = emit_shift(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
     i64a_push(code, OP_GE); return i;
   }
   if (starts_with(s, i, n, "==")) {
-    i = emit_sum(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+    i = emit_shift(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
     i64a_push(code, OP_EQ); return i;
   }
   if (starts_with(s, i, n, "!=")) {
-    i = emit_sum(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+    i = emit_shift(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
     i64a_push(code, OP_NE); return i;
   }
   if (s[i] == '<') {
-    i = emit_sum(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+    i = emit_shift(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
     i64a_push(code, OP_LT); return i;
   }
   if (s[i] == '>') {
-    i = emit_sum(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+    i = emit_shift(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
     i64a_push(code, OP_GT); return i;
+  }
+  return i;
+}
+static size_t emit_bitand(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+                         StrA *fnames, I64A *faddrs, I64A *fargc) {
+  i = emit_rel(s, i, n, code, vnames, fnames, faddrs, fargc);
+  for (;;) {
+    i = skip(s, i, n);
+    if (i >= n) break;
+    if (s[i] == '&' && (i + 1 >= n || s[i + 1] != '&')) {
+      i = emit_rel(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_BAND);
+    } else break;
+  }
+  return i;
+}
+static size_t emit_bitxor(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+                         StrA *fnames, I64A *faddrs, I64A *fargc) {
+  i = emit_bitand(s, i, n, code, vnames, fnames, faddrs, fargc);
+  for (;;) {
+    i = skip(s, i, n);
+    if (i >= n) break;
+    if (s[i] == '^') {
+      i = emit_bitand(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_BXOR);
+    } else break;
+  }
+  return i;
+}
+static size_t emit_bitor(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
+                        StrA *fnames, I64A *faddrs, I64A *fargc) {
+  i = emit_bitxor(s, i, n, code, vnames, fnames, faddrs, fargc);
+  for (;;) {
+    i = skip(s, i, n);
+    if (i >= n) break;
+    if (s[i] == '|' && (i + 1 >= n || s[i + 1] != '|')) {
+      i = emit_bitxor(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+      i64a_push(code, OP_BOR);
+    } else break;
   }
   return i;
 }
 static size_t emit_and(const char *s, size_t i, size_t n, I64A *code, StrA *vnames,
                       StrA *fnames, I64A *faddrs, I64A *fargc) {
-  i = emit_rel(s, i, n, code, vnames, fnames, faddrs, fargc);
+  i = emit_bitor(s, i, n, code, vnames, fnames, faddrs, fargc);
   for (;;) {
     i = skip(s, i, n);
     if (i >= n) break;
     if (starts_with(s, i, n, "&&")) {
-      i = emit_rel(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
+      i = emit_bitor(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
       i64a_push(code, OP_AND);
     } else break;
   }

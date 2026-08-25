@@ -1,0 +1,14 @@
+// Lite dialect struct + field write. MIT.
+
+struct Point { x, y }
+
+fn dist2(p: Point) -> i64 {
+  return p.x * p.x + p.y * p.y;
+}
+
+fn main() -> i64 {
+  let p = Point { x: 3, y: 4 };
+  p.x = 6;
+  println(dist2(p));
+  return 0;
+}

@@ -21,7 +21,8 @@ static const double g_f64s[] = { 1.5, 2.25, 2.0 };
 
 #include "bc_rt.inc.c"
 
-int main(void) {
+int main(int argc, char **argv) {
+  g_kargc = argc; g_kargv = argv;
   static const int64_t code[] = { 11, 2, 33, 0, 3, 0, 33, 1, 3, 1, 2, 0, 2, 1, 4, 3, 2, 2, 2, 17, 2, 2, 33, 2, 6, 19, 3, 3, 2, 3, 17, 2, 3, 1, 8, 25, 12, 43, 1, 1, 16, 11, 43, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;

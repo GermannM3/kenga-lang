@@ -8,7 +8,9 @@
 #include <sys/time.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95, OP_ARGC = 106, OP_ARG = 107, OP_FILE_EXISTS = 108, OP_READ_LINE = 109, OP_BAND = 110, OP_BOR = 111, OP_BXOR = 112, OP_BNOT = 113, OP_SHL = 114, OP_SHR = 115 };
+static int g_kargc = 0;
+static char **g_kargv = NULL;
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
@@ -483,6 +485,12 @@ if (gGCp) { gGCp = 0; gc_sweep(stack, sp, slots, 4096); }
     else if (op == OP_AND) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi((as_i(a)!=0 && as_i(b)!=0)?1:0); }
     else if (op == OP_OR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi((as_i(a)!=0 || as_i(b)!=0)?1:0); }
     else if (op == OP_NOT) { V a=stack[--sp]; stack[sp++]=Vi(as_i(a)==0?1:0); }
+    else if (op == OP_BAND) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) & as_i(b)); }
+    else if (op == OP_BOR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) | as_i(b)); }
+    else if (op == OP_BXOR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) ^ as_i(b)); }
+    else if (op == OP_BNOT) { V a=stack[--sp]; stack[sp++]=Vi(~as_i(a)); }
+    else if (op == OP_SHL) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) << as_i(b)); }
+    else if (op == OP_SHR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) >> as_i(b)); }
     else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }
     else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }
     else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }
@@ -792,6 +800,25 @@ if (gGCp) { gGCp = 0; gc_sweep(stack, sp, slots, 4096); }
         for (i = 0; i < t->n; i++) { double tmpv; if (fscanf(f, "%lf", &tmpv) != 1) { fclose(f); fprintf(stderr, "load_tensor: bad data\n"); exit(1); } t->data[i] = (KREAL)tmpv; }
         fclose(f);
         stack[sp++] = Vt(h); }
+    }
+    else if (op == OP_ARGC) {
+      stack[sp++] = Vi((int64_t)g_kargc);
+    }
+    else if (op == OP_ARG) {
+      int64_t idx = as_i(stack[--sp]);
+      if (idx >= 0 && idx < g_kargc && g_kargv && g_kargv[idx]) { stack[sp++] = Vs(s_new(g_kargv[idx])); }
+      else { stack[sp++] = Vs(s_new("")); }
+    }
+    else if (op == OP_FILE_EXISTS) {
+      V pathv = stack[--sp];
+      if (pathv.tag != 3) { fprintf(stderr, "file_exists: path must be str\n"); exit(1); }
+      { FILE *f = fopen(as_str(pathv), "rb"); stack[sp++] = Vi(f ? 1 : 0); if (f) fclose(f); }
+    }
+    else if (op == OP_READ_LINE) {
+      static char buf[65536];
+      char *r = fgets(buf, sizeof(buf), stdin);
+      if (r) { size_t n = strlen(buf); while (n > 0 && (buf[n-1] == 10 || buf[n-1] == 13)) { buf[--n] = 0; } stack[sp++] = Vs(s_new(buf)); }
+      else { stack[sp++] = Vs(s_new("")); }
     }
     else if (op == OP_MEM_CONFIG) {
       int64_t hidden = as_i(stack[--sp]); int64_t ep_cap = as_i(stack[--sp]); double thr = as_f(stack[--sp]);

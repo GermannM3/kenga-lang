@@ -1,0 +1,22 @@
+// Lite smoke for `.` (field) and `..` (range). kenga-lite already lexes both.
+// Bitwise `& | ^ ~ << >>` live in examples/bitops.kenga (Rust VM / emit-c);
+// kenga-lite C VM does not cover them yet (docs/ROADMAP.md).
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\ranges_lite.kenga
+
+struct Point { x, y }
+
+fn main() -> i64 {
+    let acc: i64 = 0;
+    for i in 0..4 {
+        acc = acc + i;
+    }
+    assert(acc == 6);
+
+    let p = Point { x: 3, y: 4 };
+    assert(p.x == 3);
+    assert(p.x * p.x + p.y * p.y == 25);
+
+    println(acc);
+    println("ranges lite ok");
+    return 0;
+}

@@ -46,7 +46,7 @@ fn main() -> i64 {
 }
 ```
 
-Шпаргалка: `examples/selfhost/bitops.kenga`. Прогон через **Rust VM или emit-c → gcc** — kenga-lite C VM пока не покрывает.
+Шпаргалка: `examples/selfhost/bitops.kenga`. lite / more / lower_c / bc_src_c.
 
 ## E1. Арифметика
 

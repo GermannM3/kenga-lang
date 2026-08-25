@@ -39,6 +39,10 @@
     "numbers": {
       "patterns": [
         {
+          "name": "constant.numeric.hex.kenga",
+          "match": "\\b0[xX][0-9A-Fa-f]+\\b"
+        },
+        {
           "name": "constant.numeric.float.kenga",
           "match": "\\b\\d+\\.\\d+\\b"
         },
@@ -56,7 +60,7 @@
         },
         {
           "name": "keyword.operator.kenga",
-          "match": "(\\->|==|!=|<=|>=|&&|\\|\\||[+\-*/%<>=!])"
+          "match": "(\\->|<<|>>|==|!=|<=|>=|&&|\\|\\||\\.\\.|[&|^~+\\-*/%<>=!])"
         }
       ]
     },

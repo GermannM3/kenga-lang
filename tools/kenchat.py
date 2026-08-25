@@ -19,6 +19,9 @@ at 0, matching training windows.
 import argparse, os, sys, subprocess, tempfile, re, pickle
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kenga_lex import tokenize_src
+
 VOCAB_TOKENS = [
     'fn', 'return', 'let', 'if', 'else', 'while', 'for', 'i64',
     ':', ',', ';', '{', '}', '(', ')', '->',
@@ -81,66 +84,16 @@ def load_codec_vocab(path='minds/kenga_bpe.pkl'):
 
 def tokenize(src, codec=None, keep_comments=False):
     KEYWORDS = {'fn','return','let','if','else','while','for','i64','println'}
-    TWO_CHAR = {'->','==','<=','>=','!=','&&','||','<<','>>','&','|','^','~'}
     if codec:
-        VOCAB_MAP = codec['token_to_id']
-    else:
-        VOCAB_MAP = {t: i for i, t in enumerate(VOCAB_TOKENS)}
-    out = []
-    i = 0
-    n = len(src)
-    while i < n:
-        c = src[i]
-        if c in ' \t\n\r': i += 1; continue
-        if c == '/' and i+1 < n and src[i+1] == '/':
-            if not keep_comments:
-                while i < n and src[i] != '\n': i += 1
-                continue
-            # NL mode: keep comment text as word tokens (the comment IS the spec)
-            i += 2
-            j = i
-            while j < n and src[j] != '\n':
-                if src[j].isalnum() or src[j] == '_':
-                    e = j
-                    while e < n and (src[e].isalnum() or src[e] == '_'):
-                        e += 1
-                    w = src[j:e]
-                    if codec:
-                        out.extend(codec['encode_word'](w))
-                    else:
-                        out.append(VOCAB_MAP[w] if w in KEYWORDS else VOCAB_MAP['ID'])
-                    j = e
-                else:
-                    j += 1
-            i = j
-            continue
-        two = src[i:i+2]
-        if two in TWO_CHAR:
-            out.append(VOCAB_MAP.get(two, VOCAB_MAP['ID'])); i += 2; continue
-        if c in (':', ',', ';', '{', '}', '(', ')', '+', '-', '*', '/', '=', '<', '>'):
-            if c == '-' and i+1 < n and src[i+1] == '>':
-                out.append(VOCAB_MAP['->']); i += 2; continue
-            out.append(VOCAB_MAP[c]); i += 1; continue
-        if c.isdigit():
-            j = i
-            while j < n and src[j].isdigit(): j += 1
-            if 'NUM' in VOCAB_MAP:
-                out.append(VOCAB_MAP['NUM']); i = j; continue
-            for d in src[i:j]:
-                out.append(VOCAB_MAP.get(d, VOCAB_MAP['ID']))
-            i = j; continue
-        if c.isalpha() or c == '_':
-            j = i
-            while j < n and (src[j].isalnum() or src[j] == '_'):
-                j += 1
-            word = src[i:j]
-            if codec:
-                out.extend(codec['encode_word'](word))
-            else:
-                out.append(VOCAB_MAP[word] if word in KEYWORDS else VOCAB_MAP['ID'])
-            i = j; continue
-        i += 1
-    return out
+        return tokenize_src(
+            src, codec['token_to_id'],
+            encode_word=codec['encode_word'],
+            keep_comments=keep_comments,
+        )
+    VOCAB_MAP = {t: i for i, t in enumerate(VOCAB_TOKENS)}
+    return tokenize_src(
+        src, VOCAB_MAP, keep_comments=keep_comments, keywords=KEYWORDS,
+    )
 
 
 def detokenize(toks, codec=None):

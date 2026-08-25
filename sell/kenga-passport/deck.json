@@ -1,0 +1,341 @@
+{
+  "product": "kenga-passport",
+  "slides": [
+    {
+      "type": "cover",
+      "ru": {
+        "kicker": "ПАСПОРТ",
+        "title": "Z-паспорт весов Kenga",
+        "lines": [
+          "Не модель. Слой идентичности содержимого.",
+          "M6: marker 6108e4d16400d5e1, 52 тензора, sha256 зафиксирован.",
+          "k=32 — топ сингулярных для формулы L, не длина контекста."
+        ],
+        "note": "Контекст M6 K=512. Не путать с k=32 в паспорте."
+      },
+      "en": {
+        "kicker": "PASSPORT",
+        "title": "Kenga weight passport",
+        "lines": [
+          "Not a model. A content-identity layer.",
+          "M6: marker 6108e4d16400d5e1, 52 tensors, sha256 pinned.",
+          "k=32 is top singular values for L, not context length."
+        ],
+        "note": "M6 context is K=512. Do not mix with passport k=32."
+      },
+      "zh": {
+        "kicker": "护照",
+        "title": "Kenga 权重护照",
+        "lines": [
+          "不是模型。是内容身份层。",
+          "M6：marker 6108e4d16400d5e1，52 个张量，sha256 钉死。",
+          "k=32 是公式 L 的奇异值个数，不是上下文长度。"
+        ],
+        "note": "M6 上下文 K=512。别和护照里的 k=32 混。"
+      }
+    },
+    {
+      "type": "buyer",
+      "ru": {
+        "kicker": "КОМУ",
+        "title": "Кому нести",
+        "lines": [
+          "Supply-chain, security, eval.",
+          "Люди, которым чекпоинт без акта — это просто файл.",
+          "Не чат-бот отдел."
+        ],
+        "note": "Первым письмом — security/eval."
+      },
+      "en": {
+        "kicker": "WHO",
+        "title": "Who this is for",
+        "lines": [
+          "Supply-chain, security, eval.",
+          "People for whom a checkpoint without an act is just a file.",
+          "Not the chatbot org."
+        ],
+        "note": "Email security/eval first."
+      },
+      "zh": {
+        "kicker": "对象",
+        "title": "该找谁",
+        "lines": [
+          "供应链、安全、评测。",
+          "觉得没有文书的检查点只是文件的人。",
+          "不是聊天组。"
+        ],
+        "note": "先写给安全和评测。"
+      }
+    },
+    {
+      "type": "pain",
+      "ru": {
+        "kicker": "БОЛЬ",
+        "title": "Почему имя файла врёт",
+        "lines": [
+          "Веса кочуют, имя остаётся старым.",
+          "Хеш файла не говорит, тот ли спектр тензоров.",
+          "После дообучения «это та же модель?» — спор без метрики."
+        ],
+        "note": "Юристы это понимают быстрее ML."
+      },
+      "en": {
+        "kicker": "PAIN",
+        "title": "Why filenames lie",
+        "lines": [
+          "Weights move. The name stays.",
+          "A file hash does not tell you the tensor spectrum matches.",
+          "After finetune, is it the same model? Argument without a metric."
+        ],
+        "note": "Legal gets this faster than ML."
+      },
+      "zh": {
+        "kicker": "痛点",
+        "title": "为什么文件名会撒谎",
+        "lines": [
+          "权重在搬，名字还是旧的。",
+          "文件哈希说明不了张量谱是不是同一个。",
+          "微调之后还是不是同一模型？没有度量只能吵。"
+        ],
+        "note": "法务比 ML 更快听懂。"
+      }
+    },
+    {
+      "type": "ship",
+      "ru": {
+        "kicker": "ЧТО",
+        "title": "Что выдаём",
+        "lines": [
+          "zcert.py issue/verify.",
+          "Канон: zmind.py / zcore.py.",
+          "На M6 паспорт уже висит: minds/mid_prophet_m6_w.txt.passport.json."
+        ],
+        "note": "Показать json на проекторе."
+      },
+      "en": {
+        "kicker": "SHIP",
+        "title": "What we issue",
+        "lines": [
+          "zcert.py issue/verify.",
+          "Canon: zmind.py / zcore.py.",
+          "M6 already has a passport: minds/mid_prophet_m6_w.txt.passport.json."
+        ],
+        "note": "Put the json on the projector."
+      },
+      "zh": {
+        "kicker": "交付",
+        "title": "发什么",
+        "lines": [
+          "zcert.py issue/verify。",
+          "正文：zmind.py / zcore.py。",
+          "M6 已有护照：...passport.json。"
+        ],
+        "note": "把 json 投到墙上。"
+      }
+    },
+    {
+      "type": "proof",
+      "ru": {
+        "kicker": "ФАКТ",
+        "title": "M6 как есть",
+        "lines": [
+          "887 168 параметров, V=128, K=512, D=128, L=6.",
+          "2 680 618 токенов, split_v3, git 7adb20d.",
+          "sha256 e433bdeb… marker 6108e4d16400d5e1, создан 24.08.2026 22:57.",
+          "Утренний M6_REPORT: Genesis по realgen T1 закрыт. Паспорт про файл, не про умение писать код."
+        ],
+        "note": "Не открывать гейты голосом."
+      },
+      "en": {
+        "kicker": "FACTS",
+        "title": "M6 as shipped",
+        "lines": [
+          "887,168 params, V=128, K=512, D=128, L=6.",
+          "2,680,618 tokens, split_v3, git 7adb20d.",
+          "sha256 e433bdeb… marker 6108e4d16400d5e1, issued 2026-08-24 22:57.",
+          "Morning M6_REPORT: Genesis closed on realgen T1. The passport is about the file, not coding skill."
+        ],
+        "note": "Do not open gates with your voice."
+      },
+      "zh": {
+        "kicker": "事实",
+        "title": "M6 现状",
+        "lines": [
+          "887168 参数，V=128，K=512，D=128，L=6。",
+          "2680618 token，split_v3，git 7adb20d。",
+          "sha256 e433bdeb… marker 6108e4d16400d5e1，2026-08-24 22:57 签发。",
+          "上午 M6_REPORT：Genesis 因 realgen T1 关闭。护照管文件，不管会不会写代码。"
+        ],
+        "note": "别用嘴宣布门开了。"
+      }
+    },
+    {
+      "type": "fit",
+      "ru": {
+        "kicker": "КУДА",
+        "title": "Куда встаёт",
+        "lines": [
+          "Рядом с артефактом поставки: веса + паспорт.",
+          "verify в CI: exit 0 или 1.",
+          "Формула L — zlineage.py и GENESIS_V0.md, блок D8."
+        ],
+        "note": "CI проще объяснить, чем математику."
+      },
+      "en": {
+        "kicker": "FIT",
+        "title": "Where it sits",
+        "lines": [
+          "Next to the delivery artifact: weights plus passport.",
+          "verify in CI: exit 0 or 1.",
+          "L lives in zlineage.py and GENESIS_V0.md, D8."
+        ],
+        "note": "CI is easier to explain than the math."
+      },
+      "zh": {
+        "kicker": "位置",
+        "title": "放哪",
+        "lines": [
+          "交付物旁边：权重加护照。",
+          "CI 里 verify：退出码 0 或 1。",
+          "L 在 zlineage.py 和 GENESIS_V0.md 的 D8。"
+        ],
+        "note": "用 CI 解释，别先讲公式。"
+      }
+    },
+    {
+      "type": "honest",
+      "ru": {
+        "kicker": "НЕТ",
+        "title": "Чего паспорт не делает",
+        "lines": [
+          "Не лечит realgen 0%.",
+          "Не доказывает «траектория, не данные» — двухсидовый контроль не сделан.",
+          "Не замена подписи модели у вас внутри, если свой PKI уже есть — стык, не религия."
+        ],
+        "note": "Стык с их PKI — тема второго созвона."
+      },
+      "en": {
+        "kicker": "LIMITS",
+        "title": "What a passport does not do",
+        "lines": [
+          "It does not fix realgen 0%.",
+          "It does not prove trajectory-over-data — two-seed control is not done.",
+          "If you already have model signing PKI, this is a join, not a religion."
+        ],
+        "note": "PKI join is the second call."
+      },
+      "zh": {
+        "kicker": "不是",
+        "title": "护照不做什么",
+        "lines": [
+          "不治 realgen 0%。",
+          "不能证明「轨迹不是数据」——双种子对照没做。",
+          "如果你们已有模型签名 PKI，这是对接，不是改教。"
+        ],
+        "note": "PKI 对接放第二次电话。"
+      }
+    },
+    {
+      "type": "repro",
+      "ru": {
+        "kicker": "КОМАНДЫ",
+        "title": "Воспроизведение",
+        "lines": [
+          "python tools\\\\zcert.py verify minds\\\\mid_prophet_m6_w.txt --cert minds\\\\mid_prophet_m6_w.txt.passport.json",
+          "tools/zcert.py, tools/zmind.py, tools/zcore.py",
+          "docs/GENESIS_V0.md — формула L",
+          "Не трогать веса во время чужого train/eval"
+        ],
+        "note": "В зале: verify, смотрим exit code."
+      },
+      "en": {
+        "kicker": "COMMANDS",
+        "title": "Reproduce",
+        "lines": [
+          "python tools\\\\zcert.py verify minds\\\\mid_prophet_m6_w.txt --cert minds\\\\mid_prophet_m6_w.txt.passport.json",
+          "tools/zcert.py, tools/zmind.py, tools/zcore.py",
+          "docs/GENESIS_V0.md — formula L",
+          "Do not touch weights during someone else train/eval"
+        ],
+        "note": "In the room: verify, watch the exit code."
+      },
+      "zh": {
+        "kicker": "命令",
+        "title": "复现",
+        "lines": [
+          "python tools\\\\zcert.py verify ...passport.json",
+          "zcert.py / zmind.py / zcore.py",
+          "GENESIS_V0.md — 公式 L",
+          "别人在 train/eval 时别动权重"
+        ],
+        "note": "会上跑 verify，看退出码。"
+      }
+    },
+    {
+      "type": "offer",
+      "ru": {
+        "kicker": "СДЕЛКА",
+        "title": "Форматы",
+        "lines": [
+          "Лицензия слоя паспорта + встройка в их CI.",
+          "Пилот: один их чекпоинт прогоняем issue/verify.",
+          "Совместно с эксперт-LM, не вместо него."
+        ],
+        "note": "Первый пилот — на их файле, не на нашем M6."
+      },
+      "en": {
+        "kicker": "DEAL",
+        "title": "Shapes",
+        "lines": [
+          "License the passport layer and wire it into their CI.",
+          "Pilot: issue/verify on one of their checkpoints.",
+          "Together with Expert LM, not instead of it."
+        ],
+        "note": "First pilot is their file, not our M6."
+      },
+      "zh": {
+        "kicker": "交易",
+        "title": "做法",
+        "lines": [
+          "授权护照层并接到他们的 CI。",
+          "试点：对他们的一个检查点做 issue/verify。",
+          "和专家模型一起卖，不是替代。"
+        ],
+        "note": "第一次试点用他们的文件，不是我们的 M6。"
+      }
+    },
+    {
+      "type": "close",
+      "ru": {
+        "kicker": "ДАЛЬШЕ",
+        "title": "Просьба",
+        "lines": [
+          "30 минут с supply-chain или eval.",
+          "На встрече: verify M6, читаем marker вслух.",
+          "Гейты Genesis голосом не открываем."
+        ],
+        "note": "Имя владельца чекпоинтов."
+      },
+      "en": {
+        "kicker": "NEXT",
+        "title": "Ask",
+        "lines": [
+          "30 minutes with supply-chain or eval.",
+          "In the room: verify M6, read the marker out loud.",
+          "We do not open Genesis gates with a sentence."
+        ],
+        "note": "Name of whoever owns checkpoints."
+      },
+      "zh": {
+        "kicker": "下一步",
+        "title": "请求",
+        "lines": [
+          "和供应链或评测谈 30 分钟。",
+          "会上 verify M6，把 marker 读出来。",
+          "不用一句话宣布 Genesis 开门。"
+        ],
+        "note": "要到检查点负责人。"
+      }
+    }
+  ]
+}

@@ -22,6 +22,29 @@ static ParsedNum parse_number(const char *s, size_t *i, size_t n) {
   *i = skip(s, *i, n);
   if (*i >= n || !isdigit((unsigned char)s[*i])) die("expected number");
   int64_t v = 0;
+  if (s[*i] == '0' && *i + 1 < n) {
+    char p = s[*i + 1];
+    if (p == 'x' || p == 'X') {
+      *i += 2; if (*i >= n) die("expected hex digit");
+      int any = 0;
+      while (*i < n) {
+        unsigned char c = (unsigned char)s[*i]; int d = -1;
+        if (c >= '0' && c <= '9') d = c - '0';
+        else if (c >= 'a' && c <= 'f') d = c - 'a' + 10;
+        else if (c >= 'A' && c <= 'F') d = c - 'A' + 10;
+        if (d < 0) break; v = v * 16 + d; (*i)++; any = 1;
+      }
+      if (!any) die("expected hex digit"); r.i = v; return r;
+    }
+    if (p == 'b' || p == 'B') {
+      *i += 2; if (*i >= n) die("expected binary digit");
+      int any = 0;
+      while (*i < n && (s[*i] == '0' || s[*i] == '1')) {
+        v = v * 2 + (s[*i] - '0'); (*i)++; any = 1;
+      }
+      if (!any) die("expected binary digit"); r.i = v; return r;
+    }
+  }
   while (*i < n && isdigit((unsigned char)s[*i])) {
     v = v * 10 + (s[*i] - '0');
     (*i)++;

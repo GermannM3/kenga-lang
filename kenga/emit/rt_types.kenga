@@ -58,7 +58,13 @@ fn main() -> i64 {
     s = s + "  OP_ARGC,\n";
     s = s + "  OP_ARG,\n";
     s = s + "  OP_FILE_EXISTS,\n";
-    s = s + "  OP_READ_LINE\n";
+    s = s + "  OP_READ_LINE,\n";
+    s = s + "  OP_BAND,\n";
+    s = s + "  OP_BOR,\n";
+    s = s + "  OP_BXOR,\n";
+    s = s + "  OP_BNOT,\n";
+    s = s + "  OP_SHL,\n";
+    s = s + "  OP_SHR\n";
     s = s + "};\n";
     s = s + "static int g_kargc = 0;\n";
     s = s + "static char **g_kargv = NULL;\n";

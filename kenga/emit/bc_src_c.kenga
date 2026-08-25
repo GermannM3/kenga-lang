@@ -101,6 +101,12 @@ fn OP_ARGC() -> i64 { return 106; }
 fn OP_ARG() -> i64 { return 107; }
 fn OP_FILE_EXISTS() -> i64 { return 108; }
 fn OP_READ_LINE() -> i64 { return 109; }
+fn OP_BAND() -> i64 { return 110; }
+fn OP_BOR() -> i64 { return 111; }
+fn OP_BXOR() -> i64 { return 112; }
+fn OP_BNOT() -> i64 { return 113; }
+fn OP_SHL() -> i64 { return 114; }
+fn OP_SHR() -> i64 { return 115; }
 fn dirname_of(path: str) -> str {
     let i: i64 = len(path) - 1;
     while i >= 0 {
@@ -215,11 +221,26 @@ fn is_space(ch: str) -> i64 {
     if ch == " " { return 1; }
     if ch == "\t" { return 1; }
     if ch == "\n" { return 1; }
+    if ord(ch) == 13 { return 1; }
     return 0;
 }
 fn is_digit(ch: str) -> i64 {
     let c: i64 = ord(ch);
     if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn is_hex_digit(ch: str) -> i64 {
+    if is_digit(ch) == 1 { return 1; }
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 102 { return 1; } }
+    if c >= 65 { if c <= 70 { return 1; } }
+    return 0;
+}
+fn hex_val(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return c - 48; } }
+    if c >= 97 { if c <= 102 { return c - 87; } }
+    if c >= 65 { if c <= 70 { return c - 55; } }
     return 0;
 }
 fn is_alpha(ch: str) -> i64 {
@@ -388,6 +409,52 @@ fn parse_number(s: str, i: i64) -> list {
     i = skip(s, i);
     let v: i64 = 0;
     let start: i64 = i;
+    if i < len(s) {
+        if s[i] == "0" {
+            if i + 1 < len(s) {
+                let p: str = s[i + 1];
+                let hex: i64 = 0;
+                if p == "x" { hex = 1; }
+                if p == "X" { hex = 1; }
+                if hex == 1 {
+                    i = i + 2;
+                    assert(i < len(s));
+                    assert(is_hex_digit(s[i]) == 1);
+                    while i < len(s) {
+                        if is_hex_digit(s[i]) == 0 { break; }
+                        v = v * 16 + hex_val(s[i]);
+                        i = i + 1;
+                    }
+                    return [0, v, i];
+                }
+                let bin: i64 = 0;
+                if p == "b" { bin = 1; }
+                if p == "B" { bin = 1; }
+                if bin == 1 {
+                    i = i + 2;
+                    assert(i < len(s));
+                    let okb: i64 = 0;
+                    if s[i] == "0" { okb = 1; }
+                    if s[i] == "1" { okb = 1; }
+                    assert(okb == 1);
+                    while i < len(s) {
+                        if s[i] == "0" {
+                            v = v * 2;
+                            i = i + 1;
+                            continue;
+                        }
+                        if s[i] == "1" {
+                            v = v * 2 + 1;
+                            i = i + 1;
+                            continue;
+                        }
+                        break;
+                    }
+                    return [0, v, i];
+                }
+            }
+        }
+    }
     while i < len(s) {
         if is_digit(s[i]) == 0 { break; }
         v = v * 10 + (ord(s[i]) - 48);
@@ -509,6 +576,11 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
         code = push(r[0], OP_NOT());
         return [code, r[1], r[2]];
     }
+    if s[i] == "~" {
+        let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+        code = push(r[0], OP_BNOT());
+        return [code, r[1], r[2]];
+    }
     if s[i] == "(" {
         let r = emit_cmp(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
         code = r[0]; i = r[1]; vnames = r[2];
@@ -547,6 +619,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
             if j < len(s) {
                 if s[j] == "(" {
                     j = j + 1;
+                    let i0: i64 = i;
                     if id[0] == "round" {
                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                         code = ar[0]; j = ar[1]; vnames = ar[2];
@@ -555,8 +628,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                         j = j + 1;
                         code = push(code, OP_ROUND());
                         i = j;
-                    } else {
-                        if id[0] == "sleep_ms" {
+                    } if id[0] == "sleep_ms" {
                             let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                             code = ar[0]; j = ar[1]; vnames = ar[2];
                             j = skip(s, j);
@@ -564,8 +636,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             j = j + 1;
                             code = push(code, OP_SLEEP_MS());
                             i = j;
-                        } else {
-                        if id[0] == "ord" {
+                        } if id[0] == "ord" {
                             let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                             code = ar[0]; j = ar[1]; vnames = ar[2];
                             j = skip(s, j);
@@ -573,8 +644,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             j = j + 1;
                             code = push(code, OP_ORD());
                             i = j;
-                        } else {
-                        if id[0] == "typeof" {
+                        } if id[0] == "typeof" {
                             let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                             code = ar[0]; j = ar[1]; vnames = ar[2];
                             j = skip(s, j);
@@ -582,8 +652,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             j = j + 1;
                             code = push(code, OP_TYPEOF());
                             i = j;
-                        } else {
-                        if id[0] == "to_str" {
+                        } if id[0] == "to_str" {
                             let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                             code = ar[0]; j = ar[1]; vnames = ar[2];
                             j = skip(s, j);
@@ -591,8 +660,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             j = j + 1;
                             code = push(code, OP_TO_STR());
                             i = j;
-                        } else {
-                        if id[0] == "len" {
+                        } if id[0] == "len" {
                             let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                             code = ar[0]; j = ar[1]; vnames = ar[2];
                             j = skip(s, j);
@@ -600,8 +668,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             j = j + 1;
                             code = push(code, OP_LEN());
                             i = j;
-                        } else {
-                            if id[0] == "read_file" {
+                        } if id[0] == "read_file" {
                                 let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                                 code = ar[0]; j = ar[1]; vnames = ar[2];
                                 j = skip(s, j);
@@ -609,8 +676,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 j = j + 1;
                                 code = push(code, OP_READ_FILE());
                                 i = j;
-                            } else {
-                            if id[0] == "write_file" {
+                            } if id[0] == "write_file" {
                                 let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                                 code = ar[0]; j = ar[1]; vnames = ar[2];
                                 j = skip(s, j);
@@ -623,8 +689,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 j = j + 1;
                                 code = push(code, OP_WRITE_FILE());
                                 i = j;
-                            } else {
-                            if id[0] == "push" {
+                            } if id[0] == "push" {
                                 let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                                 code = ar[0]; j = ar[1]; vnames = ar[2];
                                 j = skip(s, j);
@@ -637,8 +702,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 j = j + 1;
                                 code = push(code, OP_LIST_PUSH());
                                 i = j;
-                            } else {
-                                if id[0] == "emit" {
+                            } if id[0] == "emit" {
                                     let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                                     code = ar[0]; j = ar[1]; vnames = ar[2];
                                     j = skip(s, j);
@@ -651,8 +715,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                     j = j + 1;
                                     code = push(code, OP_EMIT());
                                     i = j;
-                                } else {
-                                    if id[0] == "pump" {
+                                } if id[0] == "pump" {
                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
                                         code = ar[0]; j = ar[1]; vnames = ar[2];
                                         j = skip(s, j);
@@ -660,285 +723,232 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                         j = j + 1;
                                         code = push(code, OP_PUMP());
                                         i = j;
-                                    } else {
-                                        if id[0] == "pending" {
+                                    } if id[0] == "pending" {
                                             j = skip(s, j);
                                             assert(s[j] == ")");
                                             j = j + 1;
                                             code = push(code, OP_PENDING());
                                             i = j;
-                                        } else {
-                                        if id[0] == "now_ms" {
+                                        } if id[0] == "now_ms" {
                                             j = skip(s, j);
                                             assert(s[j] == ")");
                                             j = j + 1;
                                             code = push(code, OP_NOW_MS());
                                             i = j;
-                                        } else {
-                                        if id[0] == "t_from" {
+                                        } if id[0] == "t_from" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_FROM());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_get" {
+                                        } if id[0] == "t_get" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_GET());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_matmul" {
+                                        } if id[0] == "t_matmul" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_MATMUL());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_shape" {
+                                        } if id[0] == "t_shape" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_T_SHAPE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "tensor" {
+                                        } if id[0] == "tensor" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_TENSOR());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_fill" {
+                                        } if id[0] == "t_fill" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_FILL());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_set" {
+                                        } if id[0] == "t_set" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
                                             code = push(ar[0], OP_T_SET());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_add" {
+                                        } if id[0] == "t_add" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_ADD());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_sub" {
+                                        } if id[0] == "t_sub" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_SUB());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_mul" {
+                                        } if id[0] == "t_mul" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_MUL());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_scale" {
+                                        } if id[0] == "t_scale" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_T_SCALE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_transpose" {
+                                        } if id[0] == "t_transpose" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_T_TRANSPOSE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "t_softmax" {
+                                        } if id[0] == "t_softmax" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_T_SOFTMAX());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "save_tensor" {
+                                        } if id[0] == "save_tensor" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_SAVE_TENSOR());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "load_tensor" {
+                                        } if id[0] == "load_tensor" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_LOAD_TENSOR());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "memory_config" {
+                                        } if id[0] == "memory_config" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
                                             code = push(ar[0], OP_MEM_CONFIG());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "learn" {
+                                        } if id[0] == "learn" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
                                             code = push(ar[0], OP_LEARN());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "predict" {
+                                        } if id[0] == "predict" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_PREDICT());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_clear" {
+                                        } if id[0] == "ag_clear" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 0);
                                             code = push(ar[0], OP_AG_CLEAR());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_param" {
+                                        } if id[0] == "ag_param" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_PARAM());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_const" {
+                                        } if id[0] == "ag_const" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_CONST());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_matmul" {
+                                        } if id[0] == "ag_matmul" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_MATMUL());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_mse" {
+                                        } if id[0] == "ag_mse" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_MSE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_backward" {
+                                        } if id[0] == "ag_backward" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_BACKWARD());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_step" {
+                                        } if id[0] == "ag_step" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_STEP());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "remember" {
+                                        } if id[0] == "remember" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
                                             code = push(ar[0], OP_REMEMBER());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "unroll" {
+                                        } if id[0] == "unroll" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
                                             code = push(ar[0], OP_UNROLL());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "save_mind" {
+                                        } if id[0] == "save_mind" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_SAVE_MIND());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "load_mind" {
+                                        } if id[0] == "load_mind" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_LOAD_MIND());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "remember_next" {
+                                        } if id[0] == "remember_next" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 4);
                                             code = push(ar[0], OP_REMEMBER_NEXT());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "surprise" {
+                                        } if id[0] == "surprise" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_SURPRISE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "consolidate" {
+                                        } if id[0] == "consolidate" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_CONSOLIDATE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "mem_stats" {
+                                        } if id[0] == "mem_stats" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_MEM_STATS());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "foresee" {
+                                        } if id[0] == "foresee" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_FORESEE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "foresee_n" {
+                                        } if id[0] == "foresee_n" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
                                             code = push(ar[0], OP_FORESEE_N());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_add" {
+                                        } if id[0] == "ag_add" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_ADD());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_sub" {
+                                        } if id[0] == "ag_sub" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_SUB());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_mul" {
+                                        } if id[0] == "ag_mul" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_MUL());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_scale" {
+                                        } if id[0] == "ag_scale" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_SCALE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_relu" {
+                                        } if id[0] == "ag_relu" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_RELU());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_neg" {
+                                        } if id[0] == "ag_neg" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_NEG());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_transpose" {
+                                        } if id[0] == "ag_transpose" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_TRANSPOSE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_reshape" {
+                                        } if id[0] == "ag_reshape" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
                                             code = push(ar[0], OP_AG_RESHAPE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_exp" {
+                                        } if id[0] == "ag_exp" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_EXP());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_log" {
+                                        } if id[0] == "ag_log" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_LOG());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_softmax" {
+                                        } if id[0] == "ag_softmax" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_SOFTMAX());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_sum" {
+                                        } if id[0] == "ag_sum" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_SUM());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_value" {
+                                        } if id[0] == "ag_value" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_VALUE());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "ag_grad" {
+                                        } if id[0] == "ag_grad" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_AG_GRAD());
                                             i = ar[1]; vnames = ar[2];
-                                        if id[0] == "argc" {
+                                        } if id[0] == "argc" {
                                             code = push(code, OP_ARGC());
                                             j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                             i = j;
-                                        } else {
-                                        if id[0] == "arg" {
+                                        } if id[0] == "arg" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_ARG());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "file_exists" {
+                                        } if id[0] == "file_exists" {
                                             let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
                                             code = push(ar[0], OP_FILE_EXISTS());
                                             i = ar[1]; vnames = ar[2];
-                                        } else {
-                                        if id[0] == "read_line" {
+                                        } if id[0] == "read_line" {
                                             code = push(code, OP_READ_LINE());
                                             j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                             i = j;
-                                        } else {
+                                        }
+                    if i == i0 {
                                 let argc: i64 = 0;
                                 j = skip(s, j);
                                 if s[j] != ")" {
@@ -959,67 +969,6 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 code = emit3(code, OP_CALL(), faddrs[fi], argc);
                                 i = j;
                                         }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                        }
-                                    }
-                                }
-                            }
-                            }
-                            }
-                        }
-                        }
-                        }
-                        }
-                        }
-                    }
                 } else {
                     if s[j] == "{" {
                         let tid: i64 = find_struct(strbox[2], id[0]);
@@ -1053,12 +1002,10 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                             code = emit2(code, OP_LOAD(), sl[0]);
                             i = id[1]; vnames = sl[1];
                         }
-                    } else {
-                        if id[0] == "true" {
+                    } else if id[0] == "true" {
                             code = emit2(code, OP_CONST(), 1);
                             i = id[1];
-                        } else {
-                            if id[0] == "false" {
+                        } else if id[0] == "false" {
                                 code = emit2(code, OP_CONST(), 0);
                                 i = id[1];
                             } else {
@@ -1066,15 +1013,11 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 code = emit2(code, OP_LOAD(), sl[0]);
                                 i = id[1]; vnames = sl[1];
                             }
-                        }
-                    }
                 }
-            } else {
-                if id[0] == "true" {
+            } else if id[0] == "true" {
                     code = emit2(code, OP_CONST(), 1);
                     i = id[1];
-                } else {
-                    if id[0] == "false" {
+                } else if id[0] == "false" {
                         code = emit2(code, OP_CONST(), 0);
                         i = id[1];
                     } else {
@@ -1082,8 +1025,6 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                         code = emit2(code, OP_LOAD(), sl[0]);
                         i = id[1]; vnames = sl[1];
                     }
-                }
-            }
         } else {
             let n = parse_number(s, i);
             if n[0] == 1 {
@@ -1123,10 +1064,6 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
         code = emit2(code, OP_CONST(), fidx);
         code = push(code, OP_GET());
         i = fld[1];
-    }
-    }
-    }
-    }
     }
     return [code, i, vnames];
 }
@@ -1179,51 +1116,110 @@ fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     return [code, i, vnames];
 }
 
-fn emit_rel(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+fn emit_shift(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
     let r = emit_sum(s, i, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if starts_with(s, i, "<<") == 1 {
+            r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+            code = push(r[0], OP_SHL()); i = r[1]; vnames = r[2];
+        } else {
+            if starts_with(s, i, ">>") == 1 {
+                r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+                code = push(r[0], OP_SHR()); i = r[1]; vnames = r[2];
+            } else { break; }
+        }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_rel(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    let r = emit_shift(s, i, code, vnames, fnames, faddrs, fargc, strbox);
     code = r[0]; i = r[1]; vnames = r[2];
     i = skip(s, i);
     if i >= len(s) { return [code, i, vnames]; }
     if starts_with(s, i, "==") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_EQ());
         return [code, r[1], r[2]];
     }
     if starts_with(s, i, "!=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_NE());
         return [code, r[1], r[2]];
     }
     if starts_with(s, i, "<=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_LE());
         return [code, r[1], r[2]];
     }
     if starts_with(s, i, ">=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_GE());
         return [code, r[1], r[2]];
     }
     if s[i] == "<" {
-        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+        r = emit_shift(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_LT());
         return [code, r[1], r[2]];
     }
     if s[i] == ">" {
-        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+        r = emit_shift(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
         code = push(r[0], OP_GT());
         return [code, r[1], r[2]];
     }
     return [code, i, vnames];
 }
 
-fn emit_and(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+fn emit_bitand(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
     let r = emit_rel(s, i, code, vnames, fnames, faddrs, fargc, strbox);
     code = r[0]; i = r[1]; vnames = r[2];
     while true {
         i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "&" {
+            if starts_with(s, i, "&&") == 1 { break; }
+            r = emit_rel(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+            code = push(r[0], OP_BAND()); i = r[1]; vnames = r[2];
+        } else { break; }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_bitxor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    let r = emit_bitand(s, i, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "^" {
+            r = emit_bitand(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+            code = push(r[0], OP_BXOR()); i = r[1]; vnames = r[2];
+        } else { break; }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_bitor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    let r = emit_bitxor(s, i, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "|" {
+            if starts_with(s, i, "||") == 1 { break; }
+            r = emit_bitxor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
+            code = push(r[0], OP_BOR()); i = r[1]; vnames = r[2];
+        } else { break; }
+    }
+    return [code, i, vnames];
+}
+
+fn emit_and(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    let r = emit_bitor(s, i, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0]; i = r[1]; vnames = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
         if starts_with(s, i, "&&") == 1 {
-            r = emit_rel(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
+            r = emit_bitor(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
             code = push(r[0], OP_AND()); i = r[1]; vnames = r[2];
         } else { break; }
     }
@@ -1869,7 +1865,7 @@ fn write_runtime() -> str {
     s = s + "#include <unistd.h>\n";
     s = s + "#include <sys/time.h>\n";
     s = s + "#endif\n\n";
-    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95, OP_ARGC = 106, OP_ARG = 107, OP_FILE_EXISTS = 108, OP_READ_LINE = 109 };\n";
+    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95, OP_ARGC = 106, OP_ARG = 107, OP_FILE_EXISTS = 108, OP_READ_LINE = 109, OP_BAND = 110, OP_BOR = 111, OP_BXOR = 112, OP_BNOT = 113, OP_SHL = 114, OP_SHR = 115 };\n";
     s = s + "static int g_kargc = 0;\nstatic char **g_kargv = NULL;\n";
     s = s + "typedef struct { int tag; int64_t i; double f; } V;\n";
     s = s + "static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }\n";
@@ -2338,6 +2334,12 @@ typedef double KREAL;
     s = s + "    else if (op == OP_AND) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi((as_i(a)!=0 && as_i(b)!=0)?1:0); }\n";
     s = s + "    else if (op == OP_OR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi((as_i(a)!=0 || as_i(b)!=0)?1:0); }\n";
     s = s + "    else if (op == OP_NOT) { V a=stack[--sp]; stack[sp++]=Vi(as_i(a)==0?1:0); }\n";
+    s = s + "    else if (op == OP_BAND) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) & as_i(b)); }\n";
+    s = s + "    else if (op == OP_BOR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) | as_i(b)); }\n";
+    s = s + "    else if (op == OP_BXOR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) ^ as_i(b)); }\n";
+    s = s + "    else if (op == OP_BNOT) { V a=stack[--sp]; stack[sp++]=Vi(~as_i(a)); }\n";
+    s = s + "    else if (op == OP_SHL) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) << as_i(b)); }\n";
+    s = s + "    else if (op == OP_SHR) { V b=stack[--sp]; V a=stack[--sp]; stack[sp++]=Vi(as_i(a) >> as_i(b)); }\n";
     s = s + "    else if (op == OP_LT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<as_f(b)); else stack[sp++]=Vi(a.i<b.i); }\n";
     s = s + "    else if (op == OP_LE) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)<=as_f(b)); else stack[sp++]=Vi(a.i<=b.i); }\n";
     s = s + "    else if (op == OP_GT) { V b=stack[--sp]; V a=stack[--sp]; if (a.tag==1||b.tag==1) stack[sp++]=Vi(as_f(a)>as_f(b)); else stack[sp++]=Vi(a.i>b.i); }\n";
@@ -2653,7 +2655,7 @@ typedef double KREAL;
     s = s + "    }\n";
     s = s + "    else if (op == OP_ARG) {\n";
     s = s + "      int64_t idx = as_i(stack[--sp]);\n";
-    s = s + "      if (idx >= 0 && idx < g_kargc) { stack[sp++] = Vs(s_new(g_kargv[idx])); }\n";
+    s = s + "      if (idx >= 0 && idx < g_kargc && g_kargv && g_kargv[idx]) { stack[sp++] = Vs(s_new(g_kargv[idx])); }\n";
     s = s + "      else { stack[sp++] = Vs(s_new(\"\")); }\n";
     s = s + "    }\n";
     s = s + "    else if (op == OP_FILE_EXISTS) {\n";
@@ -2990,6 +2992,11 @@ fn main() -> i64 {
     assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_CONST(), 1, OP_OR()]) == 1);
     assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_NOT()]) == 1);
 
+    let rbit = compile_src(resolve_imports("examples/selfhost/bitops.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_bitops.c", write_c_driver(rbit[0], rbit[1], rbit[2], rbit[3])) == true);
+    assert(code_has_seq(rbit[0], [OP_BAND()]) == 1);
+    assert(code_has_seq(rbit[0], [OP_SHL()]) == 1);
+
     let r22 = compile_src(resolve_imports("examples/selfhost/bc_typeof.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_typeof.c", write_c_driver(r22[0], r22[1], r22[2], r22[3])) == true);
     assert(code_has_seq(r22[0], [OP_CONST(), 1, OP_TYPEOF()]) == 1);
@@ -3038,6 +3045,11 @@ fn main() -> i64 {
     assert(code_has_seq(r29[0], [OP_ARG()]) == 1);
     assert(code_has_seq(r29[0], [OP_FILE_EXISTS()]) == 1);
     assert(code_has_seq(r29[0], [OP_READ_LINE()]) == 1);
+
+    let r30 = compile_src(resolve_imports("examples/selfhost/hex_lab.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_hex.c", write_c_driver(r30[0], r30[1], r30[2], r30[3])) == true);
+    assert(code_has_seq(r30[0], [OP_CONST(), 255]) == 1);
+    assert(code_has_seq(r30[0], [OP_CONST(), 10]) == 1);
 
     let raw: str = read_file("bootstrap/generated/_bc_path.txt");
     let one: str = trim_path(raw);

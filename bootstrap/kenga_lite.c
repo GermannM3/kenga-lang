@@ -2,7 +2,7 @@
  *
  * Dialect:
  *   fn / let / while / if-else / return / calls
- *   i64 / f64 arith + cmp (< > <= >= == !=) + && || ! + i64 %
+ *   i64 / f64 arith + cmp (< > <= >= == !=) + && || ! + i64 % + bitwise & | ^ ~ << >>
  *   println(expr); print(expr);  — with / without newline
  *   sleep_ms(n)             — wall-clock sleep, n >= 0
  *   "string" literals       — values (println, == / !=)

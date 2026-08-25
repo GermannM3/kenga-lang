@@ -2,13 +2,13 @@
 // + multi-fn, string literals, list [ ] / push / len / index,
 //   events (on/emit/pump), import flatten, for-in-list, true/false,
 //   && || % ! and block comments, typeof / to_str, print / sleep_ms / now_ms,
+//   argc / arg / file_exists / read_line (C main sets g_kargc / g_kargv),
+//   bitwise & | ^ ~ << >> and 0x / 0b literals,
 //   u8/u16/u32/u64 width types (declare in struct fields; pass-by-value),
 //   intrinsics passthrough for bare-metal: mmio_readN, mmio_writeN, asm_hlt/cli/sti,
 //   atomic_{load,store,cas,fence}, asm(code). Stubbed call to C runtime — the kernel
 //   provides kf_alloc (weak) and friends in kf_rt.h.
 // Run: bootstrap\bin\kenga-lite.exe run kenga\emit\lower_c.kenga --freestanding -o out.c in.kenga
-
-let g_freestanding: i64 = 0;
 
 fn is_space(ch: str) -> i64 {
     if ch == " " { return 1; }
@@ -19,6 +19,20 @@ fn is_space(ch: str) -> i64 {
 fn is_digit(ch: str) -> i64 {
     let c: i64 = ord(ch);
     if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn is_hex_digit(ch: str) -> i64 {
+    if is_digit(ch) == 1 { return 1; }
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 102 { return 1; } }
+    if c >= 65 { if c <= 70 { return 1; } }
+    return 0;
+}
+fn hex_val(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return c - 48; } }
+    if c >= 97 { if c <= 102 { return c - 87; } }
+    if c >= 65 { if c <= 70 { return c - 55; } }
     return 0;
 }
 fn is_alpha(ch: str) -> i64 {
@@ -350,7 +364,21 @@ fn runtime_c() -> str {
     s = s + "  gettimeofday(&tv, NULL);\n";
     s = s + "  return (int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000;\n";
     s = s + "#endif\n";
-    s = s + "}\n\n";
+    s = s + "}\n";
+    s = s + "static int g_kargc = 0;\nstatic char **g_kargv = NULL;\n";
+    s = s + "static int64_t k_argc(void) { return (int64_t)g_kargc; }\n";
+    s = s + "static const char *k_arg(int64_t i) {\n";
+    s = s + "  if (i < 0 || i >= (int64_t)g_kargc || !g_kargv || !g_kargv[i]) return \"\";\n";
+    s = s + "  return g_kargv[i];\n}\n";
+    s = s + "static int64_t k_file_exists(const char *path) {\n";
+    s = s + "  FILE *f; if (!path) return 0;\n";
+    s = s + "  f = fopen(path, \"rb\"); if (!f) return 0; fclose(f); return 1;\n}\n";
+    s = s + "static const char *k_read_line(void) {\n";
+    s = s + "  static char buf[65536]; char *r; size_t n;\n";
+    s = s + "  r = fgets(buf, (int)sizeof(buf), stdin);\n";
+    s = s + "  if (!r) return \"\";\n";
+    s = s + "  n = strlen(buf); while (n > 0 && (buf[n-1] == 10 || buf[n-1] == 13)) buf[--n] = 0;\n";
+    s = s + "  return buf;\n}\n\n";
     s = s + "static const char *k_to_str_i64(int64_t v) { static char b[32]; snprintf(b, sizeof(b), \"%lld\", (long long)v); return b; }\n";
     s = s + "static const char *k_to_str_f64(double v) { static char b[64]; snprintf(b, sizeof(b), \"%g\", v); return b; }\n";
     s = s + "static const char *kstr_concat(const char *a, const char *b) {\n";
@@ -403,6 +431,10 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
         let r = lower_factor(s, i + 1, decls);
         return ["(!(" + r[0] + "))", r[1], 0];
     }
+    if s[i] == "~" {
+        let r = lower_factor(s, i + 1, decls);
+        return ["(~(" + r[0] + "))", r[1], 0];
+    }
     if s[i] == "\"" {
         let ps = parse_string(s, i);
         return ["\"" + c_escape(ps[0]) + "\"", ps[1], 2];
@@ -430,6 +462,51 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
     if is_digit(s[i]) == 1 {
         let start: i64 = i;
         let v: i64 = 0;
+        if s[i] == "0" {
+            if i + 1 < len(s) {
+                let p: str = s[i + 1];
+                if p == "x" {
+                    i = i + 2;
+                    assert(i < len(s));
+                    assert(is_hex_digit(s[i]) == 1);
+                    while i < len(s) {
+                        if is_hex_digit(s[i]) == 0 { break; }
+                        v = v * 16 + hex_val(s[i]); i = i + 1;
+                    }
+                    return [itoa(v) + "LL", i, 0];
+                }
+                if p == "X" {
+                    i = i + 2;
+                    assert(i < len(s));
+                    assert(is_hex_digit(s[i]) == 1);
+                    while i < len(s) {
+                        if is_hex_digit(s[i]) == 0 { break; }
+                        v = v * 16 + hex_val(s[i]); i = i + 1;
+                    }
+                    return [itoa(v) + "LL", i, 0];
+                }
+                if p == "b" {
+                    i = i + 2;
+                    assert(i < len(s));
+                    while i < len(s) {
+                        if s[i] == "0" { v = v * 2; i = i + 1; continue; }
+                        if s[i] == "1" { v = v * 2 + 1; i = i + 1; continue; }
+                        break;
+                    }
+                    return [itoa(v) + "LL", i, 0];
+                }
+                if p == "B" {
+                    i = i + 2;
+                    assert(i < len(s));
+                    while i < len(s) {
+                        if s[i] == "0" { v = v * 2; i = i + 1; continue; }
+                        if s[i] == "1" { v = v * 2 + 1; i = i + 1; continue; }
+                        break;
+                    }
+                    return [itoa(v) + "LL", i, 0];
+                }
+            }
+        }
         while i < len(s) {
             if is_digit(s[i]) == 0 { break; }
             v = v * 10 + (ord(s[i]) - 48); i = i + 1;
@@ -571,6 +648,24 @@ fn lower_factor(s: str, i: i64, decls: list) -> list {
                 assert(s[j] == ")"); j = j + 1;
                 return ["k_now_ms()", j, 0];
             }
+            if id[0] == "argc" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["k_argc()", j, 0];
+            }
+            if id[0] == "read_line" {
+                assert(s[j] == ")"); j = j + 1;
+                return ["k_read_line()", j, 2];
+            }
+            if id[0] == "arg" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_arg(" + ar[0] + ")", j, 2];
+            }
+            if id[0] == "file_exists" {
+                let ar = lower_cmp(s, j, decls);
+                j = skip(s, ar[1]); assert(s[j] == ")"); j = j + 1;
+                return ["k_file_exists(" + ar[0] + ")", j, 0];
+            }
             // user fn call
             let args: str = "";
             let argc: i64 = 0;
@@ -682,18 +777,36 @@ fn lower_sum(s: str, i: i64, decls: list) -> list {
     return [out, i, kind];
 }
 
-fn lower_rel(s: str, i: i64, decls: list) -> list {
+fn lower_shift(s: str, i: i64, decls: list) -> list {
     let r = lower_sum(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if starts_with(s, i, "<<") == 1 {
+            r = lower_sum(s, i + 2, decls);
+            out = "(" + out + " << " + r[0] + ")"; i = r[1]; kind = 0;
+        } else {
+            if starts_with(s, i, ">>") == 1 {
+                r = lower_sum(s, i + 2, decls);
+                out = "(" + out + " >> " + r[0] + ")"; i = r[1]; kind = 0;
+            } else { break; }
+        }
+    }
+    return [out, i, kind];
+}
+
+fn lower_rel(s: str, i: i64, decls: list) -> list {
+    let r = lower_shift(s, i, decls);
     let out: str = r[0]; i = r[1]; let kind: i64 = r[2]; i = skip(s, i);
     if i >= len(s) { return [out, i, kind]; }
     if starts_with(s, i, "<=") == 1 {
-        r = lower_sum(s, i + 2, decls); return ["(" + out + " <= " + r[0] + ")", r[1], 0];
+        r = lower_shift(s, i + 2, decls); return ["(" + out + " <= " + r[0] + ")", r[1], 0];
     }
     if starts_with(s, i, ">=") == 1 {
-        r = lower_sum(s, i + 2, decls); return ["(" + out + " >= " + r[0] + ")", r[1], 0];
+        r = lower_shift(s, i + 2, decls); return ["(" + out + " >= " + r[0] + ")", r[1], 0];
     }
     if starts_with(s, i, "==") == 1 {
-        r = lower_sum(s, i + 2, decls);
+        r = lower_shift(s, i + 2, decls);
         if kind == 2 {
             return ["(strcmp(" + out + ", " + r[0] + ") == 0)", r[1], 0];
         }
@@ -703,7 +816,7 @@ fn lower_rel(s: str, i: i64, decls: list) -> list {
         return ["(" + out + " == " + r[0] + ")", r[1], 0];
     }
     if starts_with(s, i, "!=") == 1 {
-        r = lower_sum(s, i + 2, decls);
+        r = lower_shift(s, i + 2, decls);
         if kind == 2 {
             return ["(strcmp(" + out + ", " + r[0] + ") != 0)", r[1], 0];
         }
@@ -713,21 +826,62 @@ fn lower_rel(s: str, i: i64, decls: list) -> list {
         return ["(" + out + " != " + r[0] + ")", r[1], 0];
     }
     if s[i] == "<" {
-        r = lower_sum(s, i + 1, decls); return ["(" + out + " < " + r[0] + ")", r[1], 0];
+        r = lower_shift(s, i + 1, decls); return ["(" + out + " < " + r[0] + ")", r[1], 0];
     }
     if s[i] == ">" {
-        r = lower_sum(s, i + 1, decls); return ["(" + out + " > " + r[0] + ")", r[1], 0];
+        r = lower_shift(s, i + 1, decls); return ["(" + out + " > " + r[0] + ")", r[1], 0];
+    }
+    return [out, i, kind];
+}
+
+fn lower_bitand(s: str, i: i64, decls: list) -> list {
+    let r = lower_rel(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "&" {
+            if starts_with(s, i, "&&") == 1 { break; }
+            r = lower_rel(s, i + 1, decls);
+            out = "(" + out + " & " + r[0] + ")"; i = r[1]; kind = 0;
+        } else { break; }
+    }
+    return [out, i, kind];
+}
+
+fn lower_bitxor(s: str, i: i64, decls: list) -> list {
+    let r = lower_bitand(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "^" {
+            r = lower_bitand(s, i + 1, decls);
+            out = "(" + out + " ^ " + r[0] + ")"; i = r[1]; kind = 0;
+        } else { break; }
+    }
+    return [out, i, kind];
+}
+
+fn lower_bitor(s: str, i: i64, decls: list) -> list {
+    let r = lower_bitxor(s, i, decls);
+    let out: str = r[0]; i = r[1]; let kind: i64 = r[2];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "|" {
+            if starts_with(s, i, "||") == 1 { break; }
+            r = lower_bitxor(s, i + 1, decls);
+            out = "(" + out + " | " + r[0] + ")"; i = r[1]; kind = 0;
+        } else { break; }
     }
     return [out, i, kind];
 }
 
 fn lower_and(s: str, i: i64, decls: list) -> list {
-    let r = lower_rel(s, i, decls);
+    let r = lower_bitor(s, i, decls);
     let out: str = r[0]; i = r[1]; let kind: i64 = r[2];
     while true {
         i = skip(s, i); if i >= len(s) { break; }
         if starts_with(s, i, "&&") == 1 {
-            r = lower_rel(s, i + 2, decls);
+            r = lower_bitor(s, i + 2, decls);
             out = "(" + out + " && " + r[0] + ")";
             i = r[1];
             kind = 0;
@@ -1198,7 +1352,8 @@ fn lower_program(src: str) -> str {
         }
         if fkinds[fi] == 2 {
             let body = lower_fn_body(fbodies[fi], fparams[fi], stypes);
-            out = out + "int main(void) {\n";
+            out = out + "int main(int argc, char **argv) {\n";
+            out = out + "  g_kargc = argc; g_kargv = argv;\n";
             let ei: i64 = 0;
             while ei < len(events) {
                 out = out + "  ke_listen(\"" + c_escape(events[ei][0]) + "\", " + events[ei][1] + ", " + itoa(events[ei][2]) + ");\n";
@@ -1260,6 +1415,14 @@ fn main() -> i64 {
     assert(em_mod[0] == "(10LL % 3LL)");
     let em_not = lower_cmp("!0", 0, []);
     assert(em_not[0] == "(!(0LL))");
+    let em_hex = lower_cmp("0xFF", 0, []);
+    assert(em_hex[0] == "255LL");
+    let em_bin = lower_cmp("0b1010", 0, []);
+    assert(em_bin[0] == "10LL");
+    let em_band = lower_cmp("5 & 3", 0, []);
+    assert(em_band[0] == "(5LL & 3LL)");
+    let em_shl = lower_cmp("1 << 4", 0, []);
+    assert(em_shl[0] == "(1LL << 4LL)");
     let em_typeof = lower_cmp("typeof(1)", 0, []);
     assert(em_typeof[0] == "\"i64\"");
     assert(em_typeof[2] == 2);
@@ -1277,6 +1440,18 @@ fn main() -> i64 {
     let em_now = lower_cmp("now_ms()", 0, []);
     assert(em_now[0] == "k_now_ms()");
     assert(em_now[2] == 0);
+    let em_argc = lower_cmp("argc()", 0, []);
+    assert(em_argc[0] == "k_argc()");
+    assert(em_argc[2] == 0);
+    let em_arg = lower_cmp("arg(0)", 0, []);
+    assert(em_arg[0] == "k_arg(0LL)");
+    assert(em_arg[2] == 2);
+    let em_fe = lower_cmp("file_exists(\"x\")", 0, []);
+    assert(em_fe[0] == "k_file_exists(\"x\")");
+    assert(em_fe[2] == 0);
+    let em_rl = lower_cmp("read_line()", 0, []);
+    assert(em_rl[0] == "k_read_line()");
+    assert(em_rl[2] == 2);
 
     let logic = resolve_imports("examples/selfhost/lower_logic.kenga", 0);
     assert(write_file("bootstrap/bin/lower_logic.c", lower_program(logic)) == true);
@@ -1290,7 +1465,10 @@ fn main() -> i64 {
     let nowf = resolve_imports("examples/selfhost/lower_now.kenga", 0);
     assert(write_file("bootstrap/bin/lower_now.c", lower_program(nowf)) == true);
 
-    println("wrote bootstrap/bin/lower_*.c (events/agent/import/for/lists/struct/elif/float/logic/typeof/print/now)");
+    let argc_src = resolve_imports("examples/selfhost/argc_more.kenga", 0);
+    assert(write_file("bootstrap/bin/lower_argc.c", lower_program(argc_src)) == true);
+
+    println("wrote bootstrap/bin/lower_*.c (events/agent/import/for/lists/struct/elif/float/logic/typeof/print/now/argc)");
     println("lower_c ok");
     return 0;
 }

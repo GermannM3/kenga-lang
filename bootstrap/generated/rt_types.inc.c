@@ -53,7 +53,13 @@ enum {
   OP_ARGC,
   OP_ARG,
   OP_FILE_EXISTS,
-  OP_READ_LINE
+  OP_READ_LINE,
+  OP_BAND,
+  OP_BOR,
+  OP_BXOR,
+  OP_BNOT,
+  OP_SHL,
+  OP_SHR
 };
 static int g_kargc = 0;
 static char **g_kargv = NULL;

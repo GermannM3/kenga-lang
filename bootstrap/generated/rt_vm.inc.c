@@ -652,6 +652,60 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(a == 0 ? 1 : 0));
       continue;
     }
+    case OP_BAND: {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, "& expects i64");
+      int64_t b = as_i64(vb, "& expects i64");
+      vala_push(&stack, V_i64(a & b));
+      continue;
+    }
+    case OP_BOR: {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, "| expects i64");
+      int64_t b = as_i64(vb, "| expects i64");
+      vala_push(&stack, V_i64(a | b));
+      continue;
+    }
+    case OP_BXOR: {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, "^ expects i64");
+      int64_t b = as_i64(vb, "^ expects i64");
+      vala_push(&stack, V_i64(a ^ b));
+      continue;
+    }
+    case OP_BNOT: {
+      if (!stack.len) die("stack underflow BNOT");
+      Value v = stack.data[--stack.len];
+      int64_t a = as_i64(v, "~ expects i64");
+      vala_push(&stack, V_i64(~a));
+      continue;
+    }
+    case OP_SHL: {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, "<< expects i64");
+      int64_t b = as_i64(vb, "<< expects i64");
+      if (b < 0 || b >= 64) die("<< shift out of range");
+      vala_push(&stack, V_i64((int64_t)((uint64_t)a << (unsigned)b)));
+      continue;
+    }
+    case OP_SHR: {
+      if (stack.len < 2) die("stack underflow");
+      Value vb = stack.data[--stack.len];
+      Value va = stack.data[--stack.len];
+      int64_t a = as_i64(va, ">> expects i64");
+      int64_t b = as_i64(vb, ">> expects i64");
+      if (b < 0 || b >= 64) die(">> shift out of range");
+      vala_push(&stack, V_i64(a >> b));
+      continue;
+    }
     case OP_LT: {
       BIN_NUM(a < b, a < b, 1);
       continue;

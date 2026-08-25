@@ -1,0 +1,22 @@
+# GitHub Linguist. *.kenga is unknown until github-linguist/linguist
+# merges a language (threshold: >=2000 public files, not one author).
+# Hide trainers and legacy so the bar is not "Python/Rust project".
+
+*.kenga linguist-detectable
+
+bootstrap/generated/** linguist-generated
+
+# weights, passports, repair corpora
+minds/** linguist-vendored
+
+# numpy Prophet / factory — lab, not the language
+tools/** linguist-vendored
+
+# legacy host; new code lives in kenga/
+src/** linguist-vendored
+
+# HF cards and book assets
+hf/** linguist-vendored
+book/** linguist-documentation
+docs/** linguist-documentation
+sell/** linguist-documentation

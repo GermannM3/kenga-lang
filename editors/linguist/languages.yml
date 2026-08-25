@@ -1,0 +1,14 @@
+# Snippet for github-linguist/linguist lib/linguist/languages.yml
+# Insert alphabetically between KakouneScript and KerboScript.
+# Omit language_id; generate it with script/update-ids in the linguist clone.
+# Color: brand cyan (#2ee6d6). Alternate brand blue is #5b9dff.
+
+Kenga:
+  type: programming
+  color: "#2ee6d6"
+  extensions:
+    - ".kenga"
+  tm_scope: source.kenga
+  ace_mode: text
+  aliases:
+    - kenga

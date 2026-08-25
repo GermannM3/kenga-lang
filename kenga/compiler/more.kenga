@@ -3,7 +3,7 @@
 // User file: kenga-lite run examples\selfhost\fact_lite.kenga  (more VM)
 // Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, import,
 //          XOR, birth→24, c_seed/expr_c (Kenga writes .c) via run_file.
-//          on/emit/pump/pending, types/ttl skip, && || % !, typeof/to_str,
+//          on/emit/pump/pending, types/ttl skip, && || % !, bitwise & | ^ ~ << >>, typeof/to_str,
 //          t_from/t_get/t_matmul/t_shape/t_add/tensor/t_fill,
 //          t_sub/t_mul/t_reshape/t_transpose/t_scale/t_sum/t_dot,
 //          t_exp/t_log/t_softmax/t_mean/t_mse,
@@ -12,7 +12,8 @@
 //          t_set/save_tensor/load_tensor/sweep/now_ms/memory,
 //          load_ppm/load_wav/t_patch_mean/t_linear_grad,
 //          print/sleep_ms/learn/predict/unroll/remember_next/foresee_n
-//          argc/arg/file_exists/read_line (guest argv skips more path)
+//          argc/arg/file_exists/read_line (guest argv skips more path),
+//          hex/bin literals 0xFF / 0b1010
 // Tensor/tape/Prophet dispatch → native_ml.kenga (Kenga lists).
 // Host left: CRT. ppm/wav via read_bytes + Kenga parse.
 
@@ -127,6 +128,12 @@ fn OP_ARGC() -> i64 { return 106; }
 fn OP_ARG() -> i64 { return 107; }
 fn OP_FILE_EXISTS() -> i64 { return 108; }
 fn OP_READ_LINE() -> i64 { return 109; }
+fn OP_BAND() -> i64 { return 110; }
+fn OP_BOR() -> i64 { return 111; }
+fn OP_BXOR() -> i64 { return 112; }
+fn OP_BNOT() -> i64 { return 113; }
+fn OP_SHL() -> i64 { return 114; }
+fn OP_SHR() -> i64 { return 115; }
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -359,7 +366,9 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
     let oSleepMs: i64 = 100; let oLearn: i64 = 101;  let oPredict: i64 = 102;
     let oUnroll: i64 = 103; let oRememberNext: i64 = 104; let oForeseeN: i64 = 105;
     let oArgc: i64 = 106;   let oArg: i64 = 107;     let oFileExists: i64 = 108;
-    let oReadLine: i64 = 109;
+    let oReadLine: i64 = 109; let oBand: i64 = 110;  let oBor: i64 = 111;
+    let oBxor: i64 = 112;   let oBnot: i64 = 113;    let oShl: i64 = 114;
+    let oShr: i64 = 115;
     let stack: list = [];
     let spi: i64 = 0;
     let prei: i64 = 0;
@@ -942,6 +951,35 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
                 if spi >= len(stack) { stack = push(stack, 0); }
                 stack[spi] = read_line(); spi = spi + 1;
             }
+            else if op == oBand {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = stack[spi] & b; spi = spi + 1;
+            }
+            else if op == oBor {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = stack[spi] | b; spi = spi + 1;
+            }
+            else if op == oBxor {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = stack[spi] ^ b; spi = spi + 1;
+            }
+            else if op == oBnot {
+                spi = spi - 1;
+                stack[spi] = ~stack[spi]; spi = spi + 1;
+            }
+            else if op == oShl {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = stack[spi] << b; spi = spi + 1;
+            }
+            else if op == oShr {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = stack[spi] >> b; spi = spi + 1;
+            }
         }
     }
     if spi == 0 { return [0, evq]; }
@@ -962,6 +1000,20 @@ fn is_space(ch: str) -> i64 {
 fn is_digit(ch: str) -> i64 {
     let c: i64 = ord(ch);
     if c >= 48 { if c <= 57 { return 1; } }
+    return 0;
+}
+fn is_hex_digit(ch: str) -> i64 {
+    if is_digit(ch) == 1 { return 1; }
+    let c: i64 = ord(ch);
+    if c >= 97 { if c <= 102 { return 1; } }
+    if c >= 65 { if c <= 70 { return 1; } }
+    return 0;
+}
+fn hex_val(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return c - 48; } }
+    if c >= 97 { if c <= 102 { return c - 87; } }
+    if c >= 65 { if c <= 70 { return c - 55; } }
     return 0;
 }
 fn is_alpha(ch: str) -> i64 {
@@ -1035,6 +1087,52 @@ fn parse_ident(s: str, i: i64) -> list {
 }
 fn parse_number(s: str, i: i64) -> list {
     i = skip(s, i); let v: i64 = 0;
+    if i < len(s) {
+        if s[i] == "0" {
+            if i + 1 < len(s) {
+                let p: str = s[i + 1];
+                let hex: i64 = 0;
+                if p == "x" { hex = 1; }
+                if p == "X" { hex = 1; }
+                if hex == 1 {
+                    i = i + 2;
+                    assert(i < len(s));
+                    assert(is_hex_digit(s[i]) == 1);
+                    while i < len(s) {
+                        if is_hex_digit(s[i]) == 0 { break; }
+                        v = v * 16 + hex_val(s[i]);
+                        i = i + 1;
+                    }
+                    return [v, i];
+                }
+                let bin: i64 = 0;
+                if p == "b" { bin = 1; }
+                if p == "B" { bin = 1; }
+                if bin == 1 {
+                    i = i + 2;
+                    assert(i < len(s));
+                    let okb: i64 = 0;
+                    if s[i] == "0" { okb = 1; }
+                    if s[i] == "1" { okb = 1; }
+                    assert(okb == 1);
+                    while i < len(s) {
+                        if s[i] == "0" {
+                            v = v * 2;
+                            i = i + 1;
+                            continue;
+                        }
+                        if s[i] == "1" {
+                            v = v * 2 + 1;
+                            i = i + 1;
+                            continue;
+                        }
+                        break;
+                    }
+                    return [v, i];
+                }
+            }
+        }
+    }
     while i < len(s) {
         if is_digit(s[i]) == 0 { break; }
         v = v * 10 + (ord(s[i]) - 48); i = i + 1;
@@ -1145,6 +1243,10 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
             if s[i] == "!" {
                 let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
                 code = push(r[0], OP_NOT()); i = r[1]; vnames = r[2]; patches = r[3];
+            } else {
+            if s[i] == "~" {
+                let r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                code = push(r[0], OP_BNOT()); i = r[1]; vnames = r[2]; patches = r[3];
             } else {
             if s[i] == "\"" {
                 let ps = parse_string(s, i);
@@ -1547,6 +1649,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                 }
             }
             }
+            }
         }
     }
     while true {
@@ -1617,44 +1720,103 @@ fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     return [code, i, vnames, patches];
 }
 
-fn emit_rel(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
+fn emit_shift(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
     let r = emit_sum(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
+    code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if starts_with(s, i, "<<") == 1 {
+            r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
+            code = push(r[0], OP_SHL()); i = r[1]; vnames = r[2]; patches = r[3];
+        } else {
+            if starts_with(s, i, ">>") == 1 {
+                r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                code = push(r[0], OP_SHR()); i = r[1]; vnames = r[2]; patches = r[3];
+            } else { break; }
+        }
+    }
+    return [code, i, vnames, patches];
+}
+
+fn emit_rel(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
+    let r = emit_shift(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
     code = r[0]; i = r[1]; vnames = r[2]; patches = r[3]; i = skip(s, i);
     if i >= len(s) { return [code, i, vnames, patches]; }
     if starts_with(s, i, "<=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
         return [push(r[0], OP_LE()), r[1], r[2], r[3]];
     }
     if starts_with(s, i, ">=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
         return [push(r[0], OP_GE()), r[1], r[2], r[3]];
     }
     if starts_with(s, i, "==") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
         return [push(r[0], OP_EQ()), r[1], r[2], r[3]];
     }
     if starts_with(s, i, "!=") == 1 {
-        r = emit_sum(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
+        r = emit_shift(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
         return [push(r[0], OP_NE()), r[1], r[2], r[3]];
     }
     if s[i] == "<" {
-        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
+        r = emit_shift(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
         return [push(r[0], OP_LT()), r[1], r[2], r[3]];
     }
     if s[i] == ">" {
-        r = emit_sum(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
+        r = emit_shift(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
         return [push(r[0], OP_GT()), r[1], r[2], r[3]];
     }
     return [code, i, vnames, patches];
 }
 
-fn emit_and(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
+fn emit_bitand(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
     let r = emit_rel(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
     code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
     while true {
         i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "&" {
+            if starts_with(s, i, "&&") == 1 { break; }
+            r = emit_rel(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
+            code = push(r[0], OP_BAND()); i = r[1]; vnames = r[2]; patches = r[3];
+        } else { break; }
+    }
+    return [code, i, vnames, patches];
+}
+
+fn emit_bitxor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
+    let r = emit_bitand(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
+    code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "^" {
+            r = emit_bitand(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
+            code = push(r[0], OP_BXOR()); i = r[1]; vnames = r[2]; patches = r[3];
+        } else { break; }
+    }
+    return [code, i, vnames, patches];
+}
+
+fn emit_bitor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
+    let r = emit_bitxor(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
+    code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
+        if s[i] == "|" {
+            if starts_with(s, i, "||") == 1 { break; }
+            r = emit_bitxor(s, i + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
+            code = push(r[0], OP_BOR()); i = r[1]; vnames = r[2]; patches = r[3];
+        } else { break; }
+    }
+    return [code, i, vnames, patches];
+}
+
+fn emit_and(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list) -> list {
+    let r = emit_bitor(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
+    code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+    while true {
+        i = skip(s, i); if i >= len(s) { break; }
         if starts_with(s, i, "&&") == 1 {
-            r = emit_rel(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
+            r = emit_bitor(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
             code = push(r[0], OP_AND()); i = r[1]; vnames = r[2]; patches = r[3];
         } else { break; }
     }
@@ -2227,6 +2389,9 @@ fn main() -> i64 {
     assert(run_lite("fn main() { file_exists(\"kenga/compiler/more.kenga\") }") == 1);
     assert(run_file("examples/selfhost/argc_more.kenga") == 0);
     assert(run_lite("fn main() { let s = \"a\\nb\"; len(s) }") == 3);
+    assert(run_lite("fn main() { 0xFF }") == 255);
+    assert(run_lite("fn main() { 0b1010 }") == 10);
+    assert(run_file("examples/selfhost/hex_lab.kenga") == 0);
     assert(run_lite("fn main() { 10 % 3 }") == 1);
     assert(run_lite("fn main() { 1 && 0 }") == 0);
     assert(run_lite("fn main() { 1 && 1 }") == 1);
@@ -2237,6 +2402,15 @@ fn main() -> i64 {
     assert(run_lite("fn main() { /* c */ 1 + /* x */ 2 }") == 3);
     assert(run_file("examples/selfhost/comments_lite.kenga") == 0);
     assert(run_file("examples/selfhost/logic_lite.kenga") == 0);
+    assert(run_lite("fn main() { 5 & 3 }") == 1);
+    assert(run_lite("fn main() { 5 | 3 }") == 7);
+    assert(run_lite("fn main() { 5 ^ 3 }") == 6);
+    assert(run_lite("fn main() { ~0 }") == -1);
+    assert(run_lite("fn main() { 1 << 4 }") == 16);
+    assert(run_lite("fn main() { 16 >> 2 }") == 4);
+    assert(run_lite("fn main() { 1 + 2 << 3 }") == 24);
+    assert(run_lite("fn main() { 2 << 2 & 8 | 1 }") == 9);
+    assert(run_file("examples/selfhost/bitops.kenga") == 0);
     assert(run_lite("fn main() { typeof(1) == \"i64\" }") == 1);
     assert(run_lite("fn main() { typeof(\"a\") == \"str\" }") == 1);
     assert(run_lite("fn main() { \"n=\" + to_str(42) == \"n=42\" }") == 1);

@@ -92,6 +92,8 @@ jobs:
       - name: Examples (no Rust)
         run: |
           ./bootstrap/bin/kenga-lite run examples/hello.kenga
+          ./bootstrap/bin/kenga-lite run examples/selfhost/bitops.kenga
+          ./bootstrap/bin/kenga-lite run examples/selfhost/hex_lab.kenga
           ./bootstrap/bin/kenga-lite run examples/prophet.kenga
           ./bootstrap/bin/kenga-lite run examples/selfhost/fact_lite.kenga
           ./bootstrap/bin/kenga-lite run examples/selfhost/argc_more.kenga

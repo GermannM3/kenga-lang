@@ -49,6 +49,10 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
     i = emit_factor(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
     i64a_push(code, OP_NOT);
     return i;
+  } else if (s[i] == '~') {
+    i = emit_factor(s, i + 1, n, code, vnames, fnames, faddrs, fargc);
+    i64a_push(code, OP_BNOT);
+    return i;
   } else if (s[i] == '"') {
     size_t ii = i;
     char *lit = parse_string(s, &ii, n);

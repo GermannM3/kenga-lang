@@ -74,7 +74,7 @@
 | ✅ | CI job `lite` без cargo; release **требует** `kenga-lite` (cargo `kenga` ещё legacy в архиве) |
 | ✅ | `kenga-lite run file` → more VM; eval/selftest ML на списках. `kenga/emit/*` остаётся lite bootstrap |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
-| ⬜ | Битовые `& \| ^ ~ << >>` в kenga-lite C VM: править `kenga/emit/rt_lex.kenga` + `rt_factor.kenga` + `kenga_lite.c` VM dispatch (Rust VM и emit-c уже parity) |
+| ✅ | Битовые `& \| ^ ~ << >>` и `0x`/`0b` на lite C VM, more, `lower_c`, `bc_src_c` (`examples/selfhost/bitops.kenga`, `hex_lab.kenga`)
 
 ## 2. Ядро и тензоры
 

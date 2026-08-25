@@ -1,6 +1,11 @@
 fn main() -> i64 {
-  if argc() >= 0 {
-    assert(1 == 1);
+  assert(argc() >= 1);
+  assert(arg(0) != "");
+  if argc() >= 2 {
+    assert(arg(1) != "");
   }
+  assert(file_exists("examples/selfhost/bc_argc.kenga") == 1);
+  assert(file_exists("no_such_zz_argc.kenga") == 0);
+  let line = read_line();
   return 0;
 }

@@ -1,0 +1,13 @@
+// Prophet Memory: learn / predict / remember. MIT.
+
+fn main() -> i64 {
+  let m = memory_config(0.12, 16, 8);
+  learn(m, [1, 2, 3], [2, 3, 4]);
+  let p = predict(m, [1, 2, 3]);
+  assert(len(p) == 3);
+  remember(m, [9, 0, 9], 80);
+  let f = foresee(m, [1, 2, 3]);
+  assert(len(f) == 3);
+  println(mem_stats(m));
+  return 0;
+}

@@ -27,10 +27,13 @@ Run:
 """
 import os
 import subprocess
+import sys
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from kenga_lex import tokenize_src
+
 KEYWORDS = {'fn','return','let','if','else','while','for','i64','println'}
-TWO_CHAR = {'->','==','<=','>=','!=','&&','||','<<','>>','&','|','^','~'}
 
 TOKENS = [
     'fn',     'return', 'let',    'if',     'else',   'while',
@@ -44,36 +47,7 @@ VOCAB = {t: i for i, t in enumerate(TOKENS)}
 
 
 def tokenize(src):
-    out = []
-    i = 0
-    n = len(src)
-    while i < n:
-        c = src[i]
-        if c in ' \t\n\r':
-            i += 1; continue
-        if c == '/' and i+1 < n and src[i+1] == '/':
-            while i < n and src[i] != '\n': i += 1
-            continue
-        two = src[i:i+2]
-        if two in TWO_CHAR:
-            out.append(VOCAB.get(two, VOCAB['ID'])); i += 2; continue
-        if c in (':', ',', ';', '{', '}', '(', ')', '+', '-', '*', '/', '=', '<', '>'):
-            if c == '-' and i+1 < n and src[i+1] == '>':
-                out.append(VOCAB['->']); i += 2; continue
-            out.append(VOCAB[c]); i += 1; continue
-        if c.isdigit():
-            j = i
-            while j < n and src[j].isdigit(): j += 1
-            out.append(VOCAB['NUM']); i = j; continue
-        if c.isalpha() or c == '_':
-            j = i
-            while j < n and (src[j].isalnum() or src[j] == '_'):
-                j += 1
-            word = src[i:j]
-            out.append(VOCAB[word] if word in KEYWORDS else VOCAB['ID'])
-            i = j; continue
-        i += 1
-    return out
+    return tokenize_src(src, VOCAB, keywords=KEYWORDS)
 
 
 def make_codec():
@@ -119,61 +93,16 @@ def make_codec():
 
 def make_codec_tokenize(codec):
     """Tokenizer that uses the codec for identifiers, syntax as usual.
-    M3_KEEP_COMMENTS=1 keeps // comment text as word tokens (NL->code)."""
-    token_to_id = codec['token_to_id']
-    encode_word = codec['encode_word']
+    M3_KEEP_COMMENTS=1 keeps // comment text as word tokens (NL->code).
+    Missing ops (`.` `..` `=>` `::` `&|^~`) are lexed then dropped, never ID."""
     keep_comments = os.environ.get('M3_KEEP_COMMENTS', '0') == '1'
 
     def tokenize_codec(src):
-        out = []
-        i = 0
-        n = len(src)
-        while i < n:
-            c = src[i]
-            if c in ' \t\n\r':
-                i += 1; continue
-            if c == '/' and i+1 < n and src[i+1] == '/':
-                if not keep_comments:
-                    while i < n and src[i] != '\n': i += 1
-                    continue
-                i += 2
-                j = i
-                while j < n and src[j] != '\n':
-                    if src[j].isalnum() or src[j] == '_':
-                        e = j
-                        while e < n and (src[e].isalnum() or src[e] == '_'):
-                            e += 1
-                        out.extend(encode_word(src[j:e]))
-                        j = e
-                    else:
-                        j += 1
-                i = j
-                continue
-            two = src[i:i+2]
-            if two in TWO_CHAR:
-                out.append(token_to_id.get(two, token_to_id['ID'])); i += 2; continue
-            if c in (':', ',', ';', '{', '}', '(', ')', '+', '-', '*', '/', '=', '<', '>'):
-                if c == '-' and i+1 < n and src[i+1] == '>':
-                    out.append(token_to_id['->']); i += 2; continue
-                out.append(token_to_id[c]); i += 1; continue
-            if c.isdigit():
-                j = i
-                while j < n and src[j].isdigit(): j += 1
-                if 'NUM' in token_to_id:
-                    out.append(token_to_id['NUM']); i = j; continue
-                # digit codec: emit each digit as its own token
-                for d in src[i:j]:
-                    out.append(token_to_id.get(d, token_to_id['ID']))
-                i = j; continue
-            if c.isalpha() or c == '_':
-                j = i
-                while j < n and (src[j].isalnum() or src[j] == '_'):
-                    j += 1
-                word = src[i:j]
-                out.extend(encode_word(word))
-                i = j; continue
-            i += 1
-        return out
+        return tokenize_src(
+            src, codec['token_to_id'],
+            encode_word=codec['encode_word'],
+            keep_comments=keep_comments,
+        )
     return tokenize_codec
 
 

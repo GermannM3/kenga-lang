@@ -55,7 +55,7 @@ on "tick"(n: i64) { emit("tick", n + 1); }
 Префиксы (от высшего приоритета к низшему): `unary: - ! ~` → `* / %` → `+ -` → `<< >>` → `< <= > >=` → `== !=` → `&` → `^` → `|` → `&&` → `||`.
 Внутри одной Kenga-программы можно смешивать: `0xF0 | 0x0F & 0xFF` — `&` выше `|`, поэтому сначала `0x0F & 0xFF = 0x0F`, потом `0xF0 | 0x0F = 0xFF`.
 `%` — только `i64`. Битовые — только `i64` (на f64 дают type error в codegen).
-Тест: `examples/selfhost/bitops.kenga` (Rust bytecode VM + emit-c). kenga-lite C VM пока не покрывает — TODO в `docs/ROADMAP.md`.  
+Тест: `examples/selfhost/bitops.kenga` и `examples/selfhost/hex_lab.kenga` (lite, more, lower_c, bc_src_c).  
 Lite и `more.kenga` считают `&&` `||` `!` как 0/1 (оба операнда вычисляются). `%` — только `i64`.
 
 Комментарии: `//` и `/* … */`.
@@ -105,7 +105,7 @@ World-model: residual MLP `y = x + Δ`.
 ## Lite (без Rust)
 
 Поддерживает: `fn` `let` `while` **`for` / `break` / `continue`** `if`/`else`/`else if`,  
-i64, f64, `round`, `assert`, строки, списки, `print`/`println`, `struct`, type annotations (игнор),  
+i64, f64, `0x`/`0b`, bitwise `& | ^ ~ << >>`, `round`, `assert`, строки, списки, `print`/`println`, `struct`, type annotations (игнор),  
 **Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / `load_ppm` / `load_wav` / …),
 tape `ag_*`, `sweep`, `now_ms` wall clock, `sleep_ms`, `foresee_n`.
 

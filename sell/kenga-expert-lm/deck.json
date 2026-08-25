@@ -1,0 +1,341 @@
+{
+  "product": "kenga-expert-lm",
+  "slides": [
+    {
+      "type": "cover",
+      "ru": {
+        "kicker": "МЕТОД",
+        "title": "Kenga Expert LM",
+        "lines": [
+          "Не чат. Маленькая модель, жёсткий гейт, другой корпус.",
+          "M5.3: 838k, bind 5.6% → 98.6% без смены архитектуры.",
+          "M6: 887168 параметров, K=512, паспорт Z на весах."
+        ],
+        "note": "17.6x и 0/6 real-file в одном докладе."
+      },
+      "en": {
+        "kicker": "METHOD",
+        "title": "Kenga Expert LM",
+        "lines": [
+          "Not a chatbot. Tiny model, hard gate, different corpus.",
+          "M5.3: 838k, bind 5.6% to 98.6% with the same net.",
+          "M6: 887168 params, K=512, Z passport on the weights."
+        ],
+        "note": "Keep 17.6x and 0/6 real-file in one talk."
+      },
+      "zh": {
+        "kicker": "方法",
+        "title": "Kenga 专家模型",
+        "lines": [
+          "不是聊天机器人。小模型、硬门、换语料。",
+          "M5.3：838k，bind 5.6%→98.6%，结构没改。",
+          "M6：887168 参数，K=512，权重上有 Z 护照。"
+        ],
+        "note": "17.6倍和 real-file 0/6 放在同一次讲。"
+      }
+    },
+    {
+      "type": "buyer",
+      "ru": {
+        "kicker": "КОМУ",
+        "title": "Кому нести",
+        "lines": [
+          "On-device и внутренний язык компании.",
+          "Research, кому важен compiler-in-the-loop.",
+          "Supply-chain: чекпоинт с паспортом."
+        ],
+        "note": "Не competing с их 70B чатом."
+      },
+      "en": {
+        "kicker": "WHO",
+        "title": "Who this is for",
+        "lines": [
+          "On-device and internal company languages.",
+          "Labs that care about compiler-in-the-loop eval.",
+          "Supply-chain: a checkpoint with a passport."
+        ],
+        "note": "Not competing with their 70B chat."
+      },
+      "zh": {
+        "kicker": "对象",
+        "title": "该找谁",
+        "lines": [
+          "端侧和公司内部语言。",
+          "在乎 compiler-in-the-loop 的研究组。",
+          "供应链：带护照的检查点。"
+        ],
+        "note": "不跟他们的70B聊天抢。"
+      }
+    },
+    {
+      "type": "pain",
+      "ru": {
+        "kicker": "БОЛЬ",
+        "title": "Три расхода",
+        "lines": [
+          "Эксперт узкого языка не обязан жить на кластере.",
+          "Данных на внутренний язык нет в природе.",
+          "Ответ без запуска — мнение."
+        ],
+        "note": "Без революций."
+      },
+      "en": {
+        "kicker": "PAIN",
+        "title": "Three costs",
+        "lines": [
+          "A narrow expert does not need a cluster.",
+          "Internal-language data is not on the internet.",
+          "An answer that never ran is an opinion."
+        ],
+        "note": "No revolution talk."
+      },
+      "zh": {
+        "kicker": "痛点",
+        "title": "三项花费",
+        "lines": [
+          "窄专家不必上集群。",
+          "内部语言数据网上没有。",
+          "没跑过的回答只是看法。"
+        ],
+        "note": "别喊革命。"
+      }
+    },
+    {
+      "type": "ship",
+      "ru": {
+        "kicker": "ЧТО",
+        "title": "Что продаём",
+        "lines": [
+          "Фабрика + numpy-трансформер + гейт kenga-lite.",
+          "Карточка M5.3 на HF (GermannM).",
+          "M6 + passport.json, marker 6108e4d16400d5e1."
+        ],
+        "note": "Веса не называть Grok."
+      },
+      "en": {
+        "kicker": "SHIP",
+        "title": "What we sell",
+        "lines": [
+          "Factory, numpy transformer, kenga-lite gate.",
+          "M5.3 card on HF (GermannM).",
+          "M6 plus passport.json, marker 6108e4d16400d5e1."
+        ],
+        "note": "Do not call the weights Grok."
+      },
+      "zh": {
+        "kicker": "交付",
+        "title": "卖什么",
+        "lines": [
+          "工厂、numpy transformer、kenga-lite 门。",
+          "HF 上的 M5.3 卡片。",
+          "M6 加护照，marker 6108e4d16400d5e1。"
+        ],
+        "note": "别叫 Grok。"
+      }
+    },
+    {
+      "type": "proof",
+      "ru": {
+        "kicker": "ЦИФРЫ",
+        "title": "Таблица",
+        "lines": [
+          "M5.3 A: factory compile 92.5% → 100%.",
+          "M5.3 B: bind compile x17.6 (5.6% → 98.6%).",
+          "M5.3 C: real-file compile 1/6, stdout 0/6.",
+          "M6 held-out 25.08 overall 72.57%. Genesis закрыт по realgen T1."
+        ],
+        "note": "Идущие эвалы не вписывать."
+      },
+      "en": {
+        "kicker": "NUMBERS",
+        "title": "Table",
+        "lines": [
+          "M5.3 A: factory compile 92.5% to 100%.",
+          "M5.3 B: bind compile x17.6 (5.6% to 98.6%).",
+          "M5.3 C: real-file 1/6 compile, 0/6 stdout.",
+          "M6 held-out 25 Aug 72.57%. Genesis closed on realgen T1."
+        ],
+        "note": "Do not paste in-flight evals."
+      },
+      "zh": {
+        "kicker": "数字",
+        "title": "表",
+        "lines": [
+          "M5.3 A：factory compile 92.5%→100%。",
+          "M5.3 B：bind x17.6（5.6%→98.6%）。",
+          "M5.3 C：real-file 1/6 compile，stdout 0/6。",
+          "M6 25日 held-out 72.57%。Genesis 因 realgen T1 关闭。"
+        ],
+        "note": "进行中的评测别写。"
+      }
+    },
+    {
+      "type": "fit",
+      "ru": {
+        "kicker": "КУДА",
+        "title": "Как живёт",
+        "lines": [
+          "Их интерпретатор — гейт.",
+          "Пилот до ~2M параметров, критерий до старта.",
+          "Паспорт едет с чекпоинтом."
+        ],
+        "note": "Пилот не про GPU rack."
+      },
+      "en": {
+        "kicker": "FIT",
+        "title": "How it lives",
+        "lines": [
+          "Their interpreter is the gate.",
+          "Pilot up to ~2M params; they write the bar first.",
+          "Passport travels with the checkpoint."
+        ],
+        "note": "Not a GPU-rack ask."
+      },
+      "zh": {
+        "kicker": "位置",
+        "title": "怎么活",
+        "lines": [
+          "他们的解释器就是门。",
+          "试点大约到 2M，标准先写。",
+          "护照跟检查点走。"
+        ],
+        "note": "试点不是要 GPU。"
+      }
+    },
+    {
+      "type": "honest",
+      "ru": {
+        "kicker": "НЕТ",
+        "title": "Чего нет",
+        "lines": [
+          "Не Grok и не Kenga-ai/kenga-mm.",
+          "NL greedy match 1.2% утром 25.08.",
+          "Без двух сидов не говорим про траекторию."
+        ],
+        "note": "Слайд обязательный."
+      },
+      "en": {
+        "kicker": "LIMITS",
+        "title": "Missing",
+        "lines": [
+          "Not Grok. Not Kenga-ai/kenga-mm.",
+          "NL greedy match 1.2% on 25 Aug morning.",
+          "No trajectory-vs-data claim without two seeds."
+        ],
+        "note": "Keep this slide."
+      },
+      "zh": {
+        "kicker": "不是",
+        "title": "缺什么",
+        "lines": [
+          "不是 Grok，不是 Kenga-ai/kenga-mm。",
+          "NL greedy match 1.2%（25日上午）。",
+          "没有双种子就不讲轨迹。"
+        ],
+        "note": "必留。"
+      }
+    },
+    {
+      "type": "repro",
+      "ru": {
+        "kicker": "КОМАНДЫ",
+        "title": "Воспроизведение",
+        "lines": [
+          "hf/Kenga-Prophet-m5.3/README.md",
+          "python tools\\\\zcert.py verify minds\\\\mid_prophet_m6_w.txt --cert minds\\\\mid_prophet_m6_w.txt.passport.json",
+          "python tools\\\\corpus_eval.py --category bind",
+          "docs/PITCH_DECK.md"
+        ],
+        "note": "Паспорт проверить в зале."
+      },
+      "en": {
+        "kicker": "COMMANDS",
+        "title": "Reproduce",
+        "lines": [
+          "hf/Kenga-Prophet-m5.3/README.md",
+          "python tools\\\\zcert.py verify minds\\\\mid_prophet_m6_w.txt --cert minds\\\\mid_prophet_m6_w.txt.passport.json",
+          "python tools\\\\corpus_eval.py --category bind",
+          "docs/PITCH_DECK.md"
+        ],
+        "note": "Verify the passport in the room."
+      },
+      "zh": {
+        "kicker": "命令",
+        "title": "复现",
+        "lines": [
+          "hf/Kenga-Prophet-m5.3/README.md",
+          "python tools\\\\zcert.py verify ...passport.json",
+          "python tools\\\\corpus_eval.py --category bind",
+          "docs/PITCH_DECK.md"
+        ],
+        "note": "会上核对护照。"
+      }
+    },
+    {
+      "type": "offer",
+      "ru": {
+        "kicker": "СДЕЛКА",
+        "title": "Три формата",
+        "lines": [
+          "Покупка стека.",
+          "Пилот 4 недели, модель до ~2M.",
+          "Партнёрство: сдвинуть realgen. Сейчас гейт закрыт."
+        ],
+        "note": "Критерий — до старта."
+      },
+      "en": {
+        "kicker": "DEAL",
+        "title": "Three shapes",
+        "lines": [
+          "Acquire the stack.",
+          "Four-week pilot, model up to ~2M.",
+          "Partnership to move realgen. Gate closed today."
+        ],
+        "note": "Bar before kickoff."
+      },
+      "zh": {
+        "kicker": "交易",
+        "title": "三种",
+        "lines": [
+          "买下栈。",
+          "四周试点，模型大约到 2M。",
+          "合作推动 realgen。门今天关着。"
+        ],
+        "note": "开始前写标准。"
+      }
+    },
+    {
+      "type": "close",
+      "ru": {
+        "kicker": "ДАЛЬШЕ",
+        "title": "Просьба",
+        "lines": [
+          "30 минут с владельцем языка и eval.",
+          "На столе: карточка M5.3, паспорт M6, M6_REPORT.",
+          "GPU в первом письме нет."
+        ],
+        "note": "Имя владельца интерпретатора."
+      },
+      "en": {
+        "kicker": "NEXT",
+        "title": "Ask",
+        "lines": [
+          "30 minutes with language and eval owner.",
+          "M5.3 card, M6 passport, M6_REPORT on the table.",
+          "No GPU in the first email."
+        ],
+        "note": "Interpreter owner name."
+      },
+      "zh": {
+        "kicker": "下一步",
+        "title": "请求",
+        "lines": [
+          "和管语言与评测的人谈 30 分钟。",
+          "桌上：M5.3 卡片、M6 护照、M6_REPORT。",
+          "第一封信不提 GPU。"
+        ],
+        "note": "要到解释器负责人。"
+      }
+    }
+  ]
+}
