@@ -110,5 +110,3 @@ Lite: `examples/selfhost/struct_lite.kenga`.
 `examples/ml/kenga_mm_words.kenga` — цвет одним словом + `kenga zhivet v yazyke`.
 
 Бонус: `scripts\bc-run.cmd examples\ml\kenga_birth.kenga` — birth без lite VM, потом `kenga-lite run examples\ml\kenga_born.kenga` → 24.
-
-Дальше: `docs/KENGA_LM.md` · `docs/HUGGINGFACE.md` · `docs/ROADMAP.md`.

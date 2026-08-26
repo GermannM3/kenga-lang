@@ -32,6 +32,7 @@ examples/*.c
 *.gen.c
 
 # === Generated minds / weights (demos stay: agent.km demo.km multi.km) ===
+minds/genesis/copies/
 minds/_*
 minds/word_lm_*.kt
 minds/kenga_lm_*.kt
@@ -64,3 +65,22 @@ dist/
 *.log
 .env
 .env.*
+
+# Lab / not the public language surface (kept locally)
+sell/
+hf/
+tools/
+docs/PITCH_DECK.md
+docs/GENESIS_V0.md
+docs/FACTORY_V3_NOTES.md
+docs/NEUROMODEL_27B.md
+docs/HUGGINGFACE.md
+docs/FOR_FRIENDS.md
+docs/PICO_PROPHET.md
+docs/KENGA_LM.md
+docs/KENGA_RESOURCE_SPEC.md
+docs/LIVING_MULTIMODAL.md
+minds/corpus_factory/
+minds/repair_corpus/
+minds/mid_prophet_*
+minds/kenga_big_*

@@ -1,26 +1,20 @@
 # Что лежит в репозитории
 
-Репозиторий — для **пользователей и форков**, не свалка артефактов.
+Публичное — язык и обучалки. Лаборатория (корпуса, питчи, веса Prophet) в git не входит.
 
 ## Есть на GitHub
 
 | Путь | Зачем |
 |---|---|
-| `README.md`, `docs/` | ставить, учить, запускать |
+| `README.md`, `docs/LANGUAGE.md`, `LEARN.md`, `EXERCISES.md`, `TOUR.md`, `SPEC.md` | ставить и учить |
 | `examples/` | рабочие программы |
-| `kenga/` | **замена Rust**: compiler/emit на `.kenga` |
-| `bootstrap/` | C99 runtime (временный host) |
-| `editors/vscode/` | расширение + актуальный `.vsix` |
-| `minds/*.km` | демо для chat |
+| `kenga/` | compiler/emit на `.kenga` |
+| `bootstrap/` | C99 runtime |
+| `editors/vscode/` | расширение |
+| `minds/*.km` | демо chat |
 | `scripts/` | smoke |
-| `src/`, `Cargo.toml` | **legacy** Rust-хост (см. `docs/REPLACE_RUST.md`) |
+| `src/` | legacy Rust |
 
-## Нет на GitHub (gitignore)
+## Нет на GitHub
 
-- `target/`, бинарники, `bootstrap/bin/`
-- emit-артефакты, `tmp_*`
-- веса `minds/word_lm_*`, `minds/_*`
-- старые `.vsix` (только текущий)
-
-Друзьям: Releases **или** `bootstrap\build.cmd`.  
-Свобода: `docs/INDEPENDENCE.md` · замена Rust: `docs/REPLACE_RUST.md`.
+Лаба, питчи, веса моделей, `tools/`, `sell/`, `hf/`.

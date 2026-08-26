@@ -52,4 +52,4 @@ scripts\freedom-smoke.cmd
 
 Статус по модулям: `docs/REPLACE_RUST.md`.
 
-Свои сети живут в `examples/ml/` (birth в т.ч. native C, char-LM, PPM+WAV→текст). Учебник: `docs/LEARN.md` §8. HF: `docs/HUGGINGFACE.md`.
+Свои сети как примеры на языке — `examples/ml/`. Учебник: `docs/LEARN.md`.

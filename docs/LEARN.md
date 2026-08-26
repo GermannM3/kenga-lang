@@ -138,10 +138,7 @@ bootstrap\bin\kenga-lite.exe run examples\ml\kenga_mm_words.kenga
 scripts\kenga-mm.cmd
 ```
 
-Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).  
-`kenga_mm_gen` — по буквам, стебель `kra`/`ze`/`si`.  
-`kenga_mm_words` — цвет одним токеном (`krasnyj` / `zelenyj` / `sinij`) и текст `kenga zhivet v yazyke`. Talk грузит веса.  
-Шкала: `docs/KENGA_LM.md`. Куда потом большую: `docs/HUGGINGFACE.md`.
+Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).
 
 ## 9. Упражнения
 
@@ -153,7 +150,4 @@ Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, з
 - Справочник: `docs/LANGUAGE.md`
 - Self-host: `docs/SELFHOST.md`
 - Свобода от Rust: `docs/INDEPENDENCE.md`
-- План: `docs/ROADMAP.md`
-- Питч: `docs/FOR_FRIENDS.md`
-- Своя LM: `docs/KENGA_LM.md`
-- Hugging Face: `docs/HUGGINGFACE.md`
+- Тур: `docs/TOUR.md`

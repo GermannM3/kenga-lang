@@ -44,9 +44,7 @@ GitHub Linguist ещё не знает `.kenga` (порог: тысячи пуб
 
 Язык. Компилятор `kenga/compiler/more.kenga` написан на Kenga. Байткод-VM. Emit в C (`lower_c`, `bc_src_c`). Новый код — в `kenga/` и `bootstrap/`, не в `src/` (там legacy Rust).
 
-В языке же: тензоры, tape-autograd, Prophet-память (`remember` / `foresee`), события. Это библиотека рантайма, не отдельный продукт.
-
-**Вместо Python для маленького LM.** Decoder, XOR-MLP и birth (модель пишет `.kenga` → тот же runtime выполняет → `24`) гоняются через `kenga-lite` / native C, без PyTorch. Большой трансформер Prophet (M5/M6) пока учится numpy-скриптом в `tools/` — это лаборатория, не вход. PyTorch на 70B это не замена.
+В языке же: тензоры, tape-autograd, память `remember` / `foresee`, события. Это библиотека рантайма, не отдельный продукт.
 
 ---
 
@@ -59,31 +57,10 @@ GitHub Linguist ещё не знает `.kenga` (порог: тысячи пуб
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\selfhost\bitops.kenga
 bootstrap\bin\kenga-lite.exe run examples\selfhost\hex_lab.kenga
-scripts\bc-run.cmd examples\ml\kenga_birth.kenga
+bootstrap\bin\kenga-lite.exe run examples\selfhost\struct_lite.kenga
 ```
 
 Полный self-host без gcc/cl — последний шаг лестницы. `kenga_lite.c` — каркас из ~90 строк includes.
-
----
-
-## LM на языке (не Python)
-
-```bat
-bootstrap\bin\kenga-lite.exe run examples\ml\kenga_net.kenga      # XOR MLP
-bootstrap\bin\kenga-lite.exe run examples\ml\kenga_lm.kenga       # decoder next-token
-scripts\kenga-birth.cmd                                          # пишет программу → 24
-bootstrap\bin\kenga-lite.exe chat minds\multi.km                  # векторы, не чат-LLM
-```
-
-Это не Grok и не HuggingFace-гигант. Словарь крошечный, D/L маленькие, GPU-ядра нет. Честная таблица:
-
-| Есть | Нет |
-|---|---|
-| Язык + VM + native C из `.kenga` | Linguist / полоска «Kenga» на github.com |
-| Decoder / tape / Prophet API в `.kenga` | 50k vocab, L=32, CUDA |
-| Birth → 24 одним рантаймом | Замена PyTorch |
-
-Исследования (Prophet numpy, «как 27B», pico 5/5): [docs/KENGA_LM.md](docs/KENGA_LM.md), [docs/NEUROMODEL_27B.md](docs/NEUROMODEL_27B.md). Не с этого начинать.
 
 ---
 
@@ -117,14 +94,12 @@ kenga-lite chat [mind.km]
 ```
 kenga/            канон: compiler + emit
 bootstrap/        C99 host
-examples/         язык + ml + selfhost
+examples/         язык, selfhost, упражнения
 editors/vscode/   грамматика (VSIX 3.13.0)
-editors/linguist/ черновик для github-linguist
 src/              legacy Rust, новый код сюда не идёт
-tools/            лабораторный Python (корпус / Prophet), не runtime
 ```
 
-Учить: [docs/LEARN.md](docs/LEARN.md) · упражнения: [docs/EXERCISES.md](docs/EXERCISES.md) · карта вместо Rust: [docs/REPLACE_RUST.md](docs/REPLACE_RUST.md) · план: [docs/ROADMAP.md](docs/ROADMAP.md).
+Учить: [docs/LEARN.md](docs/LEARN.md) · упражнения: [docs/EXERCISES.md](docs/EXERCISES.md) · тур: [docs/TOUR.md](docs/TOUR.md) · карта вместо Rust: [docs/REPLACE_RUST.md](docs/REPLACE_RUST.md).
 
 Книга языка: [book/](book/) — хроника, не научная монография.
 

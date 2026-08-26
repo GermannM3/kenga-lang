@@ -16,9 +16,6 @@
 | **Char-LM на нашем `.kenga`** | ✅ `examples/ml/kenga_charlm.kenga` + `kenga_char_talk.kenga` |
 | **Триграмма на нашем `.kenga`** | ✅ `examples/ml/kenga_trigram.kenga` — list/i64, `fn add(a: i64` |
 | **Birth → run** | ✅ lite, native C, **`more.kenga` пишет и запускает** `kenga_born.kenga` → **24** |
-| **Vision+audio → text** | ✅ word-decoder: 3 подписи + `kenga zhivet v yazyke` (12 токенов, CPU) |
-| Hugging Face | ⬜ большая модель → `Kenga-ai/kenga-mm`; сид: `docs/HUGGINGFACE.md` |
-| Половина Grok / GPU | ⬜ те же блоки × D/L/V + корпус + GPU; см. `docs/KENGA_LM.md` |
 
 ```bat
 bootstrap\bin\kenga-lite.exe run examples\ml\word_lm.kenga

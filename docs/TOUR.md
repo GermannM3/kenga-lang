@@ -154,14 +154,7 @@ H
   стратегия полной независимости от Rust — `docs/INDEPENDENCE.md`.
   Исходник компилятора lite, написанный на самой Kenga:
   `examples/selfhost/kenga_lite.kenga` → алиас `kenga/compiler/lite.kenga`.
-- **Factory** — генератор корпусов программ на Kenga для обучения микро-моделей
-  (`tools/corpus_factory.py`): каждая сгенерированная программа верифицируется
-  исполнением до попадания в корпус.
-- **Prophet** — микро-модель/память на чистой Kenga: `memory()` / `learn()` /
-  `predict()` / `unroll()`, примеры `examples/prophet.kenga`,
-  `examples/ml/world_model.kenga`, обзор `docs/PROPHET_LITE.md`.
-- Проектная запись решений по токенизатору/кодеку (128 токенов, приоритеты
-  Factory v3) — **ADR**: `docs/FACTORY_V3_NOTES.md`.
+- **Prophet** — память в рантайме: `memory()` / `learn()` / `predict()` / `unroll()`, примеры `examples/prophet.kenga`, обзор `docs/PROPHET_LITE.md`.
 
 Полный справочник языка (тензоры, Memory, события, struct): `docs/LANGUAGE.md`.
 Упражнения посложнее: `docs/EXERCISES.md`.
