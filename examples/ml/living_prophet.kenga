@@ -1,0 +1,151 @@
+// Living Prophet — written in Kenga, grows on verified experience.
+// Linear world-model + Prophet memory + disk identity (no LoRA).
+// Second run keeps the same mind file; weights re-fit on the oracle.
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\living_prophet.kenga
+//
+// Arena track: Kenga-live (this file compiles, runs, prints hits).
+// Not ruMTEB. Not GigaEmbeddings.
+
+fn physics(pos: i64, vel: i64, fuel: i64) -> list {
+    return [pos + vel + 0.0, vel + 0.0, fuel - 1 + 0.0];
+}
+
+fn pred(w: list, x: list) -> list {
+    let y0 = w[0] * x[0] + w[1] * x[1] + w[2] * x[2] + w[3];
+    let y1 = w[4] * x[0] + w[5] * x[1] + w[6] * x[2] + w[7];
+    let y2 = w[8] * x[0] + w[9] * x[1] + w[10] * x[2] + w[11];
+    return [y0, y1, y2];
+}
+
+fn step(w: list, x: list, y: list, lr: f64) -> f64 {
+    let p = pred(w, x);
+    let e0 = p[0] - y[0];
+    let e1 = p[1] - y[1];
+    let e2 = p[2] - y[2];
+    w[0] = w[0] - lr * e0 * x[0];
+    w[1] = w[1] - lr * e0 * x[1];
+    w[2] = w[2] - lr * e0 * x[2];
+    w[3] = w[3] - lr * e0;
+    w[4] = w[4] - lr * e1 * x[0];
+    w[5] = w[5] - lr * e1 * x[1];
+    w[6] = w[6] - lr * e1 * x[2];
+    w[7] = w[7] - lr * e1;
+    w[8] = w[8] - lr * e2 * x[0];
+    w[9] = w[9] - lr * e2 * x[1];
+    w[10] = w[10] - lr * e2 * x[2];
+    w[11] = w[11] - lr * e2;
+    return e0 * e0 + e1 * e1 + e2 * e2;
+}
+
+fn train_epoch(w: list, mind: Memory, lr: f64) -> f64 {
+    let loss: f64 = 0.0;
+    let n: i64 = 0;
+    for pos in 0..12 {
+        for vel in 0..3 {
+            let v = vel - 1;
+            let x = [pos + 0.0, v + 0.0, 8.0];
+            let y = physics(pos, v, 8);
+            let e = step(w, x, y, lr);
+            loss = loss + e;
+            n = n + 1;
+            if e > 0.05 {
+                remember_next(mind, x, y, 60);
+            }
+        }
+    }
+    return loss / n;
+}
+
+fn holdout(w: list) -> list {
+    let hits: i64 = 0;
+    let total: i64 = 0;
+    for pos in 1..10 {
+        for vel in 0..3 {
+            let v = vel - 1;
+            let want = physics(pos, v, 7);
+            let got = pred(w, [pos + 0.0, v + 0.0, 7.0]);
+            total = total + 1;
+            if round(got[0]) == round(want[0]) {
+                if round(got[1]) == round(want[1]) {
+                    if round(got[2]) == round(want[2]) {
+                        hits = hits + 1;
+                    }
+                }
+            }
+        }
+    }
+    return [hits, total];
+}
+
+fn retrieval_ok(w: list) -> i64 {
+    let q = pred(w, [4.0, 1.0, 6.0]);
+    let near = pred(w, [4.0, 1.0, 7.0]);
+    let far = pred(w, [0.0, 0.0 - 1.0, 2.0]);
+    if surprise(q, near) < surprise(q, far) {
+        return 1;
+    }
+    return 0;
+}
+
+fn stamp(path: str, hits: i64, total: i64, epoch: i64, resumed: i64) {
+    let pct: i64 = 0;
+    if total > 0 { pct = (hits * 100) / total; }
+    let body: str = "{\"kind\":\"kenga-living-prophet\",\"hits\":";
+    body = body + to_str(hits);
+    body = body + ",\"total\":" + to_str(total);
+    body = body + ",\"pct\":" + to_str(pct);
+    body = body + ",\"epoch\":" + to_str(epoch);
+    body = body + ",\"resumed\":" + to_str(resumed);
+    body = body + ",\"lang\":\"kenga\"}\n";
+    write_file(path + ".passport.json", body);
+}
+
+fn main() -> i64 {
+    let path: str = "minds/_living_prophet.km";
+    let resumed: i64 = 0;
+    let mind: Memory = memory_config(5, 96, 32);
+    if z_is_alive(path) == 1 {
+        mind = load_mind(path);
+        resumed = 1;
+        println("resume");
+    } else {
+        println("birth");
+    }
+
+    let w = [0.2, 0.1, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0];
+    let lr = 0.01;
+    let e: i64 = 0;
+    while e < 40 {
+        let loss = train_epoch(w, mind, lr);
+        if e % 10 == 0 { println(loss); }
+        e = e + 1;
+    }
+    consolidate(mind);
+
+    let sc = holdout(w);
+    let hits: i64 = sc[0];
+    let total: i64 = sc[1];
+    let pct: i64 = 0;
+    if total > 0 { pct = (hits * 100) / total; }
+    let ret: i64 = retrieval_ok(w);
+
+    save_mind(mind, path);
+    stamp(path, hits, total, 40, resumed);
+
+    println("ARENA kenga_living_prophet");
+    println(hits);
+    println(total);
+    println(pct);
+    println(resumed);
+    println(z_is_alive(path));
+    println(z_verify(path));
+    println(ret);
+
+    assert(z_is_alive(path) == 1);
+    assert(z_verify(path) == 1);
+    assert(hits >= 20);
+    assert(ret == 1);
+    println("living prophet ok");
+    return 0;
+}
