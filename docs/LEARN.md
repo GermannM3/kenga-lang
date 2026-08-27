@@ -140,7 +140,7 @@ scripts\kenga-mm.cmd
 
 Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).
 
-Живой Пророк (память, паспорт, повторный запуск продолжает то же тело): `examples/ml/living_prophet.kenga`.
+Живой Пророк: `examples/ml/living_prophet.kenga`. Спека 400M (Z-ёмкость + смесь проверенных программ): `examples/ml/prophet_400m.kenga`.
 
 ## 9. Упражнения
 

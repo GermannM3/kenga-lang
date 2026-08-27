@@ -1,8 +1,10 @@
-// Living Prophet ó written in Kenga, grows on verified experience.
+// Living Prophet ù written in Kenga, grows on verified experience.
 // Linear world-model + Prophet memory + disk identity (no LoRA).
 // Second run keeps the same mind file; weights re-fit on the oracle.
 //
 //   bootstrap\bin\kenga-lite.exe run examples\ml\living_prophet.kenga
+// Industrial 400M (Z-capacity + Kenga mix): examples/ml/prophet_400m.kenga
+//   + D:\z-system\exp_PROPHET_400.py
 //
 // Arena track: Kenga-live (this file compiles, runs, prints hits).
 // Not ruMTEB. Not GigaEmbeddings.

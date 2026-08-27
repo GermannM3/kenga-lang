@@ -1,0 +1,54 @@
+// Prophet-400  industrial body of the living Prophet.
+// Methods: Z-Capacity (rank curriculum) + Kenga verified programs in the mix.
+// This file is the spec ML people can read. Weights train in z-system
+// exp_PROPHET_400.py on the 1660 (full factors ~400M, start thin).
+//
+//   bootstrap\bin\kenga-lite.exe run examples\ml\prophet_400m.kenga
+//
+// Fair fight vs GigaEmbeddings ~480M is THIS size, not 1.5B personality.
+
+fn d_model() -> i64 { return 1280; }
+fn n_layers() -> i64 { return 16; }
+fn n_heads() -> i64 { return 20; }
+fn d_ff() -> i64 { return 5120; }
+fn k_attn_full() -> i64 { return 512; }
+fn k_ff_full() -> i64 { return 1280; }
+fn k_attn0() -> i64 { return 128; }
+fn k_ff0() -> i64 { return 384; }
+
+fn bl_params(inf: i64, outf: i64, k: i64) -> i64 {
+    return outf * k + inf * k + k + outf;
+}
+
+fn n_params() -> i64 {
+    let d = d_model();
+    let ka = k_attn_full();
+    let kf = k_ff_full();
+    let dff = d_ff();
+    let attn = 4 * bl_params(d, d, ka);
+    let ff = bl_params(d, dff, kf) + bl_params(dff, d, kf);
+    return n_layers() * (attn + ff);
+}
+
+fn stamp(path: str, n: i64) {
+    let body: str = "{\"kind\":\"kenga-prophet-400\",\"D\":1280,\"L\":16,\"K_ATTN\":512,\"K_FF\":1536,\"n_params\":";
+    body = body + to_str(n);
+    body = body + ",\"z_curriculum\":\"128/384 -> 256/640 -> 512/1280\",\"kenga_mix\":1,\"fair_vs_giga_480m\":1,\"note\":\"K_FF capped at D=1280, ~350M factors\"}\n";
+    write_file(path, body);
+}
+
+fn main() -> i64 {
+    let n = n_params();
+    println("PROPHET400");
+    println(d_model());
+    println(n_layers());
+    println(k_attn_full());
+    println(k_ff_full());
+    println(n);
+    stamp("minds/_prophet_400m.passport.json", n);
+    assert(n > 330000000);
+    assert(n < 370000000);
+    assert(z_is_alive("minds/_prophet_400m.passport.json") == 1);
+    println("prophet 400 spec ok");
+    return 0;
+}
