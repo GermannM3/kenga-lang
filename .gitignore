@@ -61,6 +61,7 @@ editors/vscode/*.vsix
 !editors/vscode/kenga-3.13.0.vsix
 
 # Misc
+str_kv_out.txt
 dist/
 *.log
 .env
@@ -82,5 +83,12 @@ docs/KENGA_RESOURCE_SPEC.md
 docs/LIVING_MULTIMODAL.md
 minds/corpus_factory/
 minds/repair_corpus/
+minds/repair_corpus_v2/
+minds/tg_memory.txt
+minds/tg_offset.txt
+minds/tg_prev.txt
+minds/tg_prophet.km
+minds/tg_boot.err
+minds/bot_*.log
 minds/mid_prophet_*
 minds/kenga_big_*

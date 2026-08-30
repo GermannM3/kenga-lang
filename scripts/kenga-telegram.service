@@ -1,0 +1,17 @@
+[Unit]
+Description=Kenga Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/kenga-lang
+EnvironmentFile=/etc/kenga/telegram.env
+ExecStart=/opt/kenga-lang/bootstrap/bin/kenga-lite run examples/telegram_bot.kenga
+Restart=always
+RestartSec=3
+# long poll ~20s; do not kill mid-request unless needed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

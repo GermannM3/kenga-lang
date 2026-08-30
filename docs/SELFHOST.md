@@ -46,9 +46,9 @@ bootstrap\rebuild-from-kenga.cmd
 | 5 | `bytecode.kenga` | stack VM + emit assign/expr |
 | 6 | `bc_while.kenga` | bytecode while via JMP/JMPF |
 | 7 | `bc_fn.kenga` | bytecode functions CALL/RET |
-| 8 | `kenga_lite.kenga` | тот же диалект, написанный на Kenga |
+| 8 | `kenga/compiler/lite.kenga` | i64 VM: `for i in a..b`, `break`/`continue`, `match` i64 |
 | 9 | `kenga_more.kenga` | f64 + lists + println/assert/round |
-| 10 | `kenga/compiler/more.kenga` | for / elif / struct / import / events / opcodes 1–109 (`argc`/`arg`/`file_exists`/`read_line`) |
+| 10 | `kenga/compiler/more.kenga` | for / elif / struct / import / events / map / json_set / match str / host I/O |
 | 11 | `kenga/emit/lower_c.kenga` | recursive Kenga→C99 (agent, lists, struct, f64, import) |
 | 12 | `kenga/emit/lower_kv.kenga` + `rt_kval` | tagged KVal path (str/ord/lex/parse) |
 | 13 | `opcodes_c` + `bc_vm_c` + `bc_compile_c` + **`bc_src_c`** | opcodes + VM + while→bytecode→native → `bc_one_out.exe` через `gcc`/`cl` |

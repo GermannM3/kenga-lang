@@ -39,6 +39,9 @@ kenga run --lite examples/hello.kenga
 - `while cond { … }`
 - `for i in 0..n { … }` / `for x in xs { … }`
 - `break` / `continue`
+- `match x { 0 => { … } _ => { … } }` — i64 везде; строки — на more (`examples/selfhost/match_str.kenga`)
+- `slice` / `index_of` / `starts_with` / `split` — `examples/selfhost/str_lab.kenga`
+- `map_new` / `map_get` / `map_set` / `map_has` / `json_set` — more; лаба `map_lab.kenga`
 - `&&` `||` `!` `%` `typeof` `to_str` (lite, `more`, lowerers, `bc_src_c`)
 - `print` без `\n`, `sleep_ms` (lite, `more`; `lower_c` / `lower_kv` / `bc_src_c`)
 - `learn` / `predict` / `unroll` / `remember_next` на `more` VM (хост — lite builtins)
@@ -103,6 +106,10 @@ kenga run --lite examples\selfhost\struct_lite.kenga
 kenga run --lite examples\selfhost\float_lite.kenga
 kenga run --lite examples\selfhost\elif_lite.kenga
 kenga run --lite examples\selfhost\for_lite.kenga
+kenga run --lite examples\selfhost\str_lab.kenga
+kenga run --lite examples\selfhost\map_lab.kenga
+kenga run --lite examples\selfhost\match_str.kenga
+kenga run --lite kenga\compiler\lite.kenga
 kenga run --lite examples\agent.kenga
 ```
 
@@ -141,6 +148,8 @@ scripts\kenga-mm.cmd
 Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, запуск — **24**. Тот же birth собирается в native C (`bc-run`).
 
 Живой Пророк: `examples/ml/living_prophet.kenga`. Спека 400M (Z-ёмкость + смесь проверенных программ): `examples/ml/prophet_400m.kenga`.
+
+Telegram-бот на том же языке: `examples/telegram_bot.kenga` (токен в `TELEGRAM_BOT_TOKEN`). Слышит чат, отвечает из `minds/tg_memory.txt`, тихо учит 16-d Пророка (`minds/tg_prophet.km`). `remember: факт`, `search: запрос`, вопрос с `?`. VPS: `docs/VPS.md`.
 
 ## 9. Упражнения
 

@@ -308,6 +308,54 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         j++;
         i64a_push(code, OP_PUMP);
         i = j;
+      } else if (strcmp(id.name, "after_ms") == 0) {
+        int k;
+        free(id.name);
+        j++;
+        for (k = 0; k < 3; k++) {
+          j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+          j = skip(s, j, n);
+          if (k < 2) {
+            if (j >= n || s[j] != ',') die("expected , in after_ms");
+            j++;
+          }
+        }
+        if (j >= n || s[j] != ')') die("expected ) in after_ms");
+        j++;
+        i64a_push(code, OP_AFTER_MS);
+        i = j;
+      } else if (strcmp(id.name, "slice") == 0) {
+        int k;
+        free(id.name);
+        j++;
+        for (k = 0; k < 3; k++) {
+          j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+          j = skip(s, j, n);
+          if (k < 2) {
+            if (j >= n || s[j] != ',') die("expected , in slice");
+            j++;
+          }
+        }
+        if (j >= n || s[j] != ')') die("expected ) in slice");
+        j++;
+        i64a_push(code, OP_SLICE);
+        i = j;
+      } else if (strcmp(id.name, "flush_due") == 0) {
+        free(id.name);
+        j++;
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in flush_due");
+        j++;
+        i64a_push(code, OP_FLUSH_DUE);
+        i = j;
+      } else if (strcmp(id.name, "timer_n") == 0) {
+        free(id.name);
+        j++;
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in timer_n");
+        j++;
+        i64a_push(code, OP_TIMER_N);
+        i = j;
       } else if (strcmp(id.name, "pending") == 0) {
         free(id.name);
         j++;
@@ -407,6 +455,53 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         j++;
         i64a_push(code, OP_SLEEP_MS);
         i = j;
+      } else if (strcmp(id.name, "getenv") == 0 || strcmp(id.name, "json_escape") == 0 ||
+                 strcmp(id.name, "url_encode") == 0 || strcmp(id.name, "html_text") == 0) {
+        int opx = OP_GETENV;
+        if (strcmp(id.name, "json_escape") == 0) opx = OP_JSON_ESCAPE;
+        if (strcmp(id.name, "url_encode") == 0) opx = OP_URL_ENCODE;
+        if (strcmp(id.name, "html_text") == 0) opx = OP_HTML_TEXT;
+        free(id.name);
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in str-host");
+        j++;
+        i64a_push(code, opx);
+        i = j;
+      } else if (strcmp(id.name, "json_get") == 0 || strcmp(id.name, "index_of") == 0 ||
+                 strcmp(id.name, "split") == 0) {
+        int op2 = OP_JSON_GET;
+        if (strcmp(id.name, "index_of") == 0) op2 = OP_INDEX_OF;
+        if (strcmp(id.name, "split") == 0) op2 = OP_SPLIT;
+        free(id.name);
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ',') die("expected , in 2-str");
+        j++;
+        j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+        j = skip(s, j, n);
+        if (j >= n || s[j] != ')') die("expected ) in 2-str");
+        j++;
+        i64a_push(code, op2);
+        i = j;
+      } else if (strcmp(id.name, "http_request") == 0) {
+        int k;
+        free(id.name);
+        j++;
+        for (k = 0; k < 4; k++) {
+          j = emit_cmp(s, j, n, code, vnames, fnames, faddrs, fargc);
+          j = skip(s, j, n);
+          if (k < 3) {
+            if (j >= n || s[j] != ',') die("expected , in http_request");
+            j++;
+          }
+        }
+        if (j >= n || s[j] != ')') die("expected ) in http_request");
+        j++;
+        i64a_push(code, OP_HTTP_REQUEST);
+        i = j;
       } else if (strcmp(id.name, "println") == 0 || strcmp(id.name, "print") == 0) {
         free(id.name);
         die("print/println is a statement, not an expression");
@@ -443,6 +538,28 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         emit3(code, OP_CALL, 0, argc);
         call_patch_add(code->len - 2, fni);
         i = j;
+      }
+    } else if (j < n && s[j] == '.' && !(j + 1 < n && s[j + 1] == '.')) {
+      /* Color.Red → CONST tag; p.x still LOAD + GET via postfix */
+      int tid = find_struct_type(id.name);
+      if (tid >= 0) {
+        Ident fld;
+        int fidx;
+        free(id.name);
+        fld = parse_ident(s, j + 1, n);
+        fidx = field_index_of(&g_stypes[tid], fld.name);
+        if (fidx < 0) {
+          free(fld.name);
+          die("unknown enum variant");
+        }
+        emit2(code, OP_CONST, fidx);
+        free(fld.name);
+        i = fld.i;
+      } else {
+        int sl = slot_of(vnames, id.name);
+        free(id.name);
+        emit2(code, OP_LOAD, sl);
+        i = id.i;
       }
     } else {
       int sl = slot_of(vnames, id.name);

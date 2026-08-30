@@ -155,6 +155,20 @@ static int selftest(void) {
       {"fn main() { 1 < 2 && 3 > 1 }", 1},
       {"fn main() { 1 > 2 || 2 > 1 }", 1},
       {"fn main() { !(1 == 2) }", 1},
+      {"fn main() { let x = 3; x += 2; x *= 2; x -= 4; x /= 2; x }", 3},
+      {"fn main() { let xs = [1, 2]; xs[0] += 6; xs[0] }", 7},
+      {"struct Point { x, y } fn main() { let p = Point { x: 3, y: 4 }; p.x += 7; "
+       "p.x }",
+       10},
+      {"fn main() { let s = 0; for i in 0..10 step 2 { s = s + i; } s }", 20},
+      {"fn boom() { assert(0); 1 } fn main() { 0 && boom() }", 0},
+      {"fn boom() { assert(0); 1 } fn main() { 1 || boom() }", 1},
+      {"fn mark(xs) { xs[0] = xs[0] + 1; 1 } fn main() { let h = [0]; let r = 1 && "
+       "mark(h); r + h[0] * 10 }",
+       11},
+      {"fn mark(xs) { xs[0] = xs[0] + 1; 1 } fn main() { let h = [0]; let r = 0 || "
+       "mark(h); r + h[0] * 10 }",
+       11},
       {"fn main() { /* c */ 1 + /* x */ 2 }", 3},
       {"fn main() { let x = 1; /*\n x = 9; \n*/ x }", 1},
       {"fn main() { ord(to_str(42)[0]) }", 52},
@@ -164,6 +178,36 @@ static int selftest(void) {
       {"fn main() { let m = memory_config(5, 16, 8); learn(m, [1, 2, 3], [2, 3, "
        "4]); let t = foresee_n(m, [1, 2, 3], 2); assert(len(t) == 2); assert(len(t[0]) "
        "== 3); 0 }",
+       0},
+      {"fn main() { let x = 2; let v = 0; match x { 2 => { v = 99; } _ => { v = 0; "
+       "} } v }",
+       99},
+      {"fn classify(n) { match n { 0 => { 10 } 1 => { 20 } 2 => { 30 } _ => { 40 } "
+       "} } fn main() { classify(0) + classify(1) + classify(2) + classify(7) }",
+       100},
+      {"fn main() { match 7 { 0 => { 1 } _ => { 40 } } }", 40},
+      {"fn main() { match 0 - 1 { -1 => { 5 } _ => { 0 } } }", 5},
+      {"enum Color { Red, Green, Blue } fn main() { Color.Green }", 1},
+      {"enum Color { Red, Green, Blue } fn main() { Color.Red }", 0},
+      {"enum Color { Red, Green, Blue } fn main() { Color.Blue }", 2},
+      {"enum Color { Red, Green, Blue } fn main() { let c = Color.Green; match c { "
+       "Color.Red => { 10 } Color.Green => { 20 } _ => { 30 } } }",
+       20},
+      {"enum E { A { x: i64 }, B } fn main() { E.B }", 1},
+      {"fn main() { getenv(\"KENGA_NO_SUCH_ZZ99\") == \"\" }", 1},
+      {"fn main() { json_escape(\"hi\") == \"hi\" }", 1},
+      {"fn main() { url_encode(\"a b\") == \"a%20b\" }", 1},
+      {"fn main() { html_text(\"<b>x</b>\") == \"x\" }", 1},
+      {"fn main() { html_text(\"a&amp;b\") == \"a&b\" }", 1},
+      {"fn main() { slice(\"abcdef\", 1, 4) == \"bcd\" }", 1},
+      {"fn main() { index_of(\"hello\", \"ll\") }", 2},
+      {"fn main() { let xs = split(\"a,b\", \",\"); xs[0] == \"a\" && xs[1] == \"b\" }", 1},
+      {"fn main() { json_get(\"{\\\"a\\\":1}\", \"a\") == \"1\" }", 1},
+      {"fn main() { json_get(\"{\\\"ok\\\":true,\\\"result\\\":[{\\\"update_id\\\":5}]}\", "
+       "\"result.0.update_id\") == \"5\" }",
+       1},
+      {"on \"t\"(x) { emit(\"t\", x); } fn main() { after_ms(0, \"t\", 1); "
+       "assert(pending() >= 1); assert(pump(4) >= 1); 0 }",
        0},
   };
   size_t n = sizeof(cases) / sizeof(cases[0]);

@@ -32,7 +32,9 @@ Lite без Rust вообще (только C-компилятор):
 bash bootstrap/build.sh
 ./bootstrap/bin/kenga-lite run examples/hello.kenga
 ./bootstrap/bin/kenga-lite run examples/native_lists.kenga
+./bootstrap/bin/kenga-lite run examples/selfhost/str_lab.kenga
 kenga run --lite examples/selfhost/for_lite.kenga
+# бот: TELEGRAM_BOT_TOKEN=… ./bootstrap/bin/kenga-lite run examples/telegram_bot.kenga
 ```
 
 macOS: если нет `cc` → `xcode-select --install`.

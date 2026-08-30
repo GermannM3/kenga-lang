@@ -1,0 +1,25 @@
+// String arms on match (more VM). Same desugar as i64: temp + ==.
+
+fn cmd(s: str) -> i64 {
+    match s {
+        "/start" => { 1 }
+        "/help" => { 2 }
+        "/stats" => { 3 }
+        _ => { 0 }
+    }
+}
+
+fn main() -> i64 {
+    assert(cmd("/start") == 1);
+    assert(cmd("/help") == 2);
+    assert(cmd("/stats") == 3);
+    assert(cmd("/no") == 0);
+    let t: str = "go";
+    let v: i64 = 0;
+    match t {
+        "go" => { v = 8; }
+        _ => { v = 0; }
+    }
+    assert(v == 8);
+    return 0;
+}

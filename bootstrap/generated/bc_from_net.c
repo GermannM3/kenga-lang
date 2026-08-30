@@ -6,8 +6,11 @@
 #include <math.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <winhttp.h>
 #else
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
 #include "opcodes.inc.c"
 

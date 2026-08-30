@@ -1,0 +1,18 @@
+// Unit enums on more.kenga (kenga-lite run file ? more VM).
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\enum_lab.kenga
+// Variants are i64 tags 0..n-1. Color.Red is CONST, not GET.
+
+enum Color { Red, Green, Blue }
+fn main() -> i64 {
+  let c = Color.Green;
+  assert(c == 1);
+  let v = 0;
+  match c {
+    Color.Red => { v = 10; }
+    Color.Green => { v = 20; }
+    _ => { v = 30; }
+  }
+  assert(v == 20);
+  println(v);
+  return 0;
+}

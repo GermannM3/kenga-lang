@@ -1,0 +1,18 @@
+// Short-circuit && / || via bc_src_c (JMPF, not eager OP_AND/OP_OR).
+
+fn boom() -> i64 {
+    println("boom");
+    assert(0 == 1);
+    return 1;
+}
+
+fn main() -> i64 {
+    let a: i64 = 0 && boom();
+    assert(a == 0);
+    let b: i64 = 1 || boom();
+    assert(b == 1);
+    assert((1 && 0) == 0);
+    assert((1 && 1) == 1);
+    println("and ok");
+    return 0;
+}

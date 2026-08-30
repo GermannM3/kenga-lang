@@ -2,15 +2,16 @@
  *
  * Dialect:
  *   fn / let / while / if-else / return / calls
- *   i64 / f64 arith + cmp (< > <= >= == !=) + && || ! + i64 % + bitwise & | ^ ~ << >>
+ *   i64 / f64 arith + cmp (< > <= >= == !=) + && || ! (short-circuit) + i64 % + bitwise & | ^ ~ << >>
  *   println(expr); print(expr);  — with / without newline
  *   sleep_ms(n)             — wall-clock sleep, n >= 0
  *   "string" literals       — values (println, == / !=)
  *   i64 lists: [1,2,3], len(xs), push(xs, v), xs[i], xs[i] = v
+ *   compound += -= *= /= on name / xs[i] / p.field
  *   round(x) / assert(c)    — f64→i64 / die if false
  *   nested/hetero lists, import "path", ord(s), s[i] char index
  *   str + str concat, forward fn calls, true/false
- *   for x in a..b / for v in xs / break / continue
+ *   for x in a..b / for x in a..b step k / for v in xs / break / continue
  *   comments: // line  and  slash-star block comments
  *   type annotations ignored: `let x: i64 =`, `fn f(a: i64) -> i64`, `ttl 5s`
  *   Tensor / tape / Prophet: Kenga lists (`ml_host` / `native_ml`), not C heaps
@@ -18,6 +19,8 @@
  *   Events: on "e"(x) { } / emit / pump / pending / listen
  *   now_ms() wall clock; to_str(x)
  *   structs: struct Point { x, y } / Point { x: 1, y: 2 } / p.x / p.x = v
+ *   getenv / http_request / json_get / json_escape / url_encode / html_text
+ *   slice / index_of / starts_with / split
  *
  * Usage:
  *   kenga-lite              # self-tests
@@ -32,8 +35,12 @@
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
 #else
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 #ifdef _WIN32
@@ -82,6 +89,8 @@ static size_t emit_stmt(const char *s, size_t i, size_t n, I64A *code, StrA *vna
 #include "generated/rt_print.inc.c"
 
 
+#include "generated/rt_net.inc.c"
+#include "generated/rt_str.inc.c"
 #include "generated/rt_vm.inc.c"
 #include "generated/rt_host.inc.c"
 #include "generated/rt_selftest.inc.c"

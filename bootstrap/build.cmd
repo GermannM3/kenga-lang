@@ -7,19 +7,19 @@ if not exist minds mkdir minds
 set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
 if exist "%VCVARS%" (
   call "%VCVARS%" >nul
-  cl /nologo /O2 /TC kenga_lite.c /Fe:bin\kenga-lite.exe /Fo:bin\kenga_lite.obj
+  cl /nologo /O2 /TC kenga_lite.c /Fe:bin\kenga-lite.exe /Fo:bin\kenga_lite.obj /link winhttp.lib
   if errorlevel 1 exit /b 1
   goto :run
 )
 
 where gcc >nul 2>&1 && (
-  gcc -O2 -std=c99 kenga_lite.c -o bin\kenga-lite.exe
+  gcc -O2 -std=c99 kenga_lite.c -o bin\kenga-lite.exe -lwinhttp
   if errorlevel 1 exit /b 1
   goto :run
 )
 
 where clang >nul 2>&1 && (
-  clang -O2 -std=c99 kenga_lite.c -o bin\kenga-lite.exe
+  clang -O2 -std=c99 kenga_lite.c -o bin\kenga-lite.exe -lwinhttp
   if errorlevel 1 exit /b 1
   goto :run
 )

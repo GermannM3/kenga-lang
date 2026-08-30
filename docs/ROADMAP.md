@@ -75,6 +75,10 @@
 | ✅ | `kenga-lite run file` → more VM; eval/selftest ML на списках. `kenga/emit/*` остаётся lite bootstrap |
 | ⬜ | Archive / удалить `src/` когда Releases = lite-only |
 | ✅ | Битовые `& \| ^ ~ << >>` и `0x`/`0b` на lite C VM, more, `lower_c`, `bc_src_c` (`examples/selfhost/bitops.kenga`, `hex_lab.kenga`)
+| ✅ | Host I/O: `getenv` / `http_request` / `json_get` / `json_escape` / `url_encode` / `html_text` — lite, more, `bc_src_c`. Бот: `examples/telegram_bot.kenga` (слышит чат, память сначала, сеть если не слышал) |
+| ✅ | Cooperative timers: `after_ms` + `pump` (`examples/async_tick.kenga`). VPS: `docs/VPS.md` |
+| ✅ | Строки: `slice` / `index_of` / `starts_with` / `split` — more, lite C, `bc_src_c`. Лаба: `examples/selfhost/str_lab.kenga` |
+| ✅ | `map_*` / `json_set` + `match` по строке на more. `lite.kenga`: `for i in a..b` / `break` / `continue` / `match` i64. Бот: Пророк учит с каждой реплики в чате (`minds/tg_prophet.km`) |
 
 ## 2. Ядро и тензоры
 

@@ -40,7 +40,11 @@ x = x + 1;
 if cond { … } else { … }
 while cond { … }
 for i in 0..n { … }
+for i in 0..n step 2 { … }
 for v in xs { … }
+x += 1;
+match n { 0 => { … } _ => { … } }
+enum Color { Red, Green }
 break; continue;
 return expr;
 import "path.kenga";
@@ -56,15 +60,81 @@ on "tick"(n: i64) { emit("tick", n + 1); }
 Внутри одной Kenga-программы можно смешивать: `0xF0 | 0x0F & 0xFF` — `&` выше `|`, поэтому сначала `0x0F & 0xFF = 0x0F`, потом `0xF0 | 0x0F = 0xFF`.
 `%` — только `i64`. Битовые — только `i64` (на f64 дают type error в codegen).
 Тест: `examples/selfhost/bitops.kenga` и `examples/selfhost/hex_lab.kenga` (lite, more, lower_c, bc_src_c).  
-Lite и `more.kenga` считают `&&` `||` `!` как 0/1 (оба операнда вычисляются). `%` — только `i64`.
+`&&` / `||` коротко замыкаются: lite C VM, more и `bc_src_c` — JMPF (правый операнд не считается, если уже ясно); `lower_c` — C `&&`/`||`. `%` — только `i64`.
 
 Комментарии: `//` и `/* … */`.
 
 ## Встроенные (общее)
 
 `print` `println` `len` `push` `assert` `typeof` `round` `ord` `to_str` `input`  
+`slice` `index_of` `starts_with` `split`  
+`map_new` `map_get` `map_set` `map_has` `json_set`  
 `now_ms` `sleep_ms` `sweep`  
-`listen` `emit` `pump` `pending`
+`listen` `emit` `pump` `pending` `after_ms`  
+`argc` `arg` `file_exists` `read_file` `write_file` `read_line`  
+`getenv` `http_request` `json_get` `json_escape` `url_encode` `html_text`
+
+## Строки
+
+```kenga
+slice("abcdef", 1, 4)        // "bcd"  — [start, end)
+slice(xs, 1, 3)              // подсписок; lite/more
+index_of("hello", "ll")      // 2, нет — -1
+starts_with("/start", "/")   // 1/0
+split("a,b,c", ",")          // ["a","b","c"]; sep "" — по символам
+```
+
+`slice` на строке — memcpy в C (lite / `bc_src_c`), не конкатенация по буквам.
+Тест: `examples/selfhost/str_lab.kenga`.
+
+```kenga
+let m = map_new();
+m = map_set(m, "chat", "7");
+map_get(m, "chat")              // "7"
+json_set("{}", "text", "hi")    // дописывает ключ в объект
+match cmd { "/start" => { … } _ => { … } }
+```
+
+## Сеть и JSON
+
+```kenga
+getenv("TELEGRAM_BOT_TOKEN")                    // "" если нет
+http_request("GET", url, "", "")                // тело ответа; сбой → "ERR: …"
+http_request("POST", url, body, "Content-Type: application/json")
+json_get(doc, "result.0.message.text")          // "" если нет
+json_set(doc, key, val)                         // more: дописать поле в объект
+json_escape(s)                                  // для сборки JSON-строки
+url_encode(s)                                   // a b → a%20b
+html_text(s)                                    // снять теги и &amp; / &lt; / …
+```
+
+HTTPS есть (WinHTTP на Windows, `curl` на Unix). Long poll — `http_request` + `after_ms` + `pump`.  
+Бот сначала ищет в `minds/tg_memory.txt` (все реплики чата + пары `вопрос | ответ`). В сеть (DuckDuckGo / Wikipedia) лезет только если в памяти пусто и это вопрос или `search:`.  
+Параллельно тихий 16-d Пророк (`learn` / `foresee` / `save_mind` → `minds/tg_prophet.km`): ответ идёт из файла, потом один шаг по соседним репликам. Явное `remember:` — два шага.  
+`json_set` собирает тело `sendMessage`. Пример: `examples/telegram_bot.kenga`. Smoke без сети: `examples/selfhost/net_lite.kenga`.  
+VPS (systemd): `docs/VPS.md`.
+
+## Таймеры
+
+Это не потоки. Один VM, очередь событий.
+
+```kenga
+on "tick"(n: i64) {
+    if n < 3 { after_ms(20, "tick", n + 1); }
+}
+fn main() -> i64 {
+    after_ms(0, "tick", 1);
+    while pending() > 0 {
+        pump(8);
+        sleep_ms(20);
+    }
+    return 0;
+}
+```
+
+`after_ms(ms, event, value)` кладёт событие на потом. `pump` сначала сбрасывает
+просроченные таймеры, потом handlers. `pending` считает и очередь, и таймеры.
+Тест: `examples/async_tick.kenga`.
 
 ## Тензоры
 
@@ -105,7 +175,7 @@ World-model: residual MLP `y = x + Δ`.
 ## Lite (без Rust)
 
 Поддерживает: `fn` `let` `while` **`for` / `break` / `continue`** `if`/`else`/`else if`,  
-i64, f64, `0x`/`0b`, bitwise `& | ^ ~ << >>`, `round`, `assert`, строки, списки, `print`/`println`, `struct`, type annotations (игнор),  
+i64, f64, `0x`/`0b`, bitwise `& | ^ ~ << >>`, `round`, `assert`, строки (`slice`/`index_of`/`starts_with`/`split`), списки, `print`/`println`, `struct`, type annotations (игнор),  
 **Prophet Memory** + **Tensor** (`tensor` / `t_from` / `t_matmul` / `t_add` / `load_ppm` / `load_wav` / …),
 tape `ag_*`, `sweep`, `now_ms` wall clock, `sleep_ms`, `foresee_n`.
 
@@ -148,6 +218,10 @@ kenga run --lite examples/selfhost/for_lite.kenga
 | Fusion | `examples/ml/fusion.kenga` |
 | Prophet | `examples/prophet.kenga` (и на `--lite`) |
 | Lite | `examples/selfhost/*_lite.kenga` |
+| HTTP / JSON | `examples/selfhost/net_lite.kenga` |
+| Строки | `examples/selfhost/str_lab.kenga` |
+| Telegram-бот | `examples/telegram_bot.kenga` — файл + Пророк, учит с чата; сеть если не слышал |
+| Таймеры | `examples/async_tick.kenga` |
 | more tensors / tape / vision | `examples/selfhost/tensor_more.kenga`, `tape_more.kenga`, `vision_more.kenga` |
 | more print / learn / unroll | `examples/selfhost/print_more.kenga`, `learn_more.kenga`, `unroll_more.kenga`, `foresee_n_more.kenga` |
 | more Prophet | `examples/selfhost/prophet_more.kenga`, `examples/prophet.kenga` |

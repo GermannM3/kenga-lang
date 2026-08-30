@@ -59,7 +59,20 @@ enum {
   OP_BXOR,
   OP_BNOT,
   OP_SHL,
-  OP_SHR
+  OP_SHR,
+  OP_GETENV,
+  OP_HTTP_REQUEST,
+  OP_JSON_GET,
+  OP_JSON_ESCAPE,
+  OP_AFTER_MS,
+  OP_FLUSH_DUE,
+  OP_TIMER_N,
+  OP_URL_ENCODE,
+  OP_HTML_TEXT,
+  OP_SLICE,
+  OP_INDEX_OF,
+  OP_STARTS_WITH,
+  OP_SPLIT
 };
 static int g_kargc = 0;
 static char **g_kargv = NULL;

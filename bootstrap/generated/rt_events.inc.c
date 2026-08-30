@@ -25,6 +25,34 @@ typedef struct {
 } EvBus;
 
 static EvBus g_ev;
+#define EV_TIMER_MAX 64
+typedef struct {
+  int used;
+  int64_t due;
+  char *event;
+  Value val;
+} EvTimer;
+static EvTimer g_tm[EV_TIMER_MAX];
+static void ev_emit(const char *event, Value val);
+
+static int64_t ev_now_ms(void) {
+#ifdef _WIN32
+  return (int64_t)GetTickCount64();
+#else
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000;
+#endif
+}
+
+static void ev_timers_clear(void) {
+  int i;
+  for (i = 0; i < EV_TIMER_MAX; i++) {
+    if (g_tm[i].used) free(g_tm[i].event);
+    g_tm[i].used = 0;
+    g_tm[i].event = NULL;
+  }
+}
 
 static void ev_reset(void) {
   int i;
@@ -34,6 +62,54 @@ static void ev_reset(void) {
     free(g_ev.queue[idx].event);
   }
   memset(&g_ev, 0, sizeof(g_ev));
+  ev_timers_clear();
+}
+
+static void ev_after(int64_t ms, const char *event, Value val) {
+  int i;
+  int64_t due;
+  if (ms < 0) ms = 0;
+  due = ev_now_ms() + ms;
+  for (i = 0; i < EV_TIMER_MAX; i++) {
+    if (!g_tm[i].used) {
+      g_tm[i].used = 1;
+      g_tm[i].due = due;
+      g_tm[i].event = xstrdup(event);
+      g_tm[i].val = val;
+      return;
+    }
+  }
+  die("too many after_ms timers");
+}
+
+static int ev_take_due(char **event_out, Value *val_out) {
+  int i;
+  int64_t now = ev_now_ms();
+  for (i = 0; i < EV_TIMER_MAX; i++) {
+    if (g_tm[i].used && g_tm[i].due <= now) {
+      *event_out = g_tm[i].event;
+      *val_out = g_tm[i].val;
+      g_tm[i].used = 0;
+      g_tm[i].event = NULL;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static void ev_flush_due_bus(void) {
+  char *en;
+  Value v;
+  while (ev_take_due(&en, &v)) {
+    ev_emit(en, v);
+    free(en);
+  }
+}
+
+static int64_t ev_timer_n(void) {
+  int i, n = 0;
+  for (i = 0; i < EV_TIMER_MAX; i++) if (g_tm[i].used) n++;
+  return (int64_t)n;
 }
 
 static void ev_listen(const char *event, int64_t addr, int arity) {
@@ -82,6 +158,6 @@ static int ev_dequeue(char **event_out, Value *val_out) {
   return 1;
 }
 
-static int64_t ev_pending(void) { return (int64_t)g_ev.qn; }
+static int64_t ev_pending(void) { return (int64_t)g_ev.qn + ev_timer_n(); }
 
 #endif /* KENGA_EVENTS_LITE_INC */

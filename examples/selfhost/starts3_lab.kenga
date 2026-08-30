@@ -1,0 +1,20 @@
+// 2-arg builtin vs 3-arg lexer helper (same name).
+
+fn starts_with(s: str, i: i64, w: str) -> i64 {
+    let j: i64 = 0;
+    while j < len(w) {
+        if i + j >= len(s) { return 0; }
+        if s[i + j] != w[j] { return 0; }
+        j = j + 1;
+    }
+    return 1;
+}
+
+fn main() -> i64 {
+    assert(starts_with("hello", "he") == 1);
+    assert(starts_with("hello", "lo") == 0);
+    assert(starts_with("ab", 0, "a") == 1);
+    assert(starts_with("ab", 1, "b") == 1);
+    assert(starts_with("ab", 0, "x") == 0);
+    return 0;
+}

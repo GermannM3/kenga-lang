@@ -127,8 +127,17 @@ static size_t emit_and(const char *s, size_t i, size_t n, I64A *code, StrA *vnam
     i = skip(s, i, n);
     if (i >= n) break;
     if (starts_with(s, i, n, "&&")) {
+      /* JMPF pops lhs; skip rhs when lhs is 0 */
+      size_t jmpf_at = code->len;
+      emit2(code, OP_JMPF, 0);
       i = emit_bitor(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
-      i64a_push(code, OP_AND);
+      i64a_push(code, OP_NOT);
+      i64a_push(code, OP_NOT);
+      size_t jmp_at = code->len;
+      emit2(code, OP_JMP, 0);
+      code->data[jmpf_at + 1] = (int64_t)code->len;
+      emit2(code, OP_CONST, 0);
+      code->data[jmp_at + 1] = (int64_t)code->len;
     } else break;
   }
   return i;
@@ -140,8 +149,17 @@ static size_t emit_or(const char *s, size_t i, size_t n, I64A *code, StrA *vname
     i = skip(s, i, n);
     if (i >= n) break;
     if (starts_with(s, i, n, "||")) {
+      /* JMPF pops lhs; skip rhs when lhs is already truthy */
+      size_t jmpf_at = code->len;
+      emit2(code, OP_JMPF, 0);
+      emit2(code, OP_CONST, 1);
+      size_t jmp_at = code->len;
+      emit2(code, OP_JMP, 0);
+      code->data[jmpf_at + 1] = (int64_t)code->len;
       i = emit_and(s, i + 2, n, code, vnames, fnames, faddrs, fargc);
-      i64a_push(code, OP_OR);
+      i64a_push(code, OP_NOT);
+      i64a_push(code, OP_NOT);
+      code->data[jmp_at + 1] = (int64_t)code->len;
     } else break;
   }
   return i;

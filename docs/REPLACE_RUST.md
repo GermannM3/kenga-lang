@@ -51,3 +51,9 @@ gcc -O2 -std=c99 bc_one_out.c -o bc_one_out.exe   ;; MinGW / Linux
 ```
 
 `bc_src_c` теперь умеет пробрасывать host-`argc`/`argv` в VM через `g_kargc`/`g_kargv` (opcodes 106–109). Любая `.kenga` программа корректно читает `argc()`, `arg(i)`, `file_exists(p)`, `read_line()` — нативно, без интерпретатора.
+
+Сеть: opcodes **116–119** `OP_GETENV` / `OP_HTTP_REQUEST` / `OP_JSON_GET` / `OP_JSON_ESCAPE`. Хост — `kenga/emit/rt_net.kenga` → `rt_net.inc.c` (WinHTTP / curl). Smoke: `examples/selfhost/net_lite.kenga`. `json_set` — more VM (не opcode lite C).
+
+Строки: opcodes **125–128** `OP_SLICE` / `OP_INDEX_OF` / `OP_STARTS_WITH` / `OP_SPLIT`. Хост — `kenga/emit/rt_str.kenga`. more считает их на списках/конкатенации; lite C и `bc_src_c` — `memcpy` / `memcmp`.
+
+Словарь: `map_*` на more — список пар `[k, v]`, не хеш.

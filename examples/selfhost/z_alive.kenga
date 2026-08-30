@@ -1,0 +1,12 @@
+// Z identity on CPU: alive = weights file exists; verified = .passport.json sidecar.
+// more VM injects the same two fns as native_ml.kenga (no OP_*, no SVD).
+// Spectral z_verify stays in Python zcore / genesis_loop.py verify.
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\z_alive.kenga
+
+fn main() -> i64 {
+  assert(z_is_alive("minds/mid_prophet_m53_w.txt") == 1);
+  assert(z_verify("minds/mid_prophet_m53_w.txt") == 1);
+  assert(z_is_alive("minds/no_such_mind.txt") == 0);
+  println("z alive");
+  return 0;
+}

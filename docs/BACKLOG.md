@@ -10,11 +10,13 @@
 
 ## Kenga-lane (this machine, CPU)
 - [x] Z x Kenga Etap 0 (corpus_eval prog->_prog) + Etap 1: zcore.py (11 ops), 14/14 unit tests, passports for m53/m6 (.passport.json), test_zcore.py
-- [ ] If match T1 in 7–10%: Genesis dry-run (buffer accumulation, no train)
+- [x] Live dialog M5.3 x `kenga-trained` (Ollama) → verified buffer, extra_dir absorb, no D/L grow (`tools/live_dialog.py`)
+- [ ] If match T1 in 7–10%: wire `finetune` / `grow --train` (still no LoRA)
 - [ ] If OPEN: branch A (Base control) first, then B/C/D
 - [ ] HF publish M6 + rp1 after four logs
-- [ ] Z-lane Etap 2+: lexer z_* keywords, VM builtins, Factory Z1-Z5, Genesis z_verify gate (spec v0.1+v0.2) (card: A/B rp0→rp1, NL axis,
-      K=512 effect, ladder table)
+- [x] Z-lane Etap 2 (identity): copies stamp parent passport marker (`genesis_loop.py verify`); D8 `same_agent(L)` + `--verdict` (M6 ≠ M5.3 lineage)
+- [x] Z identity in guest Kenga: `z_is_alive`/`z_verify` = file_exists + `.passport.json` (no OP_*, no SVD in VM); lexer keywords; factory `--z1` pilot (`pilot_z1.jsonl`, not split_v3)
+- [ ] Z-lane Etap 2+: Factory Z2–Z5, Genesis spectral `z_verify` on grow (Python zcore)
 - [ ] Language lane: lexer P0 fixes (`.` dropped, `&|^~`→ID, `=>` split),
       parser_laxity tests un-ignore, dialect inconsistencies list
       (SPEC agent report) → parser.rs owners

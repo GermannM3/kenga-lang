@@ -1,0 +1,19 @@
+// Native string ops on more VM.
+
+fn main() -> i64 {
+    assert(slice("abcdef", 2, 5) == "cde");
+    assert(slice("hi", 0, 2) == "hi");
+    assert(slice("hi", 8, 9) == "");
+    assert(index_of("kenga-lang", "lang") == 6);
+    assert(index_of("kenga", "z") == 0 - 1);
+    assert(starts_with("/start help", "/start") == 1);
+    assert(starts_with("help", "/start") == 0);
+    let xs = split("a|b|c", "|");
+    assert(len(xs) == 3);
+    assert(xs[0] == "a");
+    assert(xs[2] == "c");
+    let ys = slice([1, 2, 3, 4], 1, 4);
+    assert(len(ys) == 3);
+    assert(ys[0] + ys[1] + ys[2] == 9);
+    return 0;
+}

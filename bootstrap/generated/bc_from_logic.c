@@ -6,8 +6,11 @@
 #include <math.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <winhttp.h>
 #else
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
 #include "opcodes.inc.c"
 
@@ -23,7 +26,7 @@ static const double g_f64s[] = { 0.0 };
 
 int main(int argc, char **argv) {
   g_kargc = argc; g_kargv = argv;
-  static const int64_t code[] = { 11, 2, 1, 10, 1, 3, 38, 1, 1, 10, 18, 1, 1, 1, 0, 39, 1, 0, 10, 18, 1, 0, 1, 1, 40, 1, 1, 10, 18, 1, 0, 41, 1, 1, 10, 18, 1, 1, 1, 2, 4, 1, 3, 10, 18, 35, 0, 17, 1, 0, 16, 13 };
+  static const int64_t code[] = { 11, 2, 1, 10, 1, 3, 38, 1, 1, 10, 18, 1, 1, 12, 21, 1, 0, 41, 41, 11, 23, 1, 0, 1, 0, 10, 18, 1, 0, 12, 35, 1, 1, 11, 39, 1, 1, 41, 41, 1, 1, 10, 18, 1, 0, 41, 1, 1, 10, 18, 1, 1, 1, 2, 4, 1, 3, 10, 18, 35, 0, 17, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

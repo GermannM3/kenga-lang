@@ -2,6 +2,8 @@
 
 С **3.2** ядро Prophet + `.km` живут в lite без Rust. Chat — `kenga/compiler/chat.kenga` на `native_ml` (не C Prophet). Демо `examples/prophet.kenga` и `minds/multi.km`.
 
+Telegram: `examples/telegram_bot.kenga` держит свой 16-d ум в `minds/tg_prophet.km` (не коммитить). Ответ — из файла, обучение — после ответа.
+
 ```bat
 bootstrap\build.cmd
 bootstrap\bin\kenga-lite.exe run examples\prophet.kenga

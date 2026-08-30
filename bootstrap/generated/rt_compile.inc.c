@@ -66,6 +66,60 @@ static Program compile_lite(const char *src) {
       g_stypes[g_nstypes++] = st;
       continue;
     }
+    if (starts_kw(src, i, n, "enum")) {
+      i = skip(src, i + 4, n);
+      Ident id = parse_ident(src, i, n);
+      if (find_struct_type(id.name) >= 0) {
+        free(id.name);
+        die("duplicate enum");
+      }
+      i = skip(src, id.i, n);
+      if (i >= n || src[i] != '{') {
+        free(id.name);
+        die("expected { after enum name");
+      }
+      i++;
+      StructType st;
+      st.name = id.name;
+      memset(&st.fields, 0, sizeof(st.fields));
+      i = skip(src, i, n);
+      if (i < n && src[i] != '}') {
+        for (;;) {
+          i = skip(src, i, n);
+          if (i < n && src[i] == '}') break;
+          Ident vn = parse_ident(src, i, n);
+          if (field_index_of(&st, vn.name) >= 0) {
+            free(vn.name);
+            free(st.name);
+            stra_free(&st.fields);
+            die("duplicate enum variant");
+          }
+          stra_push(&st.fields, vn.name);
+          i = skip(src, vn.i, n);
+          if (i < n && src[i] == '{') i = match_brace_block(src, i, n);
+          i = skip(src, i, n);
+          if (i < n && src[i] == ',') {
+            i++;
+            i = skip(src, i, n);
+            continue;
+          }
+          break;
+        }
+      }
+      i = skip(src, i, n);
+      if (i >= n || src[i] != '}') {
+        free(st.name);
+        stra_free(&st.fields);
+        die("expected } after enum variants");
+      }
+      i++;
+      if (g_nstypes + 1 > g_stypes_cap) {
+        g_stypes_cap = g_stypes_cap ? g_stypes_cap * 2 : 4;
+        g_stypes = (StructType *)xrealloc(g_stypes, g_stypes_cap * sizeof(StructType));
+      }
+      g_stypes[g_nstypes++] = st;
+      continue;
+    }
     if (starts_kw(src, i, n, "on")) {
       char *evname;
       char fname[64];
@@ -159,7 +213,7 @@ static Program compile_lite(const char *src) {
       nbinds++;
       continue;
     }
-    if (!starts_kw(src, i, n, "fn")) die("expected fn, on, or struct");
+    if (!starts_kw(src, i, n, "fn")) die("expected fn, on, struct, or enum");
     i = skip(src, i + 2, n);
     Ident id = parse_ident(src, i, n);
     i = skip(src, id.i, n);

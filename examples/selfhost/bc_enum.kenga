@@ -1,0 +1,19 @@
+// Unit enum via bc_src_c (parse ? bytecode ? C).
+//   enum Color { Red, Green } ? tags 0..n-1; Color.Green is CONST.
+
+enum Color { Red, Green }
+
+fn main() -> i64 {
+    let c: i64 = Color.Green;
+    assert(c == 1);
+    let v: i64 = 0;
+    match c {
+        Color.Red => { v = 10; }
+        Color.Green => { v = 20; }
+        _ => { v = 30; }
+    }
+    assert(v == 20);
+    println(v);
+    println("enum ok");
+    return 0;
+}

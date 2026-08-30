@@ -107,6 +107,16 @@ fn OP_BXOR() -> i64 { return 112; }
 fn OP_BNOT() -> i64 { return 113; }
 fn OP_SHL() -> i64 { return 114; }
 fn OP_SHR() -> i64 { return 115; }
+fn OP_GETENV() -> i64 { return 116; }
+fn OP_HTTP_REQUEST() -> i64 { return 117; }
+fn OP_JSON_GET() -> i64 { return 118; }
+fn OP_JSON_ESCAPE() -> i64 { return 119; }
+fn OP_URL_ENCODE() -> i64 { return 123; }
+fn OP_HTML_TEXT() -> i64 { return 124; }
+fn OP_SLICE() -> i64 { return 125; }
+fn OP_INDEX_OF() -> i64 { return 126; }
+fn OP_STARTS_WITH() -> i64 { return 127; }
+fn OP_SPLIT() -> i64 { return 128; }
 fn dirname_of(path: str) -> str {
     let i: i64 = len(path) - 1;
     while i >= 0 {
@@ -320,6 +330,40 @@ fn emit3(code: list, a: i64, b: i64, c: i64) -> list {
     code = push(code, a);
     code = push(code, b);
     return push(code, c);
+}
+fn compound_binop(s: str, j: i64) -> i64 {
+    if starts_with(s, j, "+=") == 1 { return OP_ADD(); }
+    if starts_with(s, j, "-=") == 1 { return OP_SUB(); }
+    if starts_with(s, j, "*=") == 1 { return OP_MUL(); }
+    if starts_with(s, j, "/=") == 1 { return OP_DIV(); }
+    return 0;
+}
+fn emit_compound_index(code: list, vnames: list, s: str, j: i64, binop: i64, fnames: list, faddrs: list, fargc: list, strbox: list) -> list {
+    let ixn: str = "__cix" + itoa(len(vnames));
+    let xsn: str = "__cxs" + itoa(len(vnames));
+    let vn: str = "__cv" + itoa(len(vnames));
+    let ix = slot_of(vnames, ixn);
+    vnames = ix[1];
+    code = emit2(code, OP_STORE(), ix[0]);
+    let xs = slot_of(vnames, xsn);
+    vnames = xs[1];
+    code = emit2(code, OP_STORE(), xs[0]);
+    code = emit2(code, OP_LOAD(), xs[0]);
+    code = emit2(code, OP_LOAD(), ix[0]);
+    code = push(code, OP_GET());
+    let r = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0];
+    j = r[1];
+    vnames = r[2];
+    code = push(code, binop);
+    let vs = slot_of(vnames, vn);
+    vnames = vs[1];
+    code = emit2(code, OP_STORE(), vs[0]);
+    code = emit2(code, OP_LOAD(), xs[0]);
+    code = emit2(code, OP_LOAD(), ix[0]);
+    code = emit2(code, OP_LOAD(), vs[0]);
+    code = push(code, OP_SET());
+    return [code, j, vnames];
 }
 
 fn emit_n_args(s: str, j: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, strbox: list, n: i64) -> list {
@@ -947,6 +991,46 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                             code = push(code, OP_READ_LINE());
                                             j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                             i = j;
+                                        } if id[0] == "getenv" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
+                                            code = push(ar[0], OP_GETENV());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "json_escape" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
+                                            code = push(ar[0], OP_JSON_ESCAPE());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "url_encode" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
+                                            code = push(ar[0], OP_URL_ENCODE());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "html_text" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 1);
+                                            code = push(ar[0], OP_HTML_TEXT());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "json_get" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_JSON_GET());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "http_request" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 4);
+                                            code = push(ar[0], OP_HTTP_REQUEST());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "slice" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 3);
+                                            code = push(ar[0], OP_SLICE());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "index_of" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_INDEX_OF());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "starts_with" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_STARTS_WITH());
+                                            i = ar[1]; vnames = ar[2];
+                                        } if id[0] == "split" {
+                                            let ar = emit_n_args(s, j, code, vnames, fnames, faddrs, fargc, strbox, 2);
+                                            code = push(ar[0], OP_SPLIT());
+                                            i = ar[1]; vnames = ar[2];
                                         }
                     if i == i0 {
                                 let argc: i64 = 0;
@@ -1009,9 +1093,28 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                 code = emit2(code, OP_CONST(), 0);
                                 i = id[1];
                             } else {
-                                let sl = slot_of(vnames, id[0]);
-                                code = emit2(code, OP_LOAD(), sl[0]);
-                                i = id[1]; vnames = sl[1];
+                                // Color.Red → CONST tag; p.x still LOAD+GET via postfix
+                                let enum_ok: i64 = 0;
+                                if s[j] == "." {
+                                    if j + 1 < len(s) {
+                                        if s[j + 1] != "." {
+                                            let tid: i64 = find_struct(strbox[2], id[0]);
+                                            if tid >= 0 {
+                                                let fld = parse_ident(s, j + 1);
+                                                assert(len(fld[0]) > 0);
+                                                let fidx: i64 = field_index(strbox[2][tid][1], fld[0]);
+                                                code = emit2(code, OP_CONST(), fidx);
+                                                i = fld[1];
+                                                enum_ok = 1;
+                                            }
+                                        }
+                                    }
+                                }
+                                if enum_ok == 0 {
+                                    let sl = slot_of(vnames, id[0]);
+                                    code = emit2(code, OP_LOAD(), sl[0]);
+                                    i = id[1]; vnames = sl[1];
+                                }
                             }
                 }
             } else if id[0] == "true" {
@@ -1075,11 +1178,13 @@ fn emit_term(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         i = skip(s, i);
         if i >= len(s) { break; }
         if s[i] == "*" {
+            if starts_with(s, i, "*=") == 1 { break; }
             r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
             code = push(r[0], OP_MUL());
             i = r[1]; vnames = r[2];
         } else {
             if s[i] == "/" {
+                if starts_with(s, i, "/=") == 1 { break; }
                 r = emit_factor(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
                 code = push(r[0], OP_DIV());
                 i = r[1]; vnames = r[2];
@@ -1102,11 +1207,13 @@ fn emit_sum(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
         i = skip(s, i);
         if i >= len(s) { break; }
         if s[i] == "+" {
+            if starts_with(s, i, "+=") == 1 { break; }
             r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
             code = push(r[0], OP_ADD());
             i = r[1]; vnames = r[2];
         } else {
             if s[i] == "-" {
+                if starts_with(s, i, "-=") == 1 { break; }
                 r = emit_term(s, i + 1, code, vnames, fnames, faddrs, fargc, strbox);
                 code = push(r[0], OP_SUB());
                 i = r[1]; vnames = r[2];
@@ -1219,8 +1326,18 @@ fn emit_and(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     while true {
         i = skip(s, i); if i >= len(s) { break; }
         if starts_with(s, i, "&&") == 1 {
+            // JMPF pops lhs; skip rhs when lhs is 0
+            let jmpf_at: i64 = len(code);
+            code = emit2(code, OP_JMPF(), 0);
             r = emit_bitor(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
-            code = push(r[0], OP_AND()); i = r[1]; vnames = r[2];
+            code = r[0]; i = r[1]; vnames = r[2];
+            code = push(code, OP_NOT());
+            code = push(code, OP_NOT());
+            let jmp_at: i64 = len(code);
+            code = emit2(code, OP_JMP(), 0);
+            code[jmpf_at + 1] = len(code);
+            code = emit2(code, OP_CONST(), 0);
+            code[jmp_at + 1] = len(code);
         } else { break; }
     }
     return [code, i, vnames];
@@ -1232,8 +1349,18 @@ fn emit_or(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list,
     while true {
         i = skip(s, i); if i >= len(s) { break; }
         if starts_with(s, i, "||") == 1 {
+            // JMPF pops lhs; skip rhs when lhs is already truthy
+            let jmpf_at: i64 = len(code);
+            code = emit2(code, OP_JMPF(), 0);
+            code = emit2(code, OP_CONST(), 1);
+            let jmp_at: i64 = len(code);
+            code = emit2(code, OP_JMP(), 0);
+            code[jmpf_at + 1] = len(code);
             r = emit_and(s, i + 2, code, vnames, fnames, faddrs, fargc, strbox);
-            code = push(r[0], OP_OR()); i = r[1]; vnames = r[2];
+            code = r[0]; i = r[1]; vnames = r[2];
+            code = push(code, OP_NOT());
+            code = push(code, OP_NOT());
+            code[jmp_at + 1] = len(code);
         } else { break; }
     }
     return [code, i, vnames];
@@ -1322,10 +1449,42 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             let hs = slot_of(vnames, hi_slot_name);
             vnames = hs[1];
             code = emit2(code, OP_STORE(), hs[0]);
+            let has_step: i64 = 0;
+            let step_slot: i64 = 0;
+            i = skip(s, i);
+            if starts_kw(s, i, "step") == 1 {
+                has_step = 1;
+                i = skip(s, i + 4);
+                let step_name: str = "__st" + itoa(len(vnames));
+                let st = emit_sum(s, i, code, vnames, fnames, faddrs, fargc, strbox);
+                code = st[0]; i = st[1]; vnames = st[2];
+                let ss = slot_of(vnames, step_name);
+                vnames = ss[1];
+                step_slot = ss[0];
+                code = emit2(code, OP_STORE(), step_slot);
+            }
             let loop_start: i64 = len(code);
-            code = emit2(code, OP_LOAD(), sl[0]);
-            code = emit2(code, OP_LOAD(), hs[0]);
-            code = push(code, OP_LT());
+            if has_step == 1 {
+                code = emit2(code, OP_LOAD(), step_slot);
+                code = emit2(code, OP_CONST(), 0);
+                code = push(code, OP_GE());
+                let ge_jmpf: i64 = len(code);
+                code = emit2(code, OP_JMPF(), 0);
+                code = emit2(code, OP_LOAD(), sl[0]);
+                code = emit2(code, OP_LOAD(), hs[0]);
+                code = push(code, OP_LT());
+                let skip_neg: i64 = len(code);
+                code = emit2(code, OP_JMP(), 0);
+                code[ge_jmpf + 1] = len(code);
+                code = emit2(code, OP_LOAD(), sl[0]);
+                code = emit2(code, OP_LOAD(), hs[0]);
+                code = push(code, OP_GT());
+                code[skip_neg + 1] = len(code);
+            } else {
+                code = emit2(code, OP_LOAD(), sl[0]);
+                code = emit2(code, OP_LOAD(), hs[0]);
+                code = push(code, OP_LT());
+            }
             let jmpf_at: i64 = len(code);
             code = emit2(code, OP_JMPF(), 0);
             let my: i64 = len(loops);
@@ -1337,7 +1496,11 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             let cont_ip: i64 = len(code);
             code = patch_jmp_sites(code, frame[0], cont_ip);
             code = emit2(code, OP_LOAD(), sl[0]);
-            code = emit2(code, OP_CONST(), 1);
+            if has_step == 1 {
+                code = emit2(code, OP_LOAD(), step_slot);
+            } else {
+                code = emit2(code, OP_CONST(), 1);
+            }
             code = push(code, OP_ADD());
             code = emit2(code, OP_STORE(), sl[0]);
             code = emit2(code, OP_JMP(), loop_start);
@@ -1436,6 +1599,9 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         }
         code[jmp_end + 1] = len(code);
         return [code, i, vnames];
+    }
+    if starts_kw(s, i, "match") == 1 {
+        return emit_match(s, i, code, vnames, fnames, faddrs, fargc, loops, strbox);
     }
     if starts_kw(s, i, "break") == 1 {
         assert(len(loops) > 0);
@@ -1560,6 +1726,14 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
                         if j < len(s) { if s[j] == ";" { j = j + 1; } }
                         return [code, j, vnames];
                     }
+                    let copx: i64 = compound_binop(s, j);
+                    if copx > 0 {
+                        let cx = emit_compound_index(code, vnames, s, j + 2, copx, fnames, faddrs, fargc, strbox);
+                        code = cx[0]; j = cx[1]; vnames = cx[2];
+                        j = skip(s, j);
+                        if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                        return [code, j, vnames];
+                    }
                 }
                 let nc: list = [];
                 let ki: i64 = 0;
@@ -1586,9 +1760,33 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
                                 return [code, j, vnames];
                             }
                         }
+                        let copf: i64 = compound_binop(s, j);
+                        if copf > 0 {
+                            let fidx2: i64 = field_index_any(strbox[2], fld[0]);
+                            code = emit2(code, OP_LOAD(), sl[0]);
+                            code = emit2(code, OP_CONST(), fidx2);
+                            let cf = emit_compound_index(code, vnames, s, j + 2, copf, fnames, faddrs, fargc, strbox);
+                            code = cf[0]; j = cf[1]; vnames = cf[2];
+                            j = skip(s, j);
+                            if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                            return [code, j, vnames];
+                        }
                     }
                     i = save;
                 } else {
+                let cop: i64 = compound_binop(s, j);
+                if cop > 0 {
+                    let sl = slot_of(vnames, id[0]);
+                    vnames = sl[1];
+                    code = emit2(code, OP_LOAD(), sl[0]);
+                    let r = emit_cmp(s, j + 2, code, vnames, fnames, faddrs, fargc, strbox);
+                    code = r[0]; i = r[1]; vnames = r[2];
+                    code = push(code, cop);
+                    code = emit2(code, OP_STORE(), sl[0]);
+                    i = skip(s, i);
+                    if i < len(s) { if s[i] == ";" { i = i + 1; } }
+                    return [code, i, vnames];
+                }
                 if s[j] == "=" {
                     if starts_with(s, j, "==") == 0 {
                         let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, strbox);
@@ -1610,6 +1808,88 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
     code = push(code, OP_POP());
     i = skip(s, i);
     if i < len(s) { if s[i] == ";" { i = i + 1; } }
+    return [code, i, vnames];
+}
+
+// Integer match: `match <expr> { 0 => { ... } Color.Red => { ... } _ => { ... } }`
+// Desugars to temp + if/else chain. Unit enum tags only; no payloads, no ident bindings.
+fn emit_match(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, loops: list, strbox: list) -> list {
+    let r = emit_cmp(s, i + 5, code, vnames, fnames, faddrs, fargc, strbox);
+    code = r[0]; i = r[1]; vnames = r[2];
+    let mn: str = "__m" + itoa(len(vnames));
+    let sl = slot_of(vnames, mn); vnames = sl[1];
+    let mslot: i64 = sl[0];
+    code = emit2(code, OP_STORE(), mslot);
+    i = skip(s, i);
+    assert(s[i] == "{"); i = i + 1;
+    let jmps: list = [];
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "}" { break; }
+        let wild: i64 = 0;
+        let lit: i64 = 0;
+        if starts_kw(s, i, "_") == 1 {
+            wild = 1;
+            i = skip(s, i + 1);
+        } else {
+            if is_alpha(s[i]) == 1 {
+                let id = parse_ident(s, i);
+                i = skip(s, id[1]);
+                assert(s[i] == ".");
+                if i + 1 < len(s) {
+                    assert(s[i + 1] != ".");
+                }
+                let tid: i64 = find_struct(strbox[2], id[0]);
+                assert(tid >= 0);
+                let fld = parse_ident(s, i + 1);
+                assert(len(fld[0]) > 0);
+                lit = field_index(strbox[2][tid][1], fld[0]);
+                i = skip(s, fld[1]);
+            } else {
+                let neg: i64 = 0;
+                if s[i] == "-" { neg = 1; i = i + 1; }
+                let num = parse_number(s, i);
+                assert(num[0] == 0);
+                lit = num[1];
+                if neg == 1 { lit = 0 - lit; }
+                i = skip(s, num[2]);
+            }
+        }
+        assert(starts_with(s, i, "=>") == 1);
+        i = skip(s, i + 2);
+        if wild == 0 {
+            code = emit2(code, OP_LOAD(), mslot);
+            code = emit2(code, OP_CONST(), lit);
+            code = push(code, OP_EQ());
+            let jmpf_at: i64 = len(code);
+            code = emit2(code, OP_JMPF(), 0);
+            let bl = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops, strbox);
+            code = bl[0]; i = bl[1]; vnames = bl[2];
+            let jmp_at: i64 = len(code);
+            code = emit2(code, OP_JMP(), 0);
+            jmps = push(jmps, jmp_at);
+            code[jmpf_at + 1] = len(code);
+        } else {
+            let bl2 = compile_body(s, i, code, vnames, fnames, faddrs, fargc, loops, strbox);
+            code = bl2[0]; i = bl2[1]; vnames = bl2[2];
+        }
+        i = skip(s, i);
+        if i < len(s) {
+            if s[i] == "," { i = i + 1; }
+        }
+        if wild == 1 {
+            i = skip(s, i);
+            break;
+        }
+    }
+    assert(s[i] == "}");
+    i = i + 1;
+    let ji: i64 = 0;
+    while ji < len(jmps) {
+        code[jmps[ji] + 1] = len(code);
+        ji = ji + 1;
+    }
     return [code, i, vnames];
 }
 
@@ -1666,6 +1946,36 @@ fn compile_src(src: str) -> list {
             }
             assert(src[i] == "}"); i = i + 1;
             stypes = push(stypes, [id[0], fields]);
+            strbox[2] = stypes;
+            continue;
+        }
+        if starts_kw(src, i, "enum") == 1 {
+            i = skip(src, i + 4);
+            let eid = parse_ident(src, i);
+            i = skip(src, eid[1]);
+            assert(src[i] == "{"); i = i + 1;
+            let variants: list = [];
+            i = skip(src, i);
+            if src[i] != "}" {
+                while true {
+                    i = skip(src, i);
+                    if src[i] == "}" { break; }
+                    let vnm = parse_ident(src, i);
+                    assert(len(vnm[0]) > 0);
+                    variants = push(variants, vnm[0]);
+                    i = skip(src, vnm[1]);
+                    if i < len(src) {
+                        if src[i] == "{" {
+                            i = match_brace(src, i);
+                        }
+                    }
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; i = skip(src, i); continue; }
+                    break;
+                }
+            }
+            assert(src[i] == "}"); i = i + 1;
+            stypes = push(stypes, [eid[0], variants]);
             strbox[2] = stypes;
             continue;
         }
@@ -1861,12 +2171,27 @@ fn write_runtime() -> str {
     s = s + "/* Driver: #include opcodes.inc.c; define g_strs, g_f64s, g_handlers, g_nhandlers; then #include this file. */\n\n";
     s = s + "#ifdef _WIN32\n";
     s = s + "#include <windows.h>\n";
+    s = s + "#include <winhttp.h>\n";
+    s = s + "#pragma comment(lib, \"winhttp.lib\")\n";
     s = s + "#else\n";
     s = s + "#include <unistd.h>\n";
     s = s + "#include <sys/time.h>\n";
+    s = s + "#include <sys/types.h>\n";
+    s = s + "#include <sys/wait.h>\n";
     s = s + "#endif\n\n";
-    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95, OP_ARGC = 106, OP_ARG = 107, OP_FILE_EXISTS = 108, OP_READ_LINE = 109, OP_BAND = 110, OP_BOR = 111, OP_BXOR = 112, OP_BNOT = 113, OP_SHL = 114, OP_SHR = 115 };\n";
+    s = s + "enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95, OP_ARGC = 106, OP_ARG = 107, OP_FILE_EXISTS = 108, OP_READ_LINE = 109, OP_BAND = 110, OP_BOR = 111, OP_BXOR = 112, OP_BNOT = 113, OP_SHL = 114, OP_SHR = 115, OP_GETENV = 116, OP_HTTP_REQUEST = 117, OP_JSON_GET = 118, OP_JSON_ESCAPE = 119, OP_URL_ENCODE = 123, OP_HTML_TEXT = 124, OP_SLICE = 125, OP_INDEX_OF = 126, OP_STARTS_WITH = 127, OP_SPLIT = 128 };\n";
     s = s + "static int g_kargc = 0;\nstatic char **g_kargv = NULL;\n";
+    s = s + "static void die(const char *m) { fprintf(stderr, \"kenga: %s\\n\", m); exit(1); }\n";
+    s = s + "static void *xrealloc(void *p, size_t n) {\n";
+    s = s + "  void *q = realloc(p, n); if (!q) { fprintf(stderr, \"oom\\n\"); exit(1); } return q;\n";
+    s = s + "}\n";
+    s = s + "static char *xstrdup(const char *s) {\n";
+    s = s + "  size_t n = strlen(s ? s : \"\"); char *p = (char *)malloc(n + 1);\n";
+    s = s + "  if (!p) { fprintf(stderr, \"oom\\n\"); exit(1); }\n";
+    s = s + "  memcpy(p, s ? s : \"\", n + 1); return p;\n";
+    s = s + "}\n";
+    s = s + "#include \"rt_net.inc.c\"\n";
+    s = s + "#include \"rt_str.inc.c\"\n";
     s = s + "typedef struct { int tag; int64_t i; double f; } V;\n";
     s = s + "static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }\n";
     s = s + "static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }\n";
@@ -2669,6 +2994,49 @@ typedef double KREAL;
     s = s + "      if (r) { size_t n = strlen(buf); while (n > 0 && (buf[n-1] == 10 || buf[n-1] == 13)) { buf[--n] = 0; } stack[sp++] = Vs(s_new(buf)); }\n";
     s = s + "      else { stack[sp++] = Vs(s_new(\"\")); }\n";
     s = s + "    }\n";
+    s = s + "    else if (op == OP_GETENV) {\n";
+    s = s + "      char *g = k_getenv(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_JSON_ESCAPE) {\n";
+    s = s + "      char *g = k_json_escape(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_URL_ENCODE) {\n";
+    s = s + "      char *g = k_url_encode(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_HTML_TEXT) {\n";
+    s = s + "      char *g = k_html_text(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_JSON_GET) {\n";
+    s = s + "      V pathv = stack[--sp]; V docv = stack[--sp];\n";
+    s = s + "      { char *g = k_json_get(as_str(docv), as_str(pathv)); stack[sp++] = Vs(s_new(g)); free(g); }\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_HTTP_REQUEST) {\n";
+    s = s + "      V hv = stack[--sp]; V bv = stack[--sp]; V uv = stack[--sp]; V mv = stack[--sp];\n";
+    s = s + "      { char *g = k_http_request(as_str(mv), as_str(uv), as_str(bv), as_str(hv)); stack[sp++] = Vs(s_new(g)); free(g); }\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_SLICE) {\n";
+    s = s + "      int64_t endv = as_i(stack[--sp]); int64_t startv = as_i(stack[--sp]);\n";
+    s = s + "      { char *g = k_slice(as_str(stack[--sp]), startv, endv); stack[sp++] = Vs(s_new(g)); free(g); }\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_INDEX_OF) {\n";
+    s = s + "      V pv = stack[--sp]; V sv = stack[--sp];\n";
+    s = s + "      stack[sp++] = Vi(k_index_of(as_str(sv), as_str(pv)));\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_STARTS_WITH) {\n";
+    s = s + "      V pv = stack[--sp]; V sv = stack[--sp];\n";
+    s = s + "      stack[sp++] = Vi(k_starts_with(as_str(sv), as_str(pv)));\n";
+    s = s + "    }\n";
+    s = s + "    else if (op == OP_SPLIT) {\n";
+    s = s + "      V pv = stack[--sp]; V sv = stack[--sp];\n";
+    s = s + "      { const char *src = as_str(sv); const char *sep = as_str(pv);\n";
+    s = s + "        size_t sl = strlen(src); size_t sepl = strlen(sep); size_t start = 0; int64_t lid = lnew();\n";
+    s = s + "        if (sepl == 0) { size_t i; for (i = 0; i < sl; i++) { char one[2]; one[0] = src[i]; one[1] = 0; lpush(lid, Vs(s_new(one))); } }\n";
+    s = s + "        else { while (1) { int64_t pos = k_index_of(src + start, sep); char *part;\n";
+    s = s + "          if (pos < 0) { part = k_slice(src, (int64_t)start, (int64_t)sl); lpush(lid, Vs(s_new(part))); free(part); break; }\n";
+    s = s + "          part = k_slice(src, (int64_t)start, (int64_t)start + pos); lpush(lid, Vs(s_new(part))); free(part);\n";
+    s = s + "          start = start + (size_t)pos + sepl; } }\n";
+    s = s + "        stack[sp++] = Vl(lid); }\n";
+    s = s + "    }\n";
     s = s + "    else if (op == OP_MEM_CONFIG) {\n";
     s = s + "      int64_t hidden = as_i(stack[--sp]); int64_t ep_cap = as_i(stack[--sp]); double thr = as_f(stack[--sp]);\n";
     s = s + "      int h, cap; if (gMn >= 16) { fprintf(stderr, \"memory heap full\\n\"); exit(1); }\n";
@@ -2907,7 +3275,7 @@ fn write_c_driver(code: list, strs: list, floats: list, binds: list) -> str {
     let s: str = "";
     s = s + "/* GENERATED by kenga/emit/bc_src_c.kenga ? parsed source ? bytecode */\n";
     s = s + "#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n";
-    s = s + "#ifdef _WIN32\n#include <windows.h>\n#else\n#include <unistd.h>\n#endif\n";
+    s = s + "#ifdef _WIN32\n#include <windows.h>\n#include <winhttp.h>\n#else\n#include <unistd.h>\n#include <sys/types.h>\n#include <sys/wait.h>\n#endif\n";
     s = s + "#include \"opcodes.inc.c\"\n\n";
     s = s + emit_handlers_table(binds);
     s = s + emit_strs_table(strs);
@@ -2988,8 +3356,11 @@ fn main() -> i64 {
     let r21 = compile_src(resolve_imports("examples/selfhost/bc_logic.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_logic.c", write_c_driver(r21[0], r21[1], r21[2], r21[3])) == true);
     assert(code_has_seq(r21[0], [OP_CONST(), 10, OP_CONST(), 3, OP_MOD()]) == 1);
-    assert(code_has_seq(r21[0], [OP_CONST(), 1, OP_CONST(), 0, OP_AND()]) == 1);
-    assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_CONST(), 1, OP_OR()]) == 1);
+    assert(code_has_seq(r21[0], [OP_CONST(), 1, OP_JMPF()]) == 1);
+    assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_JMPF()]) == 1);
+    assert(code_has_seq(r21[0], [OP_NOT(), OP_NOT()]) == 1);
+    assert(code_has_seq(r21[0], [OP_CONST(), 1, OP_CONST(), 0, OP_AND()]) == 0);
+    assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_CONST(), 1, OP_OR()]) == 0);
     assert(code_has_seq(r21[0], [OP_CONST(), 0, OP_NOT()]) == 1);
 
     let rbit = compile_src(resolve_imports("examples/selfhost/bitops.kenga", 0));
@@ -3046,10 +3417,66 @@ fn main() -> i64 {
     assert(code_has_seq(r29[0], [OP_FILE_EXISTS()]) == 1);
     assert(code_has_seq(r29[0], [OP_READ_LINE()]) == 1);
 
+    let rnet = compile_src(resolve_imports("examples/selfhost/net_lite.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_net_host.c", write_c_driver(rnet[0], rnet[1], rnet[2], rnet[3])) == true);
+    assert(code_has_seq(rnet[0], [OP_GETENV()]) == 1);
+    assert(code_has_seq(rnet[0], [OP_JSON_GET()]) == 1);
+    assert(code_has_seq(rnet[0], [OP_JSON_ESCAPE()]) == 1);
+    assert(code_has_seq(rnet[0], [OP_URL_ENCODE()]) == 1);
+    assert(code_has_seq(rnet[0], [OP_HTML_TEXT()]) == 1);
+
+    let rstr = compile_src(resolve_imports("examples/selfhost/bc_str_ops.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_str.c", write_c_driver(rstr[0], rstr[1], rstr[2], rstr[3])) == true);
+    assert(code_has_seq(rstr[0], [OP_SLICE()]) == 1);
+    assert(code_has_seq(rstr[0], [OP_INDEX_OF()]) == 1);
+    assert(code_has_seq(rstr[0], [OP_STARTS_WITH()]) == 1);
+    assert(code_has_seq(rstr[0], [OP_SPLIT()]) == 1);
+
     let r30 = compile_src(resolve_imports("examples/selfhost/hex_lab.kenga", 0));
     assert(write_file("bootstrap/generated/bc_from_hex.c", write_c_driver(r30[0], r30[1], r30[2], r30[3])) == true);
     assert(code_has_seq(r30[0], [OP_CONST(), 255]) == 1);
     assert(code_has_seq(r30[0], [OP_CONST(), 10]) == 1);
+
+    let rassign = compile_src(resolve_imports("examples/selfhost/bc_assign.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_assign.c", write_c_driver(rassign[0], rassign[1], rassign[2], rassign[3])) == true);
+    assert(code_has_seq(rassign[0], [OP_ADD()]) == 1);
+    assert(code_has_seq(rassign[0], [OP_SUB()]) == 1);
+    assert(code_has_seq(rassign[0], [OP_MUL()]) == 1);
+    assert(code_has_seq(rassign[0], [OP_DIV()]) == 1);
+    assert(code_has_seq(rassign[0], [OP_SET()]) == 1);
+
+    let rstep = compile_src(resolve_imports("examples/selfhost/bc_step.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_step.c", write_c_driver(rstep[0], rstep[1], rstep[2], rstep[3])) == true);
+    assert(code_has_seq(rstep[0], [OP_GE()]) == 1);
+    assert(code_has_seq(rstep[0], [OP_GT()]) == 1);
+
+    let rsc = compile_src("fn main() -> i64 { let x: i64 = 0 && 1; let y: i64 = 1 || 0; return 0; }\n");
+    assert(code_has_seq(rsc[0], [OP_CONST(), 0, OP_JMPF()]) == 1);
+    assert(code_has_seq(rsc[0], [OP_CONST(), 1, OP_JMPF()]) == 1);
+    assert(code_has_seq(rsc[0], [OP_CONST(), 1, OP_CONST(), 0, OP_AND()]) == 0);
+    assert(code_has_seq(rsc[0], [OP_CONST(), 0, OP_CONST(), 1, OP_OR()]) == 0);
+
+    let rand = compile_src(resolve_imports("examples/selfhost/bc_and.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_and.c", write_c_driver(rand[0], rand[1], rand[2], rand[3])) == true);
+    assert(code_has_seq(rand[0], [OP_JMPF()]) == 1);
+    assert(code_has_seq(rand[0], [OP_CALL()]) == 1);
+    assert(code_has_seq(rand[0], [OP_CONST(), 0, OP_JMPF()]) == 1);
+    assert(code_has_seq(rand[0], [OP_CONST(), 1, OP_JMPF()]) == 1);
+
+    let rmatch = compile_src(resolve_imports("examples/selfhost/bc_match.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_match.c", write_c_driver(rmatch[0], rmatch[1], rmatch[2], rmatch[3])) == true);
+    assert(code_has_seq(rmatch[0], [OP_EQ()]) == 1);
+    assert(code_has_seq(rmatch[0], [OP_JMPF()]) == 1);
+    assert(code_has_seq(rmatch[0], [OP_JMP()]) == 1);
+    assert(code_has_seq(rmatch[0], [OP_LOAD()]) == 1);
+    assert(code_has_seq(rmatch[0], [OP_CONST(), 0, OP_EQ()]) == 1);
+
+    let renum = compile_src(resolve_imports("examples/selfhost/bc_enum.kenga", 0));
+    assert(write_file("bootstrap/generated/bc_from_enum.c", write_c_driver(renum[0], renum[1], renum[2], renum[3])) == true);
+    assert(code_has_seq(renum[0], [OP_CONST(), 1]) == 1);
+    assert(code_has_seq(renum[0], [OP_CONST(), 0, OP_EQ()]) == 1);
+    assert(code_has_seq(renum[0], [OP_EQ()]) == 1);
+    assert(code_has_seq(renum[0], [OP_JMPF()]) == 1);
 
     let raw: str = read_file("bootstrap/generated/_bc_path.txt");
     let one: str = trim_path(raw);
@@ -3059,7 +3486,7 @@ fn main() -> i64 {
         println("wrote bc_one_out.c for " + one);
     }
 
-    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net/birth/logic/typeof/print/now/tensor/mem/tape/tape_ops");
+    println("wrote bootstrap/generated/bc_rt.inc.c + bc_from_*.c incl agent/import/io/net/str/birth/logic/typeof/print/now/tensor/mem/tape/tape_ops/assign/step/and/match/enum");
     println("bc_src_c ok");
     return 0;
 }

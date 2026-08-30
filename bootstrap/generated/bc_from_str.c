@@ -6,8 +6,11 @@
 #include <math.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <winhttp.h>
 #else
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
 #include "opcodes.inc.c"
 
@@ -15,7 +18,7 @@ typedef struct { int64_t str_idx; int64_t addr; int64_t arity; } EvHandler;
 static const EvHandler g_handlers[] = { {0,0,0} };
 static const int g_nhandlers = 0;
 
-static const char *g_strs[] = { "ab", "c", "A" };
+static const char *g_strs[] = { "abcdef", "bcd", "hello", "ll", "he", "x,y", ",", "x", "y" };
 
 static const double g_f64s[] = { 0.0 };
 
@@ -23,7 +26,7 @@ static const double g_f64s[] = { 0.0 };
 
 int main(int argc, char **argv) {
   g_kargc = argc; g_kargv = argv;
-  static const int64_t code[] = { 11, 2, 35, 0, 3, 0, 2, 0, 1, 0, 24, 27, 1, 97, 10, 18, 2, 0, 23, 1, 2, 10, 18, 2, 0, 35, 1, 4, 3, 1, 2, 1, 17, 35, 2, 27, 1, 65, 10, 18, 1, 0, 16, 13 };
+  static const int64_t code[] = { 11, 2, 35, 0, 1, 1, 1, 4, 125, 35, 1, 10, 18, 35, 2, 35, 3, 126, 1, 2, 10, 18, 35, 2, 35, 4, 127, 1, 1, 10, 18, 35, 5, 35, 6, 128, 3, 0, 2, 0, 1, 0, 24, 35, 7, 10, 18, 2, 0, 1, 1, 24, 35, 8, 10, 18, 1, 0, 16, 13 };
   vm_run(code, (int64_t)(sizeof(code)/sizeof(code[0])));
   return 0;
 }

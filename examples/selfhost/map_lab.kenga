@@ -1,0 +1,18 @@
+// map + json_set on more VM.
+
+fn main() -> i64 {
+    let m = map_new();
+    m = map_set(m, "chat", "7");
+    m = map_set(m, "n", 3);
+    assert(map_has(m, "chat") == 1);
+    assert(map_has(m, "no") == 0);
+    assert(map_get(m, "chat") == "7");
+    assert(map_get(m, "n") == 3);
+    m = map_set(m, "n", 9);
+    assert(map_get(m, "n") == 9);
+    let body: str = json_set("{}", "chat_id", "7");
+    body = json_set(body, "text", "hi");
+    assert(index_of(body, "chat_id") >= 0);
+    assert(index_of(body, "hi") >= 0);
+    return 0;
+}

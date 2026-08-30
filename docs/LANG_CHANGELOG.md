@@ -1,5 +1,22 @@
 # Kenga Language Changelog
 
+## lite / more (2026-08-30)
+
+То, чем живут `kenga-lite run` и self-host, не Rust-парсер.
+
+| Конструкция | Где | Лаба |
+|---|---|---|
+| `slice` / `index_of` / `starts_with` / `split` | lite C, more, `bc_src_c` | `str_lab.kenga` |
+| `map_*` / `json_set` | more | `map_lab.kenga` |
+| `match` i64 | lite C, more, `lite.kenga` | `match_lab.kenga` |
+| `match` по строке | more | `match_str.kenga` |
+| unit `enum` | lite C, more | `enum_lab.kenga` |
+| `+=` / `for … step` | lite C, more, `bc_src_c` | `step_lab.kenga` |
+| `for i in a..b` + `break`/`continue` | `kenga/compiler/lite.kenga` | сам файл, `main` |
+| host I/O + Telegram | lite / more | `telegram_bot.kenga`, `net_lite.kenga` |
+
+Ниже — старый лог Rust-ветки `b6fe466` (desktop/match/enum). Колонка **kenga-lite** там про C-host 2024-го, не про сегодняшний `lite.kenga`.
+
 Новые конструкции, вошедшие в мерж `b6fe466` (ветка desktop/match/enum поверх main).
 Источники: `git log --oneline -30`, diff `src/parser.rs`, `src/ast.rs`, `tests/lang.rs`.
 

@@ -154,7 +154,7 @@ H
   стратегия полной независимости от Rust — `docs/INDEPENDENCE.md`.
   Исходник компилятора lite, написанный на самой Kenga:
   `examples/selfhost/kenga_lite.kenga` → алиас `kenga/compiler/lite.kenga`.
-- **Prophet** — память в рантайме: `memory()` / `learn()` / `predict()` / `unroll()`, примеры `examples/prophet.kenga`, обзор `docs/PROPHET_LITE.md`.
+- **Prophet** — память в рантайме: `memory()` / `learn()` / `predict()` / `unroll()`, примеры `examples/prophet.kenga`, обзор `docs/PROPHET_LITE.md`. Живой бот: `examples/telegram_bot.kenga`.
 
 Полный справочник языка (тензоры, Memory, события, struct): `docs/LANGUAGE.md`.
 Упражнения посложнее: `docs/EXERCISES.md`.

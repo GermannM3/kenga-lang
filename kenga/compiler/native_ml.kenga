@@ -1464,3 +1464,9 @@ fn nt_load_mind(path: str) -> list {
     m[11] = eps;
     return m;
 }
+
+// Z identity (CPU, no SVD): a mind is alive if the weights file exists;
+// verified if the Z-passport sidecar exists. Spectral z_verify stays in
+// Python zcore / genesis_loop.py verify.
+fn z_is_alive(p: str) -> i64 { return file_exists(p); }
+fn z_verify(p: str) -> i64 { return file_exists(p + ".passport.json"); }

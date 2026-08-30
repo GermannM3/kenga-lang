@@ -104,8 +104,9 @@ println(expr);         // печать значения + перевод стр�
 - `let` создаёт переменную в текущей функции; повторный `let` с тем же именем
   затеняет предыдущую привязку — не полагайтесь на это в переносимом коде.
 - `for`/`break`/`continue` работают на полном VM и в `kenga-lite.exe`
-  (`examples/selfhost/for_lite.kenga`), но **не поддержаны** self-host
-  компилятором `kenga/compiler/lite.kenga` — там только `while`.
+  (`examples/selfhost/for_lite.kenga`). Self-host `kenga/compiler/lite.kenga`
+  умеет `for i in a..b` (конец не входит), `break`/`continue` и `match` по i64.
+  `for` по списку в `lite.kenga` нет: его VM без списков как значений.
 - `println` печатает `i64`, `str`, `list` (формат `[a, b, c]`) и struct;
   у `print` тот же вывод без перевода строки.
 
@@ -137,6 +138,10 @@ fn имя(a: i64, b: i64) -> i64 {
 | Конкатенация | `s + t` | новая строка |
 | Длина | `len(s)` | `i64` |
 | Индексация | `s[i]` | **строка из одного символа**, не число |
+| Срез | `slice(s, a, b)` | полуинтервал `[a, b)`; выход за край — пусто |
+| Поиск | `index_of(s, p)` | индекс или `-1` |
+| Префикс | `starts_with(s, p)` | `0`/`1` |
+| Разрез | `split(s, sep)` | список строк; `sep == ""` — по символам |
 | Сравнение | `==`, `!=` | `0`/`1`, посимвольное |
 | Код символа | `ord(ch)` | код первого символа, `i64` |
 
@@ -183,26 +188,46 @@ fn имя(a: i64, b: i64) -> i64 {
 | `i64` арифметика и сравнения, `%` | да | да | да |
 | строки: concat, `len`, `s[i]`, `==`, escape | да | да | да¹ |
 | списки: литерал, `len`, `xs[i]`, `push` | да | да | да² |
-| `for` / диапазоны `a..b` / `break` / `continue` | да | да | **нет** |
+| `for` / диапазоны `a..b` / `break` / `continue` | да | да | `for i in a..b` + break/cont⁵ |
 | `else if` | да | да | вложенным `if`³ |
 | `f64`, `round` | да | да | нет⁴ |
 | `struct` | да | да | нет |
-| `import` | да | нет | нет |
+| `import` | да | flatten | нет |
 | события `on`/`emit`/`pump` | да | да | нет |
 | Tensor / Prophet Memory / tape | да | да | нет |
-| `enum` / `match` / `union` | эксперимент. | нет | нет |
+| `enum` (unit) / `match` (i64) | эксперимент. | да | `match` i64 |
+| `+=` / `for … step` | — | да | нет |
+| `slice` / `index_of` / `starts_with` / `split` | — | да | нет |
+| `map_new` / `map_get` / `map_set` / `map_has` | — | да | нет |
+| `json_set` | — | да | нет |
+| `match` по строке | — | да | нет |
 | битовые `& ^ \| ~ << >>` | да | да | нет |
 
 ¹ строки нужны самому компилятору lite, поэтому они в ядре лестницы.
 ² списки `i64` — рабочая лошадка self-host VM (`stack`, `slots` — списки).
 ³ `else if` записывается как `else { if ... { } }` — семантика та же.
 ⁴ `f64` добавлен в `kenga_more.kenga` (ступень 9 лестницы).
+⁵ `for` по списку в `lite.kenga` нет (VM только i64); диапазон и `break`/`continue` есть.
 
 Правило переноса: программа, использующая только колонки «да» во всех трёх,
 запускается везде. Уроки `examples/tour/` соблюдают это правило (единственное
 исключение — `for`, которого мы сознательно избегаем в пользу `while`).
 
-## 11. Дальше
+## 11. Host I/O (lite / more / bc)
+
+| Функция | Смысл |
+|---|---|
+| `getenv(name)` | переменная окружения или `""` |
+| `http_request(method, url, body, headers)` | тело ответа; TLS; ошибка — строка `ERR: …` |
+| `json_get(doc, path)` | `"result.0.message.text"`; нет ключа — `""` |
+| `json_set(doc, key, val)` | дописать поле в объект (`"{}"` → `{"k":"v"}`); more VM |
+| `json_escape(s)` | экранирование для JSON-строки (без кавычек вокруг) |
+| `url_encode(s)` | percent-encoding для query (`a b` → `a%20b`) |
+| `html_text(s)` | снять HTML-теги и типовые `&amp;` / `&lt;` / `&nbsp;` |
+
+Файлы: `read_file` / `write_file` / `file_exists` уже в ядре. Пример бота: `examples/telegram_bot.kenga`.
+
+## 12. Дальше
 
 - Тур с ожидаемым выводом каждого урока: `docs/TOUR.md`.
 - Полный справочник (тензоры, Memory, events): `docs/LANGUAGE.md`.

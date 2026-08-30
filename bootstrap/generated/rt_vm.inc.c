@@ -410,6 +410,10 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_i64(ev_pending()));
       continue;
     }
+    case OP_TIMER_N: {
+      vala_push(&stack, V_i64(ev_timer_n()));
+      continue;
+    }
     case OP_LISTEN: {
       Value vh, ve;
       const char *ev, *hn;
@@ -457,10 +461,43 @@ static int64_t vm_exec(Program *prog) {
       vala_push(&stack, V_str(h));
       continue;
     }
+    case OP_AFTER_MS: {
+      Value vv, ve, vm;
+      int64_t ms;
+      if (stack.len < 3) die("stack underflow after_ms");
+      vv = stack.data[--stack.len];
+      ve = stack.data[--stack.len];
+      vm = stack.data[--stack.len];
+      if (ve.tag != TAG_STR) die("after_ms: event must be str");
+      ms = as_i64(vm, "after_ms: delay");
+      ev_after(ms, strs->data[ve.payload], vv);
+      vala_push(&stack, V_i64(0));
+      continue;
+    }
+    case OP_FLUSH_DUE: {
+      ValA outer = {0};
+      int64_t oh;
+      char *en;
+      Value ev;
+      oh = (int64_t)lists.len;
+      listh_push(&lists, outer);
+      while (ev_take_due(&en, &ev)) {
+        ValA row = {0};
+        int64_t rh = (int64_t)lists.len;
+        listh_push(&lists, row);
+        vala_push(&lists.data[rh], V_str(intern_str(en)));
+        vala_push(&lists.data[rh], ev);
+        vala_push(&lists.data[oh], V_list(rh));
+        free(en);
+      }
+      vala_push(&stack, V_list(oh));
+      continue;
+    }
     case OP_PUMP: {
       Value vm;
       if (!stack.len) die("stack underflow pump");
       vm = stack.data[--stack.len];
+      ev_flush_due_bus();
       pump_left = as_i64(vm, "pump");
       if (pump_left < 0) die("pump expects non-negative");
       pump_done = 0;
@@ -704,6 +741,146 @@ static int64_t vm_exec(Program *prog) {
       int64_t b = as_i64(vb, ">> expects i64");
       if (b < 0 || b >= 64) die(">> shift out of range");
       vala_push(&stack, V_i64(a >> b));
+      continue;
+    }
+    case OP_GETENV: {
+      Value vn; char *got;
+      if (!stack.len) die("stack underflow getenv");
+      vn = stack.data[--stack.len];
+      if (vn.tag != TAG_STR) die("getenv: name must be str");
+      got = k_getenv(strs->data[vn.payload]);
+      vala_push(&stack, V_str(intern_str(got)));
+      free(got);
+      continue;
+    }
+    case OP_JSON_ESCAPE: {
+      Value vn; char *got;
+      if (!stack.len) die("stack underflow json_escape");
+      vn = stack.data[--stack.len];
+      if (vn.tag != TAG_STR) die("json_escape: expected str");
+      got = k_json_escape(strs->data[vn.payload]);
+      vala_push(&stack, V_str(intern_str(got)));
+      free(got);
+      continue;
+    }
+    case OP_URL_ENCODE: {
+      Value vn; char *got;
+      if (!stack.len) die("stack underflow url_encode");
+      vn = stack.data[--stack.len];
+      if (vn.tag != TAG_STR) die("url_encode: expected str");
+      got = k_url_encode(strs->data[vn.payload]);
+      vala_push(&stack, V_str(intern_str(got)));
+      free(got);
+      continue;
+    }
+    case OP_HTML_TEXT: {
+      Value vn; char *got;
+      if (!stack.len) die("stack underflow html_text");
+      vn = stack.data[--stack.len];
+      if (vn.tag != TAG_STR) die("html_text: expected str");
+      got = k_html_text(strs->data[vn.payload]);
+      vala_push(&stack, V_str(intern_str(got)));
+      free(got);
+      continue;
+    }
+    case OP_JSON_GET: {
+      Value vp, vd; char *got;
+      if (stack.len < 2) die("stack underflow json_get");
+      vp = stack.data[--stack.len];
+      vd = stack.data[--stack.len];
+      if (vd.tag != TAG_STR || vp.tag != TAG_STR) die("json_get expects str, str");
+      got = k_json_get(strs->data[vd.payload], strs->data[vp.payload]);
+      vala_push(&stack, V_str(intern_str(got)));
+      free(got);
+      continue;
+    }
+    case OP_SLICE: {
+      Value ve, vs, vv; int64_t a, b, n, i, h; char *got;
+      if (stack.len < 3) die("stack underflow slice");
+      ve = stack.data[--stack.len];
+      vs = stack.data[--stack.len];
+      vv = stack.data[--stack.len];
+      a = as_i64(vs, "slice: start");
+      b = as_i64(ve, "slice: end");
+      if (vv.tag == TAG_LIST) {
+        ValA empty = {0};
+        if (vv.payload < 0 || (size_t)vv.payload >= lists.len) die("slice: bad list");
+        n = (int64_t)lists.data[vv.payload].len;
+        k_clamp_range(n, &a, &b);
+        h = (int64_t)lists.len;
+        listh_push(&lists, empty);
+        for (i = a; i < b; i++) vala_push(&lists.data[h], lists.data[vv.payload].data[i]);
+        vala_push(&stack, V_list(h));
+      } else if (vv.tag == TAG_STR) {
+        got = k_slice(strs->data[vv.payload], a, b);
+        vala_push(&stack, V_str(intern_str(got)));
+        free(got);
+      } else die("slice: expected str or list");
+      continue;
+    }
+    case OP_INDEX_OF: {
+      Value vp, vs;
+      if (stack.len < 2) die("stack underflow index_of");
+      vp = stack.data[--stack.len];
+      vs = stack.data[--stack.len];
+      if (vs.tag != TAG_STR || vp.tag != TAG_STR) die("index_of expects str, str");
+      vala_push(&stack, V_i64(k_index_of(strs->data[vs.payload], strs->data[vp.payload])));
+      continue;
+    }
+    case OP_STARTS_WITH: {
+      Value vp, vs;
+      if (stack.len < 2) die("stack underflow starts_with");
+      vp = stack.data[--stack.len];
+      vs = stack.data[--stack.len];
+      if (vs.tag != TAG_STR || vp.tag != TAG_STR) die("starts_with expects str, str");
+      vala_push(&stack, V_i64(k_starts_with(strs->data[vs.payload], strs->data[vp.payload])));
+      continue;
+    }
+    case OP_SPLIT: {
+      Value vp, vs; const char *src, *sep; size_t sl, sepl, start; int64_t h; ValA empty = {0};
+      if (stack.len < 2) die("stack underflow split");
+      vp = stack.data[--stack.len];
+      vs = stack.data[--stack.len];
+      if (vs.tag != TAG_STR || vp.tag != TAG_STR) die("split expects str, str");
+      src = strs->data[vs.payload]; sep = strs->data[vp.payload];
+      sl = strlen(src); sepl = strlen(sep);
+      h = (int64_t)lists.len; listh_push(&lists, empty);
+      if (sepl == 0) {
+        size_t i; for (i = 0; i < sl; i++) {
+          char one[2]; one[0] = src[i]; one[1] = 0;
+          vala_push(&lists.data[h], V_str(intern_str(one)));
+        }
+      } else {
+        start = 0;
+        while (1) {
+          int64_t pos = k_index_of(src + start, sep);
+          char *part;
+          if (pos < 0) {
+            part = k_slice(src, (int64_t)start, (int64_t)sl);
+            vala_push(&lists.data[h], V_str(intern_str(part))); free(part);
+            break;
+          }
+          part = k_slice(src, (int64_t)start, (int64_t)start + pos);
+          vala_push(&lists.data[h], V_str(intern_str(part))); free(part);
+          start = start + (size_t)pos + sepl;
+        }
+      }
+      vala_push(&stack, V_list(h));
+      continue;
+    }
+    case OP_HTTP_REQUEST: {
+      Value vh, vb, vu, vm; char *got;
+      if (stack.len < 4) die("stack underflow http_request");
+      vh = stack.data[--stack.len];
+      vb = stack.data[--stack.len];
+      vu = stack.data[--stack.len];
+      vm = stack.data[--stack.len];
+      if (vm.tag != TAG_STR || vu.tag != TAG_STR || vb.tag != TAG_STR || vh.tag != TAG_STR)
+        die("http_request expects str, str, str, str");
+      got = k_http_request(strs->data[vm.payload], strs->data[vu.payload],
+                          strs->data[vb.payload], strs->data[vh.payload]);
+      vala_push(&stack, V_str(intern_str(got)));
+      free(got);
       continue;
     }
     case OP_LT: {

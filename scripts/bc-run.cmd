@@ -34,7 +34,7 @@ if "%VCVARS%"=="" if exist "C:\Program Files\Microsoft Visual Studio\18\Communit
 if not "%VCVARS%"=="" (
   call "%VCVARS%" >nul
   pushd bootstrap\generated
-  cl /nologo /O2 /TC bc_one_out.c /Fe:bc_one_out.exe /Fo:bc_one_out.obj
+  cl /nologo /O2 /TC bc_one_out.c /Fe:bc_one_out.exe /Fo:bc_one_out.obj /link winhttp.lib
   if errorlevel 1 (
     popd
     exit /b 1
@@ -51,7 +51,7 @@ if errorlevel 1 (
 )
 
 pushd bootstrap\generated
-gcc -O2 -std=c99 bc_one_out.c -o bc_one_out.exe
+gcc -O2 -std=c99 bc_one_out.c -o bc_one_out.exe -lwinhttp
 if errorlevel 1 (
   popd
   exit /b 1

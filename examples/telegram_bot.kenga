@@ -1,0 +1,678 @@
+// Telegram bot in Kenga. File memory + Prophet (16-d) that learns Q?A.
+//
+//   set TELEGRAM_BOT_TOKEN=123:ABC
+//   bootstrap\bin\kenga-lite.exe run examples\telegram_bot.kenga
+//
+//   set TELEGRAM_BOT_TOKEN=123:ABC
+//   bootstrap\bin\kenga-lite.exe run examples\telegram_bot.kenga
+//
+// or:  kenga-lite run examples\telegram_bot.kenga 123:ABC
+
+fn parse_i64(s: str) -> i64 {
+    let n: i64 = 0;
+    let i: i64 = 0;
+    let sign: i64 = 1;
+    if len(s) > 0 {
+        if s[0] == "-" { sign = 0 - 1; i = 1; }
+    }
+    while i < len(s) {
+        let d: i64 = ord(s[i]) - 48;
+        if d < 0 { break; }
+        if d > 9 { break; }
+        n = n * 10 + d;
+        i = i + 1;
+    }
+    return n * sign;
+}
+
+fn slice_from(s: str, start: i64) -> str {
+    return slice(s, start, len(s));
+}
+
+fn slice_to(s: str, end: i64) -> str {
+    return slice(s, 0, end);
+}
+
+fn trim_left(s: str) -> str {
+    let i: i64 = 0;
+    while i < len(s) {
+        if s[i] == " " { i = i + 1; continue; }
+        if s[i] == "\t" { i = i + 1; continue; }
+        break;
+    }
+    return slice_from(s, i);
+}
+
+fn clip(s: str, n: i64) -> str {
+    if len(s) <= n { return s; }
+    return slice_to(s, n);
+}
+
+fn find_sub(s: str, p: str) -> i64 {
+    return index_of(s, p);
+}
+
+fn lower_ch(ch: str) -> str {
+    let c: i64 = ord(ch);
+    if c >= 65 { if c <= 90 {
+        let abc: str = "abcdefghijklmnopqrstuvwxyz";
+        return abc[c - 65];
+    } }
+    return ch;
+}
+
+fn fold_ascii(s: str) -> str {
+    let out: str = "";
+    let i: i64 = 0;
+    while i < len(s) {
+        out = out + lower_ch(s[i]);
+        i = i + 1;
+    }
+    return out;
+}
+
+fn is_word_char(ch: str) -> i64 {
+    let c: i64 = ord(ch);
+    if c >= 48 { if c <= 57 { return 1; } }
+    if c >= 65 { if c <= 90 { return 1; } }
+    if c >= 97 { if c <= 122 { return 1; } }
+    if c >= 128 { return 1; }
+    return 0;
+}
+
+fn next_word(s: str, i: i64) -> list {
+    let n: i64 = len(s);
+    while i < n {
+        if is_word_char(s[i]) == 1 { break; }
+        i = i + 1;
+    }
+    if i >= n { return ["", i]; }
+    let w: str = "";
+    while i < n {
+        if is_word_char(s[i]) == 0 { break; }
+        w = w + s[i];
+        i = i + 1;
+    }
+    return [w, i];
+}
+
+fn word_count(s: str) -> i64 {
+    let n: i64 = 0;
+    let i: i64 = 0;
+    while 1 == 1 {
+        let w = next_word(s, i);
+        if w[0] == "" { break; }
+        n = n + 1;
+        i = w[1];
+    }
+    return n;
+}
+
+fn has_word(s: str, want: str) -> i64 {
+    let wfold: str = fold_ascii(want);
+    let i: i64 = 0;
+    while 1 == 1 {
+        let w = next_word(s, i);
+        let word: str = w[0];
+        i = w[1];
+        if word == "" { break; }
+        if fold_ascii(word) == wfold { return 1; }
+    }
+    return 0;
+}
+
+fn score_line(query: str, line: str) -> i64 {
+    let q: str = fold_ascii(query);
+    let ln: str = fold_ascii(line);
+    let score: i64 = 0;
+    let i: i64 = 0;
+    while 1 == 1 {
+        let w = next_word(q, i);
+        let word: str = w[0];
+        i = w[1];
+        if word == "" { break; }
+        if len(word) < 3 { continue; }
+        let j: i64 = 0;
+        while 1 == 1 {
+            let u = next_word(ln, j);
+            let other: str = u[0];
+            j = u[1];
+            if other == "" { break; }
+            if word == other { score = score + 1; }
+        }
+    }
+    return score;
+}
+
+fn load_text(path: str) -> str {
+    if file_exists(path) == 0 { return ""; }
+    return read_file(path);
+}
+
+fn count_lines(s: str) -> i64 {
+    let n: i64 = 0;
+    let i: i64 = 0;
+    let nonempty: i64 = 0;
+    while i < len(s) {
+        if s[i] == "\n" {
+            if nonempty == 1 { n = n + 1; }
+            nonempty = 0;
+        } else {
+            nonempty = 1;
+        }
+        i = i + 1;
+    }
+    if nonempty == 1 { n = n + 1; }
+    return n;
+}
+
+fn qa_of(line: str) -> list {
+    let p: i64 = find_sub(line, " | ");
+    if p < 0 { return [line, line]; }
+    return [slice_to(line, p), slice_from(line, p + 3)];
+}
+
+fn remember_line(path: str, line: str) -> i64 {
+    if len(line) == 0 { return 0; }
+    let old: str = load_text(path);
+    if old == "" { return write_file(path, line + "\n"); }
+    return write_file(path, old + line + "\n");
+}
+
+fn mind_path() -> str {
+    return "minds/tg_prophet.km";
+}
+
+fn prev_path() -> str {
+    return "minds/tg_prev.txt";
+}
+
+fn load_prev() -> str {
+    if file_exists(prev_path()) == 0 { return ""; }
+    return clip(read_file(prev_path()), 240);
+}
+
+fn hear_line(mind: list, prev: str, text: str) -> list {
+    if len(text) == 0 { return [mind, prev, 0]; }
+    if starts_with(text, "/") == 1 { return [mind, "", 0]; }
+    if prev == "" { return [mind, text, 0]; }
+    if prev == text { return [mind, text, 0]; }
+    mind = nudge_mind(mind, prev, text);
+    return [mind, text, 1];
+}
+
+fn fsqrt(x: f64) -> f64 {
+    if x <= 0.0 { return 0.0; }
+    let g: f64 = x;
+    if g < 1.0 { g = 1.0; }
+    let i: i64 = 0;
+    while i < 14 {
+        g = 0.5 * (g + x / g);
+        i = i + 1;
+    }
+    return g;
+}
+
+fn text_vec(s: str) -> list {
+    let dim: i64 = 16;
+    let v: list = [];
+    let i: i64 = 0;
+    while i < dim {
+        v = push(v, 0.0);
+        i = i + 1;
+    }
+    i = 0;
+    let n: i64 = len(s);
+    if n > 240 { n = 240; }
+    while i < n {
+        let h: i64 = ord(s[i]);
+        if h < 0 { h = 0 - h; }
+        let b: i64 = h - (h / dim) * dim;
+        v[b] = v[b] + 1.0;
+        if i + 1 < n {
+            let h2: i64 = h * 31 + ord(s[i + 1]);
+            if h2 < 0 { h2 = 0 - h2; }
+            let b2: i64 = h2 - (h2 / dim) * dim;
+            v[b2] = v[b2] + 1.0;
+        }
+        i = i + 1;
+    }
+    let s2: f64 = 0.0001;
+    i = 0;
+    while i < dim {
+        s2 = s2 + v[i] * v[i];
+        i = i + 1;
+    }
+    let inv: f64 = 1.0 / fsqrt(s2);
+    i = 0;
+    while i < dim {
+        v[i] = v[i] * inv;
+        i = i + 1;
+    }
+    return v;
+}
+
+fn vec_dist(a: list, b: list) -> f64 {
+    let acc: f64 = 0.0;
+    let i: i64 = 0;
+    while i < 16 {
+        let av: f64 = 0.0;
+        let bv: f64 = 0.0;
+        if i < len(a) { av = a[i] + 0.0; }
+        if i < len(b) { bv = b[i] + 0.0; }
+        acc = acc + (av - bv) * (av - bv);
+        i = i + 1;
+    }
+    return acc;
+}
+
+fn nearest_by_vec(mem: str, pred: list) -> str {
+    let best_a: str = "";
+    let best: f64 = 9999.0;
+    let line: str = "";
+    let i: i64 = 0;
+    while 1 == 1 {
+        let go: i64 = 0;
+        if i >= len(mem) {
+            if len(line) > 0 { go = 1; }
+        } else {
+            if mem[i] == "\n" {
+                if len(line) > 0 { go = 1; }
+            }
+        }
+        if go == 1 {
+            let parts = qa_of(line);
+            let apart: str = parts[1];
+            if len(apart) > 0 {
+                let d: f64 = vec_dist(pred, text_vec(apart));
+                if d < best {
+                    best = d;
+                    best_a = apart;
+                }
+            }
+            line = "";
+            if i >= len(mem) { break; }
+        } else {
+            if i < len(mem) {
+                if mem[i] != "\n" { line = line + mem[i]; }
+            }
+        }
+        if i >= len(mem) { break; }
+        i = i + 1;
+    }
+    if best < 1.2 { return best_a; }
+    return "";
+}
+
+fn boot_mind() -> list {
+    let p: str = mind_path();
+    if file_exists(p) == 1 {
+        return load_mind(p);
+    }
+    return memory_config(0.12, 64, 16);
+}
+
+fn nudge_mind(mind: list, q: str, a: str) -> list {
+    if len(q) == 0 { return mind; }
+    if len(a) == 0 { return mind; }
+    let x = text_vec(q);
+    let y = text_vec(a);
+    learn(mind, x, y);
+    remember_next(mind, x, y, 20);
+    return mind;
+}
+
+fn teach_mind(mind: list, q: str, a: str) -> list {
+    if len(q) == 0 { return mind; }
+    if len(a) == 0 { return mind; }
+    let x = text_vec(q);
+    let y = text_vec(a);
+    learn(mind, x, y);
+    learn(mind, x, y);
+    remember_next(mind, x, y, 40);
+    return mind;
+}
+
+fn warm_mind(mind: list, mem: str) -> list {
+    let n: i64 = 0;
+    let line: str = "";
+    let i: i64 = len(mem) - 1;
+    while i >= 0 {
+        if mem[i] == "\n" {
+            if len(line) > 0 {
+                let parts = qa_of(line);
+                if parts[0] != parts[1] {
+                    mind = teach_mind(mind, parts[0], parts[1]);
+                    n = n + 1;
+                    if n >= 32 { break; }
+                }
+            }
+            line = "";
+        } else {
+            line = mem[i] + line;
+        }
+        i = i - 1;
+    }
+    return mind;
+}
+
+fn remember_qa(path: str, q: str, a: str) -> i64 {
+    if len(q) == 0 { return 0; }
+    if len(a) == 0 { return 0; }
+    return remember_line(path, clip(q, 240) + " | " + clip(a, 1200));
+}
+
+fn heard_of(mem: str, query: str) -> str {
+    let qf: str = fold_ascii(query);
+    let best_a: str = "";
+    let best_s: i64 = 0;
+    let line: str = "";
+    let i: i64 = 0;
+    while 1 == 1 {
+        let go: i64 = 0;
+        if i >= len(mem) {
+            if len(line) > 0 { go = 1; }
+        } else {
+            if mem[i] == "\n" {
+                if len(line) > 0 { go = 1; }
+            }
+        }
+        if go == 1 {
+            let parts = qa_of(line);
+            let qpart: str = parts[0];
+            let apart: str = parts[1];
+            if fold_ascii(qpart) == qf {
+                if len(apart) > 0 { return apart; }
+            }
+            let sc: i64 = score_line(query, qpart);
+            if sc > best_s {
+                best_s = sc;
+                best_a = apart;
+            }
+            line = "";
+            if i >= len(mem) { break; }
+        } else {
+            if i < len(mem) {
+                if mem[i] != "\n" { line = line + mem[i]; }
+            }
+        }
+        if i >= len(mem) { break; }
+        i = i + 1;
+    }
+    if best_s >= 1 { return best_a; }
+    return "";
+}
+
+fn take_prefix(text: str, p: str) -> str {
+    if starts_with(fold_ascii(text), p) == 0 { return ""; }
+    return trim_left(slice_from(text, len(p)));
+}
+
+fn ua() -> str {
+    return "User-Agent: KengaLangBot/1.0 (https://github.com/GermannM3/kenga-lang)";
+}
+
+fn http_ok(raw: str) -> i64 {
+    if starts_with(raw, "ERR") == 1 { return 0; }
+    if len(raw) == 0 { return 0; }
+    return 1;
+}
+
+fn ddg_search(q: str) -> str {
+    let url: str = "https://api.duckduckgo.com/?q=" + url_encode(q) + "&format=json&no_html=1&skip_disambig=1";
+    let raw: str = http_request("GET", url, "", ua());
+    if http_ok(raw) == 0 { return ""; }
+    let a: str = json_get(raw, "AbstractText");
+    if a == "" { a = json_get(raw, "Answer"); }
+    if a == "" { a = json_get(raw, "RelatedTopics.0.Text"); }
+    if a == "" { a = json_get(raw, "Definition"); }
+    return html_text(a);
+}
+
+fn wiki_lang(lang: str, q: str) -> str {
+    let url: str = "https://" + lang + ".wikipedia.org/w/api.php?action=query&list=search&srsearch=" + url_encode(q) + "&utf8=1&format=json&srlimit=1";
+    let raw: str = http_request("GET", url, "", ua());
+    if http_ok(raw) == 0 { return ""; }
+    let title: str = json_get(raw, "query.search.0.title");
+    if title == "" { return ""; }
+    let u2: str = "https://" + lang + ".wikipedia.org/api/rest_v1/page/summary/" + url_encode(title);
+    let raw2: str = http_request("GET", u2, "", ua());
+    let ex: str = "";
+    if http_ok(raw2) == 1 {
+        ex = json_get(raw2, "extract");
+        if ex == "" { ex = json_get(raw2, "description"); }
+    }
+    if ex == "" {
+        ex = html_text(json_get(raw, "query.search.0.snippet"));
+    }
+    return html_text(ex);
+}
+
+fn web_search(q: str) -> str {
+    let a: str = ddg_search(q);
+    if a != "" { return a; }
+    a = wiki_lang("ru", q);
+    if a != "" { return a; }
+    return wiki_lang("en", q);
+}
+
+fn padded(s: str) -> str {
+    return " " + fold_ascii(s) + " ";
+}
+
+fn is_question(text: str) -> i64 {
+    if find_sub(text, "?") >= 0 { return 1; }
+    let t: str = padded(text);
+    if find_sub(t, " what ") >= 0 { return 1; }
+    if find_sub(t, " who ") >= 0 { return 1; }
+    if find_sub(t, " how ") >= 0 { return 1; }
+    if find_sub(t, " where ") >= 0 { return 1; }
+    if find_sub(t, " when ") >= 0 { return 1; }
+    if find_sub(t, " why ") >= 0 { return 1; }
+    if find_sub(t, " which ") >= 0 { return 1; }
+    if find_sub(t, " chto ") >= 0 { return 1; }
+    if find_sub(t, " kto ") >= 0 { return 1; }
+    if find_sub(t, " kak ") >= 0 { return 1; }
+    if find_sub(t, " gde ") >= 0 { return 1; }
+    if find_sub(t, " kogda ") >= 0 { return 1; }
+    if find_sub(t, " pochemu ") >= 0 { return 1; }
+    if find_sub(t, " zachem ") >= 0 { return 1; }
+    return 0;
+}
+
+fn is_greeting(text: str) -> i64 {
+    if has_word(text, "hi") == 1 { return 1; }
+    if has_word(text, "hello") == 1 { return 1; }
+    if has_word(text, "hey") == 1 { return 1; }
+    if has_word(text, "privet") == 1 { return 1; }
+    return 0;
+}
+
+fn is_chitchat(text: str) -> i64 {
+    if has_word(text, "thanks") == 1 { return 1; }
+    if has_word(text, "ok") == 1 { return 1; }
+    if has_word(text, "bye") == 1 { return 1; }
+    if has_word(text, "????") == 1 { return 1; }
+    if has_word(text, "???????") == 1 { return 1; }
+    return 0;
+}
+
+fn help_text() -> str {
+    return "kenga bot: file memory + prophet net (16-d).\nlearns every line I see, even when I stay quiet.\n/start /help /stats\nremember: fact\nsearch: query  or a question with ?\nin groups: I listen always. I answer if you @mention me.";
+}
+
+fn think_cmd(mem_path: str, text: str) -> str {
+    let t: str = fold_ascii(text);
+    let cmd: str = t;
+    if starts_with(t, "/start") == 1 { cmd = "/start"; }
+    if starts_with(t, "/help") == 1 { cmd = "/help"; }
+    if starts_with(t, "/stats") == 1 { cmd = "/stats"; }
+    match cmd {
+        "/start" => { return help_text(); }
+        "/help" => { return help_text(); }
+        "/stats" => {
+            let n: i64 = count_lines(load_text(mem_path));
+            return "memory lines: " + to_str(n) + ". prophet file: minds/tg_prophet.km";
+        }
+        _ => { return ""; }
+    }
+}
+
+fn think_teach(mem_path: str, text: str) -> str {
+    let body: str = take_prefix(text, "remember:");
+    if body == "" { body = take_prefix(text, "zapomni:"); }
+    if body == "" { body = take_prefix(text, "remember "); }
+    if body == "" { return ""; }
+    remember_line(mem_path, body);
+    return "kept: " + body;
+}
+
+fn think_seek(mem_path: str, text: str) -> str {
+    let q: str = take_prefix(text, "search:");
+    if q == "" { q = take_prefix(text, "find:"); }
+    if q == "" { q = take_prefix(text, "naidi:"); }
+    if q == "" {
+        if find_sub(text, "?") < 0 { return "i heard."; }
+        q = text;
+    }
+    let found: str = web_search(q);
+    if found == "" { return "not yet. remember: fact"; }
+    remember_qa(mem_path, q, found);
+    return clip(found, 3500);
+}
+
+fn think(mem_path: str, mind: list, text: str) -> list {
+    let a: str = think_cmd(mem_path, text);
+    if a != "" { return [a, mind, 0]; }
+    let b: str = think_teach(mem_path, text);
+    if b != "" { return [b, mind, 1]; }
+    if is_greeting(text) == 1 {
+        return ["hi. I learn. remember: fact  or ask with ?", mind, 1];
+    }
+    let mem: str = load_text(mem_path);
+    let hit: str = heard_of(mem, text);
+    if hit != "" { return [clip(hit, 3500), mind, 1]; }
+    let pred = foresee(mind, text_vec(text));
+    let near: str = nearest_by_vec(mem, pred);
+    if near != "" { return [clip(near, 3500), mind, 1]; }
+    let seek: str = think_seek(mem_path, text);
+    let flag: i64 = 0;
+    if seek != "" {
+        if seek != "i heard." { flag = 1; }
+    }
+    return [seek, mind, flag];
+}
+
+fn send_text(token: str, chat: str, text: str) -> str {
+    let url: str = "https://api.telegram.org/bot" + token + "/sendMessage";
+    let body: str = json_set("{}", "chat_id", chat);
+    body = json_set(body, "text", text);
+    return http_request("POST", url, body, "Content-Type: application/json");
+}
+
+fn token_of() -> str {
+    let t: str = getenv("TELEGRAM_BOT_TOKEN");
+    if t != "" { return t; }
+    if argc() >= 2 { return arg(1); }
+    return "";
+}
+
+fn poll_once() -> i64 {
+    let token: str = token_of();
+    let mem_path: str = "minds/tg_memory.txt";
+    let off_path: str = "minds/tg_offset.txt";
+    let offset: str = "0";
+    if file_exists(off_path) == 1 {
+        let saved: str = read_file(off_path);
+        if len(saved) > 0 { offset = saved; }
+    }
+    let url: str = "https://api.telegram.org/bot" + token + "/getUpdates?timeout=20&offset=" + offset;
+    let raw: str = http_request("GET", url, "", "");
+    if starts_with(raw, "ERR") == 1 {
+        println(raw);
+        return 0;
+    }
+    if json_get(raw, "result.0.update_id") == "" { return 0; }
+    let mind = boot_mind();
+    let prev: str = load_prev();
+    let i: i64 = 0;
+    let taught: i64 = 0;
+    while 1 == 1 {
+        let pref: str = "result." + to_str(i);
+        let uid: str = json_get(raw, pref + ".update_id");
+        if uid == "" { break; }
+        let text: str = json_get(raw, pref + ".message.text");
+        let chat: str = json_get(raw, pref + ".message.chat.id");
+        let kind: str = json_get(raw, pref + ".message.chat.type");
+        let reply_name: str = json_get(raw, pref + ".message.reply_to_message.from.username");
+        if text != "" {
+            if chat != "" {
+                let go: i64 = 0;
+                if kind == "private" { go = 1; }
+                if kind == "" { go = 1; }
+                if find_sub(fold_ascii(text), "@kenga_newsbot") >= 0 { go = 1; }
+                if fold_ascii(reply_name) == "kenga_newsbot" { go = 1; }
+                if go == 1 {
+                    let got = think(mem_path, mind, text);
+                    let reply: str = got[0];
+                    mind = got[1];
+                    if got[2] == 1 {
+                        if starts_with(text, "/") == 0 {
+                            if reply != "" { mind = teach_mind(mind, text, reply); }
+                        }
+                        taught = 1;
+                    }
+                    if reply != "" {
+                        if starts_with(text, "/") == 0 {
+                            remember_qa(mem_path, text, reply);
+                        }
+                        let sent: str = send_text(token, chat, reply);
+                        if starts_with(sent, "ERR") == 1 { println(sent); }
+                    }
+                }
+            }
+            if starts_with(text, "/") == 0 {
+                remember_line(mem_path, text);
+                let h = hear_line(mind, prev, text);
+                mind = h[0];
+                prev = h[1];
+                if h[2] == 1 { taught = 1; }
+                write_file(prev_path(), prev);
+            } else {
+                prev = "";
+                write_file(prev_path(), "");
+            }
+        }
+        write_file(off_path, to_str(parse_i64(uid) + 1));
+        i = i + 1;
+    }
+    if taught == 1 {
+        save_mind(mind, mind_path());
+    }
+    return 0;
+}
+
+on "poll"(n: i64) {
+    poll_once();
+    after_ms(80, "poll", n + 1);
+}
+
+fn main() -> i64 {
+    if token_of() == "" {
+        println("need TELEGRAM_BOT_TOKEN or: kenga-lite run examples/telegram_bot.kenga <token>");
+        return 2;
+    }
+    let mind = boot_mind();
+    let mem: str = load_text("minds/tg_memory.txt");
+    if file_exists(mind_path()) == 0 {
+        mind = warm_mind(mind, mem);
+        save_mind(mind, mind_path());
+    }
+    println("kenga telegram bot: prophet + file memory. VPS: docs/VPS.md");
+    after_ms(0, "poll", 0);
+    while 1 == 1 {
+        pump(16);
+        sleep_ms(20);
+    }
+    return 0;
+}

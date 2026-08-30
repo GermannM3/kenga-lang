@@ -1,0 +1,19 @@
+// Compound assignment via bc_src_c (parse ? bytecode ? C).
+
+fn main() -> i64 {
+    let a: i64 = 10;
+    a += 5;
+    assert(a == 15);
+    a -= 3;
+    assert(a == 12);
+    a *= 2;
+    assert(a == 24);
+    a /= 4;
+    assert(a == 6);
+    let xs: list = [1, 2, 3];
+    xs[0] += 9;
+    assert(xs[0] == 10);
+    println(a);
+    println("assign ok");
+    return 0;
+}

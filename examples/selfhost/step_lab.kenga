@@ -1,0 +1,33 @@
+// Stepped ranges on more.kenga: for i in a..b step n (end exclusive, step>0).
+// Omitted step is 1. Negative step is not implemented (always compares i < end).
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\step_lab.kenga
+
+fn main() -> i64 {
+    let acc: i64 = 0;
+    for i in 0..10 step 2 {
+        acc = acc + i;
+    }
+    assert(acc == 20);
+
+    let odd: i64 = 0;
+    for i in 1..8 step 2 {
+        odd = odd + i;
+    }
+    assert(odd == 16);
+
+    let one: i64 = 0;
+    for i in 0..5 {
+        one = one + i;
+    }
+    assert(one == 10);
+
+    let k: i64 = 3;
+    let byk: i64 = 0;
+    for i in 0..12 step k {
+        byk = byk + i;
+    }
+    assert(byk == 18);
+
+    println("step ok");
+    return 0;
+}

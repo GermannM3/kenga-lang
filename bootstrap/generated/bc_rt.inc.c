@@ -3,14 +3,29 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
 #else
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
 
-enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95, OP_ARGC = 106, OP_ARG = 107, OP_FILE_EXISTS = 108, OP_READ_LINE = 109, OP_BAND = 110, OP_BOR = 111, OP_BXOR = 112, OP_BNOT = 113, OP_SHL = 114, OP_SHR = 115 };
+enum { OP_MOD = 38, OP_AND = 39, OP_OR = 40, OP_NOT = 41, OP_TYPEOF = 42, OP_TO_STR = 43, OP_PRINT = 44, OP_SLEEP_MS = 45, OP_NOW_MS = 46, OP_T_FROM = 47, OP_T_GET = 48, OP_T_MATMUL = 49, OP_T_SHAPE = 50, OP_TENSOR = 51, OP_T_FILL = 52, OP_MEM_CONFIG = 53, OP_LEARN = 54, OP_PREDICT = 55, OP_AG_CLEAR = 56, OP_AG_PARAM = 57, OP_AG_CONST = 58, OP_AG_MATMUL = 59, OP_AG_MSE = 60, OP_AG_BACKWARD = 61, OP_AG_STEP = 62, OP_REMEMBER = 63, OP_UNROLL = 64, OP_SAVE_MIND = 65, OP_LOAD_MIND = 66, OP_REMEMBER_NEXT = 67, OP_SURPRISE = 68, OP_CONSOLIDATE = 69, OP_MEM_STATS = 70, OP_FORESEE = 71, OP_AG_ADD = 72, OP_AG_SUB = 73, OP_AG_MUL = 74, OP_AG_SCALE = 75, OP_AG_RELU = 76, OP_AG_NEG = 77, OP_AG_TRANSPOSE = 78, OP_AG_RESHAPE = 79, OP_AG_EXP = 80, OP_AG_LOG = 81, OP_AG_SOFTMAX = 82, OP_AG_SUM = 83, OP_AG_VALUE = 84, OP_AG_GRAD = 85, OP_FORESEE_N = 86, OP_T_SET = 87, OP_T_ADD = 88, OP_T_SUB = 89, OP_T_MUL = 90, OP_T_SCALE = 91, OP_T_TRANSPOSE = 92, OP_T_SOFTMAX = 93, OP_SAVE_TENSOR = 94, OP_LOAD_TENSOR = 95, OP_ARGC = 106, OP_ARG = 107, OP_FILE_EXISTS = 108, OP_READ_LINE = 109, OP_BAND = 110, OP_BOR = 111, OP_BXOR = 112, OP_BNOT = 113, OP_SHL = 114, OP_SHR = 115, OP_GETENV = 116, OP_HTTP_REQUEST = 117, OP_JSON_GET = 118, OP_JSON_ESCAPE = 119, OP_URL_ENCODE = 123, OP_HTML_TEXT = 124, OP_SLICE = 125, OP_INDEX_OF = 126, OP_STARTS_WITH = 127, OP_SPLIT = 128 };
 static int g_kargc = 0;
 static char **g_kargv = NULL;
+static void die(const char *m) { fprintf(stderr, "kenga: %s\n", m); exit(1); }
+static void *xrealloc(void *p, size_t n) {
+  void *q = realloc(p, n); if (!q) { fprintf(stderr, "oom\n"); exit(1); } return q;
+}
+static char *xstrdup(const char *s) {
+  size_t n = strlen(s ? s : ""); char *p = (char *)malloc(n + 1);
+  if (!p) { fprintf(stderr, "oom\n"); exit(1); }
+  memcpy(p, s ? s : "", n + 1); return p;
+}
+#include "rt_net.inc.c"
+#include "rt_str.inc.c"
 typedef struct { int tag; int64_t i; double f; } V;
 static V Vi(int64_t x) { V v; v.tag=0; v.i=x; v.f=0; return v; }
 static V Vf(double x) { V v; v.tag=1; v.i=0; v.f=x; return v; }
@@ -819,6 +834,49 @@ if (gGCp) { gGCp = 0; gc_sweep(stack, sp, slots, 4096); }
       char *r = fgets(buf, sizeof(buf), stdin);
       if (r) { size_t n = strlen(buf); while (n > 0 && (buf[n-1] == 10 || buf[n-1] == 13)) { buf[--n] = 0; } stack[sp++] = Vs(s_new(buf)); }
       else { stack[sp++] = Vs(s_new("")); }
+    }
+    else if (op == OP_GETENV) {
+      char *g = k_getenv(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);
+    }
+    else if (op == OP_JSON_ESCAPE) {
+      char *g = k_json_escape(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);
+    }
+    else if (op == OP_URL_ENCODE) {
+      char *g = k_url_encode(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);
+    }
+    else if (op == OP_HTML_TEXT) {
+      char *g = k_html_text(as_str(stack[--sp])); stack[sp++] = Vs(s_new(g)); free(g);
+    }
+    else if (op == OP_JSON_GET) {
+      V pathv = stack[--sp]; V docv = stack[--sp];
+      { char *g = k_json_get(as_str(docv), as_str(pathv)); stack[sp++] = Vs(s_new(g)); free(g); }
+    }
+    else if (op == OP_HTTP_REQUEST) {
+      V hv = stack[--sp]; V bv = stack[--sp]; V uv = stack[--sp]; V mv = stack[--sp];
+      { char *g = k_http_request(as_str(mv), as_str(uv), as_str(bv), as_str(hv)); stack[sp++] = Vs(s_new(g)); free(g); }
+    }
+    else if (op == OP_SLICE) {
+      int64_t endv = as_i(stack[--sp]); int64_t startv = as_i(stack[--sp]);
+      { char *g = k_slice(as_str(stack[--sp]), startv, endv); stack[sp++] = Vs(s_new(g)); free(g); }
+    }
+    else if (op == OP_INDEX_OF) {
+      V pv = stack[--sp]; V sv = stack[--sp];
+      stack[sp++] = Vi(k_index_of(as_str(sv), as_str(pv)));
+    }
+    else if (op == OP_STARTS_WITH) {
+      V pv = stack[--sp]; V sv = stack[--sp];
+      stack[sp++] = Vi(k_starts_with(as_str(sv), as_str(pv)));
+    }
+    else if (op == OP_SPLIT) {
+      V pv = stack[--sp]; V sv = stack[--sp];
+      { const char *src = as_str(sv); const char *sep = as_str(pv);
+        size_t sl = strlen(src); size_t sepl = strlen(sep); size_t start = 0; int64_t lid = lnew();
+        if (sepl == 0) { size_t i; for (i = 0; i < sl; i++) { char one[2]; one[0] = src[i]; one[1] = 0; lpush(lid, Vs(s_new(one))); } }
+        else { while (1) { int64_t pos = k_index_of(src + start, sep); char *part;
+          if (pos < 0) { part = k_slice(src, (int64_t)start, (int64_t)sl); lpush(lid, Vs(s_new(part))); free(part); break; }
+          part = k_slice(src, (int64_t)start, (int64_t)start + pos); lpush(lid, Vs(s_new(part))); free(part);
+          start = start + (size_t)pos + sepl; } }
+        stack[sp++] = Vl(lid); }
     }
     else if (op == OP_MEM_CONFIG) {
       int64_t hidden = as_i(stack[--sp]); int64_t ep_cap = as_i(stack[--sp]); double thr = as_f(stack[--sp]);

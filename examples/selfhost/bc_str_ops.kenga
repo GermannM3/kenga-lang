@@ -1,0 +1,11 @@
+// Bytecode smoke for slice / index_of / starts_with / split.
+
+fn main() -> i64 {
+    assert(slice("abcdef", 1, 4) == "bcd");
+    assert(index_of("hello", "ll") == 2);
+    assert(starts_with("hello", "he") == 1);
+    let xs = split("x,y", ",");
+    assert(xs[0] == "x");
+    assert(xs[1] == "y");
+    return 0;
+}

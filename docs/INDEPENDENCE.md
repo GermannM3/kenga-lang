@@ -60,6 +60,8 @@ bootstrap\bin\kenga-lite.exe run kenga\emit\rt_prophet.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_tensor.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_tape.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_events.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_net.kenga
+bootstrap\bin\kenga-lite.exe run kenga\emit\rt_str.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\rt_chat.kenga
 bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 ```
@@ -69,4 +71,5 @@ bootstrap\bin\kenga-lite.exe run kenga\emit\lower_kv.kenga
 ## Честно
 
 Большая LLM / GPU — позже. Сейчас: **компилятор и LM на том же языке**, что память.  
+Бот `examples/telegram_bot.kenga` — тот же more + Prophet, без Python.  
 Rust в `src/` ещё собирает Releases — но новый код туда не кладём.

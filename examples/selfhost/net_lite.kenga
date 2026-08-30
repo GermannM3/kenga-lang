@@ -1,0 +1,19 @@
+// Smoke for getenv / json_get / json_escape. No network.
+
+fn main() -> i64 {
+    assert(getenv("KENGA_NO_SUCH_ZZ99") == "");
+    assert(json_escape("hi") == "hi");
+    assert(json_get("{\"a\":1}", "a") == "1");
+    assert(json_get("{\"ok\":true,\"result\":[{\"update_id\":5,\"message\":{\"text\":\"hi\",\"chat\":{\"id\":7}}}]}", "ok") == "true");
+    assert(json_get("{\"ok\":true,\"result\":[{\"update_id\":5,\"message\":{\"text\":\"hi\",\"chat\":{\"id\":7}}}]}", "result.0.update_id") == "5");
+    assert(json_get("{\"ok\":true,\"result\":[{\"update_id\":5,\"message\":{\"text\":\"hi\",\"chat\":{\"id\":7}}}]}", "result.0.message.text") == "hi");
+    assert(json_get("{\"ok\":true,\"result\":[{\"update_id\":5,\"message\":{\"text\":\"hi\",\"chat\":{\"id\":7}}}]}", "result.0.message.chat.id") == "7");
+    assert(json_get("{\"ok\":true,\"result\":[]}", "result.0.update_id") == "");
+    assert(json_escape("say \"hi\"") != "say \"hi\"");
+    assert(url_encode("a b") == "a%20b");
+    assert(url_encode("A-z_0") == "A-z_0");
+    assert(html_text("<b>x</b>") == "x");
+    assert(html_text("a&amp;b") == "a&b");
+    assert(html_text("a&lt;b&gt;") == "a<b>");
+    return 0;
+}

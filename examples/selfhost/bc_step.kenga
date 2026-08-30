@@ -1,0 +1,24 @@
+// Stepped for-range via bc_src_c (end exclusive, default step 1).
+
+fn main() -> i64 {
+    let s: i64 = 0;
+    for i in 0..10 step 2 {
+        s += i;
+    }
+    assert(s == 20);
+    let t: i64 = 0;
+    for i in 1..6 {
+        t += i;
+    }
+    assert(t == 15);
+    let d: i64 = 0;
+    for i in 5..0 step -1 {
+        d += i;
+    }
+    assert(d == 15);
+    println(s);
+    println(t);
+    println(d);
+    println("step ok");
+    return 0;
+}

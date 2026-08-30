@@ -50,7 +50,7 @@ GitHub Linguist ещё не знает `.kenga` (порог: тысячи пуб
 
 ## Язык
 
-`fn` `let` `if`/`else if` `while` `for` `break`/`continue` · i64/f64/str/list/struct · `& | ^ ~ << >>` · `0x`/`0b` · import · events.
+`fn` `let` `if`/`else if` `while` `for`/`step` `break`/`continue` · i64/f64/str/list/struct · `match`/`enum` · `+=` · `& | ^ ~ << >>` · `0x`/`0b` · `slice`/`index_of`/`starts_with`/`split` · `map_*`/`json_set` · import · events · HTTP/JSON.
 
 Три исполнения одного диалекта: lite C VM, more-VM, bytecode→native (`scripts\bc-run.cmd`). Дыры и таблица: [docs/DIALECT_GAP.md](docs/DIALECT_GAP.md).
 
@@ -58,7 +58,11 @@ GitHub Linguist ещё не знает `.kenga` (порог: тысячи пуб
 bootstrap\bin\kenga-lite.exe run examples\selfhost\bitops.kenga
 bootstrap\bin\kenga-lite.exe run examples\selfhost\hex_lab.kenga
 bootstrap\bin\kenga-lite.exe run examples\selfhost\struct_lite.kenga
+bootstrap\bin\kenga-lite.exe run examples\selfhost\str_lab.kenga
+bootstrap\bin\kenga-lite.exe run examples\selfhost\net_lite.kenga
 ```
+
+Telegram-бот (токен в env): `examples/telegram_bot.kenga` — файл + Пророк 16-d, учит с чата. VPS: [docs/VPS.md](docs/VPS.md).
 
 Полный self-host без gcc/cl — последний шаг лестницы. `kenga_lite.c` — каркас из ~90 строк includes.
 

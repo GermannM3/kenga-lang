@@ -1,0 +1,27 @@
+// Compound assignment on more.kenga: x += -= *= /= and xs[i] +=.
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\assign_lab.kenga
+
+fn main() -> i64 {
+    let x: i64 = 1;
+    x += 2;
+    assert(x == 3);
+    x -= 1;
+    assert(x == 2);
+    x *= 3;
+    assert(x == 6);
+    x /= 2;
+    assert(x == 3);
+
+    let xs: list = [10, 20];
+    xs[0] += 5;
+    assert(xs[0] == 15);
+    xs[1] *= 2;
+    assert(xs[1] == 40);
+    xs[0] -= 4;
+    assert(xs[0] == 11);
+    xs[1] /= 4;
+    assert(xs[1] == 10);
+
+    println("assign ok");
+    return 0;
+}

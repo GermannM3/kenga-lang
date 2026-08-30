@@ -1,0 +1,38 @@
+// Target match syntax (more.kenga emit_match), written as if/else so this
+// file also runs if match parse is missing. Real match: match_int.kenga
+//
+//   match n {
+//       0 => { return 10; }
+//       1 => { return 20; }
+//       2 => { return 30; }
+//       _ => { return 40; }
+//   }
+
+fn classify(n: i64) -> i64 {
+    if n == 0 {
+        return 10;
+    } else if n == 1 {
+        return 20;
+    } else if n == 2 {
+        return 30;
+    } else {
+        return 40;
+    }
+}
+
+fn main() -> i64 {
+    assert(classify(0) == 10);
+    assert(classify(1) == 20);
+    assert(classify(2) == 30);
+    assert(classify(7) == 40);
+    let x: i64 = 2;
+    let v: i64 = 0;
+    if x == 2 {
+        v = 99;
+    } else {
+        v = 0;
+    }
+    assert(v == 99);
+    println(classify(2));
+    return 0;
+}

@@ -1,0 +1,30 @@
+// Integer match on more.kenga (kenga-lite run file ? more VM).
+//   bootstrap\bin\kenga-lite.exe run examples\selfhost\match_int.kenga
+// Thin desugar: match <i64> { lit => { ... } _ => { ... } } ? temp + if/else.
+// No enum payloads. If/else equivalent: examples/selfhost/match_lab.kenga
+// match is a statement (not `let x = match ...`); tail of a fn may leave a value.
+
+fn classify(n: i64) -> i64 {
+    match n {
+        0 => { 10 }
+        1 => { 20 }
+        2 => { 30 }
+        _ => { 40 }
+    }
+}
+
+fn main() -> i64 {
+    assert(classify(0) == 10);
+    assert(classify(1) == 20);
+    assert(classify(2) == 30);
+    assert(classify(7) == 40);
+    let x: i64 = 2;
+    let v: i64 = 0;
+    match x {
+        2 => { v = 99; }
+        _ => { v = 0; }
+    }
+    assert(v == 99);
+    println(classify(2));
+    return 0;
+}

@@ -1,7 +1,9 @@
 // Self-host compiler on Kenga (canonical). Replaces growing slice of src/compiler.rs + vm.rs.
 // Run suite: bootstrap\bin\kenga-lite.exe run kenga\compiler\more.kenga
 // User file: kenga-lite run examples\selfhost\fact_lite.kenga  (more VM)
-// Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, import,
+// Dialect: i64/f64, lists, str, for/break/continue, else if, xs[i]=, struct, enum, import,
+//          x+=/-=/*=/= (desugar x = x op rhs; xs[i]+= too), for i in a..b step n
+//          (end exclusive; omitted step=1; negative step not implemented),
 //          XOR, birth→24, c_seed/expr_c (Kenga writes .c) via run_file.
 //          on/emit/pump/pending, types/ttl skip, && || % !, bitwise & | ^ ~ << >>, typeof/to_str,
 //          t_from/t_get/t_matmul/t_shape/t_add/tensor/t_fill,
@@ -13,7 +15,14 @@
 //          load_ppm/load_wav/t_patch_mean/t_linear_grad,
 //          print/sleep_ms/learn/predict/unroll/remember_next/foresee_n
 //          argc/arg/file_exists/read_line (guest argv skips more path),
-//          hex/bin literals 0xFF / 0b1010
+//          getenv/http_request/json_get/json_escape/url_encode/html_text,
+//          slice/index_of/starts_with/split (str; slice also list),
+//          map_new/map_get/map_set/map_has, json_set (top-level append),
+//          after_ms/flush_due/timer_n (cooperative timers in pump),
+//          z_is_alive/z_verify (weights file / .passport.json sidecar; no SVD in VM),
+//          hex/bin literals 0xFF / 0b1010,
+//          match x { n => { ... } _ => { ... } }  (i64 lit / Name.Variant + wildcard → if/else)
+//          enum Color { Red, Green } → tags 0..n-1; Color.Red is CONST, not GET
 // Tensor/tape/Prophet dispatch → native_ml.kenga (Kenga lists).
 // Host left: CRT. ppm/wav via read_bytes + Kenga parse.
 
@@ -134,6 +143,168 @@ fn OP_BXOR() -> i64 { return 112; }
 fn OP_BNOT() -> i64 { return 113; }
 fn OP_SHL() -> i64 { return 114; }
 fn OP_SHR() -> i64 { return 115; }
+fn OP_GETENV() -> i64 { return 116; }
+fn OP_HTTP_REQUEST() -> i64 { return 117; }
+fn OP_JSON_GET() -> i64 { return 118; }
+fn OP_JSON_ESCAPE() -> i64 { return 119; }
+fn OP_AFTER_MS() -> i64 { return 120; }
+fn OP_FLUSH_DUE() -> i64 { return 121; }
+fn OP_TIMER_N() -> i64 { return 122; }
+fn OP_URL_ENCODE() -> i64 { return 123; }
+fn OP_HTML_TEXT() -> i64 { return 124; }
+fn OP_SLICE() -> i64 { return 125; }
+fn OP_INDEX_OF() -> i64 { return 126; }
+fn OP_STARTS_WITH() -> i64 { return 127; }
+fn OP_SPLIT() -> i64 { return 128; }
+fn OP_MAP_NEW() -> i64 { return 129; }
+fn OP_MAP_GET() -> i64 { return 130; }
+fn OP_MAP_HAS() -> i64 { return 131; }
+fn OP_MAP_SET() -> i64 { return 132; }
+fn OP_JSON_SET() -> i64 { return 133; }
+
+fn k_clamp3(n: i64, start: i64, end: i64) -> list {
+    if start < 0 { start = 0; }
+    if start > n { start = n; }
+    if end > n { end = n; }
+    if end < start { end = start; }
+    return [start, end];
+}
+
+fn k_slice_str(s: str, start: i64, end: i64) -> str {
+    let n: i64 = len(s);
+    let r = k_clamp3(n, start, end);
+    start = r[0];
+    end = r[1];
+    let out: str = "";
+    let i: i64 = start;
+    while i < end {
+        out = out + s[i];
+        i = i + 1;
+    }
+    return out;
+}
+
+fn k_slice_list(xs: list, start: i64, end: i64) -> list {
+    let n: i64 = len(xs);
+    let r = k_clamp3(n, start, end);
+    start = r[0];
+    end = r[1];
+    let out: list = [];
+    let i: i64 = start;
+    while i < end {
+        out = push(out, xs[i]);
+        i = i + 1;
+    }
+    return out;
+}
+
+fn k_index_of(s: str, p: str) -> i64 {
+    if len(p) == 0 { return 0; }
+    if len(p) > len(s) { return 0 - 1; }
+    let i: i64 = 0;
+    while i <= len(s) - len(p) {
+        let ok: i64 = 1;
+        let j: i64 = 0;
+        while j < len(p) {
+            if s[i + j] != p[j] { ok = 0; break; }
+            j = j + 1;
+        }
+        if ok == 1 { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn k_starts_with(s: str, p: str) -> i64 {
+    if len(p) > len(s) { return 0; }
+    let i: i64 = 0;
+    while i < len(p) {
+        if s[i] != p[i] { return 0; }
+        i = i + 1;
+    }
+    return 1;
+}
+
+fn k_map_new() -> list {
+    return [];
+}
+
+fn k_map_get(m: list, k: str) -> str {
+    let i: i64 = 0;
+    while i < len(m) {
+        let row = m[i];
+        if row[0] == k { return row[1]; }
+        i = i + 1;
+    }
+    return "";
+}
+
+fn k_map_has(m: list, k: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(m) {
+        let row = m[i];
+        if row[0] == k { return 1; }
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn k_map_set(m: list, k: str, v: str) -> list {
+    let i: i64 = 0;
+    while i < len(m) {
+        let row = m[i];
+        if row[0] == k {
+            row[1] = v;
+            m[i] = row;
+            return m;
+        }
+        i = i + 1;
+    }
+    return push(m, [k, v]);
+}
+
+fn k_json_set(doc: str, key: str, val: str) -> str {
+    let q: str = html_text("&quot;");
+    let pair: str = q + json_escape(key) + q + ":" + q + json_escape(val) + q;
+    let n: i64 = len(doc);
+    if n <= 2 {
+        return k_slice_str(doc, 0, 1) + pair + k_slice_str(doc, n - 1, n);
+    }
+    return k_slice_str(doc, 0, n - 1) + "," + pair + k_slice_str(doc, n - 1, n);
+}
+
+fn k_split(s: str, sep: str) -> list {
+    let out: list = [];
+    if sep == "" {
+        let i: i64 = 0;
+        while i < len(s) {
+            out = push(out, s[i]);
+            i = i + 1;
+        }
+        return out;
+    }
+    let start: i64 = 0;
+    let i: i64 = 0;
+    let n: i64 = len(s);
+    let sn: i64 = len(sep);
+    while i <= n - sn {
+        let ok: i64 = 1;
+        let j: i64 = 0;
+        while j < sn {
+            if s[i + j] != sep[j] { ok = 0; break; }
+            j = j + 1;
+        }
+        if ok == 1 {
+            out = push(out, k_slice_str(s, start, i));
+            i = i + sn;
+            start = i;
+        } else {
+            i = i + 1;
+        }
+    }
+    out = push(out, k_slice_str(s, start, n));
+    return out;
+}
 
 fn itoa(n: i64) -> str {
     let digs: str = "0123456789";
@@ -368,7 +539,13 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
     let oArgc: i64 = 106;   let oArg: i64 = 107;     let oFileExists: i64 = 108;
     let oReadLine: i64 = 109; let oBand: i64 = 110;  let oBor: i64 = 111;
     let oBxor: i64 = 112;   let oBnot: i64 = 113;    let oShl: i64 = 114;
-    let oShr: i64 = 115;
+    let oShr: i64 = 115;    let oGetenv: i64 = 116;  let oHttpRequest: i64 = 117;
+    let oJsonGet: i64 = 118; let oJsonEscape: i64 = 119;
+    let oAfterMs: i64 = 120; let oFlushDue: i64 = 121; let oTimerN: i64 = 122;
+    let oUrlEncode: i64 = 123; let oHtmlText: i64 = 124;
+    let oSlice: i64 = 125;   let oIndexOf: i64 = 126;  let oStartsWith: i64 = 127;
+    let oSplit: i64 = 128;  let oMapNew: i64 = 129;   let oMapGet: i64 = 130;
+    let oMapHas: i64 = 131; let oMapSet: i64 = 132;   let oJsonSet: i64 = 133;
     let stack: list = [];
     let spi: i64 = 0;
     let prei: i64 = 0;
@@ -652,7 +829,7 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
             }
             else if op == oPending {
                 if spi >= len(stack) { stack = push(stack, 0); }
-                stack[spi] = len(evq); spi = spi + 1;
+                stack[spi] = len(evq) + timer_n(); spi = spi + 1;
             }
             else if op == oWriteFile {
                 spi = spi - 1; let pc = stack[spi];
@@ -669,6 +846,12 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
             else if op == oPump {
                 spi = spi - 1;
                 let left: i64 = stack[spi];
+                let due = flush_due();
+                let di: i64 = 0;
+                while di < len(due) {
+                    evq = push(evq, due[di]);
+                    di = di + 1;
+                }
                 let done: i64 = 0;
                 while left > 0 {
                     if len(evq) == 0 { break; }
@@ -979,6 +1162,100 @@ fn vm_run(code: list, binds: list, start_ip: i64, init_slots: list, evq: list) -
                 spi = spi - 1; let b = stack[spi];
                 spi = spi - 1;
                 stack[spi] = stack[spi] >> b; spi = spi + 1;
+            }
+            else if op == oGetenv {
+                spi = spi - 1;
+                stack[spi] = getenv(stack[spi]); spi = spi + 1;
+            }
+            else if op == oJsonEscape {
+                spi = spi - 1;
+                stack[spi] = json_escape(stack[spi]); spi = spi + 1;
+            }
+            else if op == oJsonGet {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = json_get(stack[spi], b); spi = spi + 1;
+            }
+            else if op == oHttpRequest {
+                spi = spi - 1; let d = stack[spi];
+                spi = spi - 1; let c = stack[spi];
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1; let a = stack[spi];
+                stack[spi] = http_request(a, b, c, d); spi = spi + 1;
+            }
+            else if op == oAfterMs {
+                spi = spi - 1; let c = stack[spi];
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1; let a = stack[spi];
+                stack[spi] = after_ms(a, b, c); spi = spi + 1;
+            }
+            else if op == oFlushDue {
+                if spi >= len(stack) { stack = push(stack, 0); }
+                stack[spi] = flush_due(); spi = spi + 1;
+            }
+            else if op == oTimerN {
+                if spi >= len(stack) { stack = push(stack, 0); }
+                stack[spi] = timer_n(); spi = spi + 1;
+            }
+            else if op == oUrlEncode {
+                spi = spi - 1;
+                stack[spi] = url_encode(stack[spi]); spi = spi + 1;
+            }
+            else if op == oHtmlText {
+                spi = spi - 1;
+                stack[spi] = html_text(stack[spi]); spi = spi + 1;
+            }
+            else if op == oSlice {
+                spi = spi - 1; let c = stack[spi];
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                if typeof(stack[spi]) == "list" {
+                    stack[spi] = k_slice_list(stack[spi], b, c);
+                } else {
+                    stack[spi] = k_slice_str(stack[spi], b, c);
+                }
+                spi = spi + 1;
+            }
+            else if op == oIndexOf {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = k_index_of(stack[spi], b); spi = spi + 1;
+            }
+            else if op == oStartsWith {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = k_starts_with(stack[spi], b); spi = spi + 1;
+            }
+            else if op == oSplit {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = k_split(stack[spi], b); spi = spi + 1;
+            }
+            else if op == oMapNew {
+                if spi >= len(stack) { stack = push(stack, 0); }
+                stack[spi] = k_map_new(); spi = spi + 1;
+            }
+            else if op == oMapGet {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = k_map_get(stack[spi], b); spi = spi + 1;
+            }
+            else if op == oMapHas {
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = k_map_has(stack[spi], b); spi = spi + 1;
+            }
+            else if op == oMapSet {
+                spi = spi - 1; let c = stack[spi];
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = k_map_set(stack[spi], b, c); spi = spi + 1;
+            }
+            else if op == oJsonSet {
+                spi = spi - 1; let c = stack[spi];
+                spi = spi - 1; let b = stack[spi];
+                spi = spi - 1;
+                stack[spi] = k_json_set(stack[spi], b, c); spi = spi + 1;
             }
         }
     }
@@ -1430,7 +1707,10 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "now_ms" { zop = OP_NOW_MS(); }
                                                     if id[0] == "memory" { zop = OP_MEMORY(); }
                                                     if id[0] == "argc" { zop = OP_ARGC(); }
+                                                    if id[0] == "map_new" { zop = OP_MAP_NEW(); }
                                                     if id[0] == "read_line" { zop = OP_READ_LINE(); }
+                                                    if id[0] == "flush_due" { zop = OP_FLUSH_DUE(); }
+                                                    if id[0] == "timer_n" { zop = OP_TIMER_N(); }
                                                     if zop != 0 {
                                                         j = skip(s, j); assert(s[j] == ")"); j = j + 1;
                                                         code = push(code, zop);
@@ -1456,15 +1736,49 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "ag_reshape" { hop = OP_AG_RESHAPE(); }
                                                     if id[0] == "ag_step" { hop = OP_AG_STEP(); }
                                                     if id[0] == "predict" { hop = OP_PREDICT(); }
+                                                    if id[0] == "json_get" { hop = OP_JSON_GET(); }
+                                                    if id[0] == "index_of" { hop = OP_INDEX_OF(); }
+                                                    if id[0] == "starts_with" { hop = OP_STARTS_WITH(); }
+                                                    if id[0] == "split" { hop = OP_SPLIT(); }
+                                                    if id[0] == "map_get" { hop = OP_MAP_GET(); }
+                                                    if id[0] == "map_has" { hop = OP_MAP_HAS(); }
                                                     if hop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
                                                         j = skip(s, j); assert(s[j] == ","); j = j + 1;
                                                         ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
-                                                        j = skip(s, j); assert(s[j] == ")"); j = j + 1;
-                                                        code = push(code, hop);
-                                                        i = j;
+                                                        j = skip(s, j);
+                                                        if hop == OP_STARTS_WITH() {
+                                                            if s[j] == "," {
+                                                                j = j + 1;
+                                                                ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                                                                code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
+                                                                j = skip(s, j); assert(s[j] == ")"); j = j + 1;
+                                                                let fi: i64 = 0; let found: i64 = 0; let fni: i64 = 0;
+                                                                while fi < len(fnames) {
+                                                                    if fnames[fi] == id[0] {
+                                                                        found = 1; fni = fi; assert(fargc[fi] == 3);
+                                                                    }
+                                                                    fi = fi + 1;
+                                                                }
+                                                                assert(found == 1);
+                                                                let addr_at: i64 = len(code) + 1;
+                                                                code = emit3(code, OP_CALL(), faddrs[fni], 3);
+                                                                if faddrs[fni] == 0 {
+                                                                    patches = push(patches, [addr_at, fni]);
+                                                                }
+                                                                i = j;
+                                                            } else {
+                                                                assert(s[j] == ")"); j = j + 1;
+                                                                code = push(code, hop);
+                                                                i = j;
+                                                            }
+                                                        } else {
+                                                            assert(s[j] == ")"); j = j + 1;
+                                                            code = push(code, hop);
+                                                            i = j;
+                                                        }
                                                     } else {
                                                     let uop: i64 = 0;
                                                     if id[0] == "t_transpose" { uop = OP_T_TRANSPOSE(); }
@@ -1494,6 +1808,10 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "sleep_ms" { uop = OP_SLEEP_MS(); }
                                                     if id[0] == "file_exists" { uop = OP_FILE_EXISTS(); }
                                                     if id[0] == "arg" { uop = OP_ARG(); }
+                                                    if id[0] == "getenv" { uop = OP_GETENV(); }
+                                                    if id[0] == "json_escape" { uop = OP_JSON_ESCAPE(); }
+                                                    if id[0] == "url_encode" { uop = OP_URL_ENCODE(); }
+                                                    if id[0] == "html_text" { uop = OP_HTML_TEXT(); }
                                                     if uop != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1511,6 +1829,10 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     if id[0] == "learn" { t3 = OP_LEARN(); }
                                                     if id[0] == "unroll" { t3 = OP_UNROLL(); }
                                                     if id[0] == "foresee_n" { t3 = OP_FORESEE_N(); }
+                                                    if id[0] == "after_ms" { t3 = OP_AFTER_MS(); }
+                                                    if id[0] == "slice" { t3 = OP_SLICE(); }
+                                                    if id[0] == "map_set" { t3 = OP_MAP_SET(); }
+                                                    if id[0] == "json_set" { t3 = OP_JSON_SET(); }
                                                     if t3 != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1526,6 +1848,7 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                     } else {
                                                     let t4: i64 = 0;
                                                     if id[0] == "remember_next" { t4 = OP_REMEMBER_NEXT(); }
+                                                    if id[0] == "http_request" { t4 = OP_HTTP_REQUEST(); }
                                                     if t4 != 0 {
                                                         let ar = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                                                         code = ar[0]; j = ar[1]; vnames = ar[2]; patches = ar[3];
@@ -1624,8 +1947,27 @@ fn emit_factor(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: l
                                                 i = j;
                                             }
                                         } else {
-                                            let sl = slot_of(vnames, id[0]);
-                                            code = emit2(code, OP_LOAD(), sl[0]); i = id[1]; vnames = sl[1];
+                                            // Color.Red → CONST tag; p.x still LOAD+GET via postfix
+                                            let enum_ok: i64 = 0;
+                                            if s[j] == "." {
+                                                if j + 1 < len(s) {
+                                                    if s[j + 1] != "." {
+                                                        let tid: i64 = find_struct(stypes, id[0]);
+                                                        if tid >= 0 {
+                                                            let fld = parse_ident(s, j + 1);
+                                                            assert(len(fld[0]) > 0);
+                                                            let fidx: i64 = field_index(stypes[tid][1], fld[0]);
+                                                            code = emit2(code, OP_CONST(), fidx);
+                                                            i = fld[1];
+                                                            enum_ok = 1;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if enum_ok == 0 {
+                                                let sl = slot_of(vnames, id[0]);
+                                                code = emit2(code, OP_LOAD(), sl[0]); i = id[1]; vnames = sl[1];
+                                            }
                                         }
                                     }
                                 }
@@ -1816,8 +2158,18 @@ fn emit_and(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list
     while true {
         i = skip(s, i); if i >= len(s) { break; }
         if starts_with(s, i, "&&") == 1 {
+            // JMPF pops lhs; skip rhs when lhs is 0
+            let jmpf_at: i64 = len(code);
+            code = emit2(code, OP_JMPF(), 0);
             r = emit_bitor(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
-            code = push(r[0], OP_AND()); i = r[1]; vnames = r[2]; patches = r[3];
+            code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+            code = push(code, OP_NOT());
+            code = push(code, OP_NOT());
+            let jmp_at: i64 = len(code);
+            code = emit2(code, OP_JMP(), 0);
+            code[jmpf_at + 1] = len(code);
+            code = emit2(code, OP_CONST(), 0);
+            code[jmp_at + 1] = len(code);
         } else { break; }
     }
     return [code, i, vnames, patches];
@@ -1829,8 +2181,18 @@ fn emit_or(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list,
     while true {
         i = skip(s, i); if i >= len(s) { break; }
         if starts_with(s, i, "||") == 1 {
+            // JMPF pops lhs; skip rhs when lhs is already truthy
+            let jmpf_at: i64 = len(code);
+            code = emit2(code, OP_JMPF(), 0);
+            code = emit2(code, OP_CONST(), 1);
+            let jmp_at: i64 = len(code);
+            code = emit2(code, OP_JMP(), 0);
+            code[jmpf_at + 1] = len(code);
             r = emit_and(s, i + 2, code, vnames, fnames, faddrs, fargc, stypes, patches);
-            code = push(r[0], OP_OR()); i = r[1]; vnames = r[2]; patches = r[3];
+            code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+            code = push(code, OP_NOT());
+            code = push(code, OP_NOT());
+            code[jmp_at + 1] = len(code);
         } else { break; }
     }
     return [code, i, vnames, patches];
@@ -1851,6 +2213,23 @@ fn emit_block(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: li
     }
     assert(s[i] == "}");
     return [code, i + 1, vnames, patches, lctx];
+}
+
+fn compound_at(s: str, i: i64) -> list {
+    // [opcode, pos_after_=]; opcode 0 = not += -= *= /=
+    if i >= len(s) { return [0, i]; }
+    let ch: str = s[i];
+    let op: i64 = 0;
+    if ch == "+" { op = OP_ADD(); }
+    if ch == "-" { op = OP_SUB(); }
+    if ch == "*" { op = OP_MUL(); }
+    if ch == "/" { op = OP_DIV(); }
+    if op == 0 { return [0, i]; }
+    let j: i64 = skip(s, i + 1);
+    if j >= len(s) { return [0, i]; }
+    if s[j] != "=" { return [0, i]; }
+    if starts_with(s, j, "==") == 1 { return [0, i]; }
+    return [op, j + 1];
 }
 
 fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list, lctx: list) -> list {
@@ -1955,6 +2334,20 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
             code = emit2(code, OP_STORE(), eslot);
             code = push(code, OP_POP());
+            i = skip(s, i);
+            let sslot: i64 = 0;
+            let has_step: i64 = 0;
+            if starts_kw(s, i, "step") == 1 {
+                i = skip(s, i + 4);
+                let stn: str = "__fs" + itoa(tmpn);
+                let ssl = slot_of(vnames, stn); vnames = ssl[1];
+                sslot = ssl[0];
+                r = emit_cmp(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+                code = emit2(code, OP_STORE(), sslot);
+                code = push(code, OP_POP());
+                has_step = 1;
+            }
             let loop_start: i64 = len(code);
             code = emit2(code, OP_LOAD(), vslot);
             code = emit2(code, OP_LOAD(), eslot);
@@ -1967,7 +2360,11 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             let cont_at: i64 = len(code);
             lctx = lctx_set_cont(lctx, cont_at);
             code = emit2(code, OP_LOAD(), vslot);
-            code = emit2(code, OP_CONST(), 1);
+            if has_step == 1 {
+                code = emit2(code, OP_LOAD(), sslot);
+            } else {
+                code = emit2(code, OP_CONST(), 1);
+            }
             code = push(code, OP_ADD());
             code = emit2(code, OP_STORE(), vslot);
             code = push(code, OP_POP());
@@ -2068,6 +2465,9 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
         }
         return [code, i, vnames, patches, lctx];
     }
+    if starts_kw(s, i, "match") == 1 {
+        return emit_match(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches, lctx);
+    }
     // bare assign, xs[i]=, or expr
     if is_alpha(s[i]) == 1 {
         let save: i64 = i;
@@ -2078,10 +2478,26 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
                 let sl = slot_of(vnames, id[0]); vnames = sl[1];
                 code = emit2(code, OP_LOAD(), sl[0]);
                 j = j + 1;
+                let idx_at: i64 = j;
                 let ix = emit_cmp(s, j, code, vnames, fnames, faddrs, fargc, stypes, patches);
                 code = ix[0]; j = ix[1]; vnames = ix[2]; patches = ix[3];
                 j = skip(s, j); assert(s[j] == "]"); j = skip(s, j + 1);
                 if j < len(s) {
+                    let cop = compound_at(s, j);
+                    if cop[0] != 0 {
+                        code = emit2(code, OP_LOAD(), sl[0]);
+                        let ix2 = emit_cmp(s, idx_at, code, vnames, fnames, faddrs, fargc, stypes, patches);
+                        code = ix2[0]; vnames = ix2[2]; patches = ix2[3];
+                        code = push(code, OP_GET());
+                        let r = emit_cmp(s, cop[1], code, vnames, fnames, faddrs, fargc, stypes, patches);
+                        code = r[0]; j = r[1]; vnames = r[2]; patches = r[3];
+                        code = push(code, cop[0]);
+                        code = push(code, OP_SET());
+                        code = emit2(code, OP_STORE(), sl[0]);
+                        code = push(code, OP_POP());
+                        j = skip(s, j); if j < len(s) { if s[j] == ";" { j = j + 1; } }
+                        return [code, j, vnames, patches, lctx];
+                    }
                     if s[j] == "=" {
                         if starts_with(s, j, "==") == 0 {
                             let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
@@ -2124,6 +2540,18 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
                     }
                     i = save;
                 } else {
+                let cop = compound_at(s, j);
+                if cop[0] != 0 {
+                    let sl = slot_of(vnames, id[0]); vnames = sl[1];
+                    code = emit2(code, OP_LOAD(), sl[0]);
+                    let r = emit_cmp(s, cop[1], code, vnames, fnames, faddrs, fargc, stypes, patches);
+                    code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+                    code = push(code, cop[0]);
+                    code = emit2(code, OP_STORE(), sl[0]);
+                    code = push(code, OP_POP());
+                    i = skip(s, i); if i < len(s) { if s[i] == ";" { i = i + 1; } }
+                    return [code, i, vnames, patches, lctx];
+                }
                 if s[j] == "=" {
                     if starts_with(s, j, "==") == 0 {
                         let r = emit_cmp(s, j + 1, code, vnames, fnames, faddrs, fargc, stypes, patches);
@@ -2147,6 +2575,96 @@ fn emit_stmt(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: lis
             i = i + 1;
             code = push(code, OP_POP());
         }
+    }
+    return [code, i, vnames, patches, lctx];
+}
+
+// Integer match: `match <expr> { 0 => { ... } Color.Red => { ... } _ => { ... } }`
+// Desugars to temp + if/else chain. Unit enum tags only; no payloads, no ident bindings.
+fn emit_match(s: str, i: i64, code: list, vnames: list, fnames: list, faddrs: list, fargc: list, stypes: list, patches: list, lctx: list) -> list {
+    let r = emit_cmp(s, i + 5, code, vnames, fnames, faddrs, fargc, stypes, patches);
+    code = r[0]; i = r[1]; vnames = r[2]; patches = r[3];
+    let tmpn: i64 = lctx[3];
+    let mn: str = "__m" + itoa(tmpn);
+    lctx = [lctx[0], lctx[1], lctx[2], tmpn + 1];
+    let sl = slot_of(vnames, mn); vnames = sl[1];
+    let mslot: i64 = sl[0];
+    code = emit2(code, OP_STORE(), mslot);
+    code = push(code, OP_POP());
+    i = skip(s, i);
+    assert(s[i] == "{"); i = i + 1;
+    let jmps: list = [];
+    while true {
+        i = skip(s, i);
+        if i >= len(s) { break; }
+        if s[i] == "}" { break; }
+        let wild: i64 = 0;
+        let lit: i64 = 0;
+        if starts_kw(s, i, "_") == 1 {
+            wild = 1;
+            i = skip(s, i + 1);
+        } else {
+            if is_alpha(s[i]) == 1 {
+                let id = parse_ident(s, i);
+                i = skip(s, id[1]);
+                assert(s[i] == ".");
+                if i + 1 < len(s) {
+                    assert(s[i + 1] != ".");
+                }
+                let tid: i64 = find_struct(stypes, id[0]);
+                assert(tid >= 0);
+                let fld = parse_ident(s, i + 1);
+                assert(len(fld[0]) > 0);
+                lit = field_index(stypes[tid][1], fld[0]);
+                i = skip(s, fld[1]);
+            } else {
+                if ord(s[i]) == 34 {
+                    let ps = parse_string(s, i);
+                    lit = ps[0];
+                    i = skip(s, ps[1]);
+                } else {
+                    let neg: i64 = 0;
+                    if s[i] == "-" { neg = 1; i = i + 1; }
+                    let num = parse_number(s, i);
+                    lit = num[0];
+                    if neg == 1 { lit = 0 - lit; }
+                    i = skip(s, num[1]);
+                }
+            }
+        }
+        assert(starts_with(s, i, "=>") == 1);
+        i = skip(s, i + 2);
+        if wild == 0 {
+            code = emit2(code, OP_LOAD(), mslot);
+            code = emit2(code, OP_CONST(), lit);
+            code = push(code, OP_EQ());
+            let jmpf_at: i64 = len(code);
+            code = emit2(code, OP_JMPF(), 0);
+            let bl = emit_block(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches, lctx);
+            code = bl[0]; i = bl[1]; vnames = bl[2]; patches = bl[3]; lctx = bl[4];
+            let jmp_at: i64 = len(code);
+            code = emit2(code, OP_JMP(), 0);
+            jmps = push(jmps, jmp_at);
+            code[jmpf_at + 1] = len(code);
+        } else {
+            let bl2 = emit_block(s, i, code, vnames, fnames, faddrs, fargc, stypes, patches, lctx);
+            code = bl2[0]; i = bl2[1]; vnames = bl2[2]; patches = bl2[3]; lctx = bl2[4];
+        }
+        i = skip(s, i);
+        if i < len(s) {
+            if s[i] == "," { i = i + 1; }
+        }
+        if wild == 1 {
+            i = skip(s, i);
+            break;
+        }
+    }
+    assert(s[i] == "}");
+    i = i + 1;
+    let ji: i64 = 0;
+    while ji < len(jmps) {
+        code[jmps[ji] + 1] = len(code);
+        ji = ji + 1;
     }
     return [code, i, vnames, patches, lctx];
 }
@@ -2191,8 +2709,33 @@ fn match_brace(src: str, i: i64) -> i64 {
     return i;
 }
 
+fn src_defines_fn(src: str, name: str) -> i64 {
+    let i: i64 = 0;
+    while i < len(src) {
+        i = skip(src, i);
+        if i >= len(src) { return 0; }
+        if starts_kw(src, i, "fn") == 1 {
+            i = skip(src, i + 2);
+            let id = parse_ident(src, i);
+            if id[0] == name { return 1; }
+            i = id[1];
+            continue;
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+// Guest-visible aliases (no new opcode): same 0/1 shape as native_ml.
+fn inject_z_identity(src: str) -> str {
+    if src_defines_fn(src, "z_is_alive") == 1 { return src; }
+    if src_defines_fn(src, "z_verify") == 1 { return src; }
+    return "fn z_is_alive(p: str) -> i64 { return file_exists(p); }\nfn z_verify(p: str) -> i64 { return file_exists(p + \".passport.json\"); }\n" + src;
+}
+
 fn compile_lite(src: str) -> list {
     // returns [code, binds] where binds = [[event, addr, arity], ...]
+    src = inject_z_identity(src);
     let fnames: list = [];
     let fparams: list = [];
     let fbodies: list = [];
@@ -2222,6 +2765,35 @@ fn compile_lite(src: str) -> list {
             }
             assert(src[i] == "}"); i = i + 1;
             stypes = push(stypes, [id[0], fields]);
+            continue;
+        }
+        if starts_kw(src, i, "enum") == 1 {
+            i = skip(src, i + 4);
+            let eid = parse_ident(src, i);
+            i = skip(src, eid[1]);
+            assert(src[i] == "{"); i = i + 1;
+            let variants: list = [];
+            i = skip(src, i);
+            if src[i] != "}" {
+                while true {
+                    i = skip(src, i);
+                    if src[i] == "}" { break; }
+                    let vnm = parse_ident(src, i);
+                    assert(len(vnm[0]) > 0);
+                    variants = push(variants, vnm[0]);
+                    i = skip(src, vnm[1]);
+                    if i < len(src) {
+                        if src[i] == "{" {
+                            i = match_brace(src, i);
+                        }
+                    }
+                    i = skip(src, i);
+                    if src[i] == "," { i = i + 1; i = skip(src, i); continue; }
+                    break;
+                }
+            }
+            assert(src[i] == "}"); i = i + 1;
+            stypes = push(stypes, [eid[0], variants]);
             continue;
         }
         if starts_kw(src, i, "on") == 1 {
@@ -2371,23 +2943,59 @@ fn main() -> i64 {
     assert(run_lite("fn main() { if true { 7 } else { 0 } }") == 7);
     assert(run_lite("fn main() { ord(\"A\") }") == 65);
     assert(run_lite("fn main() { let xs = [1, 2]; xs[0] = 7; xs[0] + xs[1] }") == 9);
+    assert(run_lite("fn main() { let x = 1; x += 2; x }") == 3);
+    assert(run_lite("fn main() { let x = 5; x -= 2; x }") == 3);
+    assert(run_lite("fn main() { let x = 3; x *= 4; x }") == 12);
+    assert(run_lite("fn main() { let x = 8; x /= 2; x }") == 4);
+    assert(run_lite("fn main() { let xs = [1, 2]; xs[0] += 6; xs[0] + xs[1] }") == 9);
     assert(run_lite("fn main() { let n = 2; let label = 0; if n == 0 { label = 10; } else if n == 1 { label = 20; } else if n == 2 { label = 30; } else { label = 40; } label }") == 30);
     assert(run_lite("fn main() { let acc = 0; for i in 0..5 { if i == 3 { break; } acc = acc + i; } acc }") == 3);
     assert(run_lite("fn main() { let skip = 0; for i in 0..5 { if i == 2 { continue; } skip = skip + i; } skip }") == 8);
+    assert(run_lite("fn main() { let acc = 0; for i in 0..10 step 2 { acc = acc + i; } acc }") == 20);
     assert(run_lite("fn sum(xs: list) -> i64 { let s: i64 = 0; for v in xs { s = s + v; } return s; } fn main() -> i64 { let xs: list = [1, 2, 3, 4]; xs[0] = 10; return sum(xs); }") == 19);
     assert(run_file("examples/selfhost/for_lite.kenga") == 0);
+    assert(run_file("examples/selfhost/assign_lab.kenga") == 0);
+    assert(run_file("examples/selfhost/step_lab.kenga") == 0);
     assert(run_file("examples/selfhost/elif_lite.kenga") == 0);
+    assert(run_lite("fn main() { let x = 2; match x { 0 => { 10 } 1 => { 20 } _ => { 30 } } }") == 30);
+    assert(run_file("examples/selfhost/match_int.kenga") == 0);
+    assert(run_lite("enum Color { Red, Green, Blue } fn main() { Color.Green }") == 1);
+    assert(run_lite("enum Color { Red, Green, Blue } fn main() { let c = Color.Green; match c { Color.Red => { 10 } Color.Green => { 20 } _ => { 30 } } }") == 20);
+    assert(run_lite("enum E { A { x: i64 }, B } fn main() { E.B }") == 1);
+    assert(run_file("examples/selfhost/enum_lab.kenga") == 0);
+    assert(run_lite("fn main() { z_is_alive(\"minds/mid_prophet_m53_w.txt\") }") == 1);
+    assert(run_lite("fn main() { z_verify(\"minds/mid_prophet_m53_w.txt\") }") == 1);
+    assert(run_lite("fn main() { z_is_alive(\"minds/no_such_mind.txt\") }") == 0);
+    assert(run_file("examples/selfhost/z_alive.kenga") == 0);
     assert(run_file("examples/selfhost/float_lite.kenga") == 0);
     assert(run_file("examples/selfhost/lists_lite.kenga") == 0);
     assert(run_file("examples/selfhost/struct_lite.kenga") == 0);
     assert(run_lite("fn main() -> i64 { return ahead(41); } fn ahead(x: i64) -> i64 { return x + 1; }") == 42);
     assert(run_lite("on \"ping\"(x) { emit(\"pong\", x); } on \"pong\"(x) { println(x); } fn main() { emit(\"ping\", 7); assert(pump(8) == 2); assert(pending() == 0); 0 }") == 0);
     assert(run_file("examples/agent.kenga") == 0);
+    assert(run_file("examples/async_tick.kenga") == 0);
     assert(run_file("examples/selfhost/fact_lite.kenga") == 0);
     assert(run_lite("fn main() { assert(write_file(\"minds/_more_io.txt\", \"hi\") == 1); ord(read_file(\"minds/_more_io.txt\")[0]) }") == 104);
     assert(run_lite("fn main() { argc() }") == 0);
     assert(run_lite("fn main() { file_exists(\"kenga/compiler/more.kenga\") }") == 1);
     assert(run_file("examples/selfhost/argc_more.kenga") == 0);
+    assert(run_lite("fn main() { getenv(\"KENGA_NO_SUCH_ZZ99\") == \"\" }") == 1);
+    assert(run_lite("fn main() { url_encode(\"a b\") == \"a%20b\" }") == 1);
+    assert(run_lite("fn main() { html_text(\"<b>x</b>\") == \"x\" }") == 1);
+    assert(run_file("examples/selfhost/net_lite.kenga") == 0);
+    assert(run_lite("fn main() { slice(\"abcdef\", 1, 4) == \"bcd\" }") == 1);
+    assert(run_lite("fn main() { slice(\"ab\", 0, 8) == \"ab\" }") == 1);
+    assert(run_lite("fn main() { slice(\"ab\", 3, 4) == \"\" }") == 1);
+    assert(run_lite("fn main() { let xs = slice([10, 20, 30, 40], 1, 3); xs[0] + xs[1] }") == 50);
+    assert(run_lite("fn main() { index_of(\"hello\", \"ll\") }") == 2);
+    assert(run_lite("fn main() { index_of(\"hello\", \"z\") }") == 0 - 1);
+    assert(run_lite("fn main() { starts_with(\"hello\", \"he\") }") == 1);
+    assert(run_lite("fn main() { starts_with(\"hello\", \"lo\") }") == 0);
+    assert(run_lite("fn main() { let xs = split(\"a,b,c\", \",\"); xs[0] + xs[1] + xs[2] == \"abc\" }") == 1);
+    assert(run_lite("fn main() { len(split(\"abc\", \"\")) }") == 3);
+    assert(run_file("examples/selfhost/str_lab.kenga") == 0);
+    assert(run_file("examples/selfhost/map_lab.kenga") == 0);
+    assert(run_file("examples/selfhost/match_str.kenga") == 0);
     assert(run_lite("fn main() { let s = \"a\\nb\"; len(s) }") == 3);
     assert(run_lite("fn main() { 0xFF }") == 255);
     assert(run_lite("fn main() { 0b1010 }") == 10);
@@ -2396,6 +3004,12 @@ fn main() -> i64 {
     assert(run_lite("fn main() { 1 && 0 }") == 0);
     assert(run_lite("fn main() { 1 && 1 }") == 1);
     assert(run_lite("fn main() { 0 || 1 }") == 1);
+    assert(run_lite("fn boom() { assert(0); 1 } fn main() { 0 && boom() }") == 0);
+    assert(run_lite("fn boom() { assert(0); 1 } fn main() { 1 || boom() }") == 1);
+    assert(run_lite("fn mark(xs) { xs[0] = xs[0] + 1; 1 } fn main() { let h = [0]; let r = 0 && mark(h); r + h[0] * 10 }") == 0);
+    assert(run_lite("fn mark(xs) { xs[0] = xs[0] + 1; 1 } fn main() { let h = [0]; let r = 1 && mark(h); r + h[0] * 10 }") == 11);
+    assert(run_lite("fn mark(xs) { xs[0] = xs[0] + 1; 1 } fn main() { let h = [0]; let r = 1 || mark(h); r + h[0] * 10 }") == 1);
+    assert(run_lite("fn mark(xs) { xs[0] = xs[0] + 1; 1 } fn main() { let h = [0]; let r = 0 || mark(h); r + h[0] * 10 }") == 11);
     assert(run_lite("fn main() { !0 }") == 1);
     assert(run_lite("fn main() { !(1 == 2) }") == 1);
     assert(run_lite("fn main() { 1 < 2 && 3 > 1 }") == 1);
