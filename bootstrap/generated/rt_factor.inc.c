@@ -470,7 +470,8 @@ static size_t emit_factor(const char *s, size_t i, size_t n, I64A *code, StrA *v
         i64a_push(code, opx);
         i = j;
       } else if (strcmp(id.name, "json_get") == 0 || strcmp(id.name, "index_of") == 0 ||
-                 strcmp(id.name, "split") == 0 || strcmp(id.name, "starts_with") == 0) {
+                 strcmp(id.name, "split") == 0 ||
+                 (strcmp(id.name, "starts_with") == 0 && !lite_fn_defined(fnames, id.name))) {
         int op2 = OP_JSON_GET;
         if (strcmp(id.name, "index_of") == 0) op2 = OP_INDEX_OF;
         if (strcmp(id.name, "split") == 0) op2 = OP_SPLIT;

@@ -475,7 +475,8 @@ fn main() -> i64 {
     s = s + "        i64a_push(code, opx);\n";
     s = s + "        i = j;\n";
     s = s + "      } else if (strcmp(id.name, \"json_get\") == 0 || strcmp(id.name, \"index_of\") == 0 ||\n";
-    s = s + "                 strcmp(id.name, \"split\") == 0 || strcmp(id.name, \"starts_with\") == 0) {\n";
+    s = s + "                 strcmp(id.name, \"split\") == 0 ||\n";
+    s = s + "                 (strcmp(id.name, \"starts_with\") == 0 && !lite_fn_defined(fnames, id.name))) {\n";
     s = s + "        int op2 = OP_JSON_GET;\n";
     s = s + "        if (strcmp(id.name, \"index_of\") == 0) op2 = OP_INDEX_OF;\n";
     s = s + "        if (strcmp(id.name, \"split\") == 0) op2 = OP_SPLIT;\n";
