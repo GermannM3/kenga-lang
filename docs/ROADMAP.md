@@ -117,7 +117,7 @@
 | ⬜ | Выкладка большой модели: git + **Hugging Face** `Kenga-ai/kenga-mm` |
 | ◐ | GPU: OpenCL за `t_matmul` (Windows, оси ≥ 32). Не CUDA/wgpu |
 | ✅ | **Энкодеры 42M на HF**: `GermannM/kenga-embed-z`, `GermannM/kenga-embed-prophet-instruct` (byte-level, instruct-протокол Giga). Holdout 24 троек: 23/24 и 22/24 против Giga-480M 21/24; RuSTS 0.37 / 0.44 против 0.80 — `docs/PROPHETS.md` §5 |
-| ⬜ | **Instruct-Пророк** (скачать и говорить, как с `GermannM/Kenga`): ступени П1–П3 в `docs/PROPHETS.md` §6 |
+| ◐ | **Prophet-LM / Z-LM 93M** (скачать, подключить в LM Studio / Cursor): Z-факторизованные декодеры в форме Llama → GGUF; претрейн на 1660 идёт, SFT + оракул-eval автоматом — `docs/PROPHETS.md` §6–7 |
 
 ## 4. Docs / marketplace
 
