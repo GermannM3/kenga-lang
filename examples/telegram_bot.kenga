@@ -1,4 +1,6 @@
-// Telegram bot in Kenga. File memory + Prophet (16-d) that learns Q?A.
+// Telegram bot in Kenga. File memory + Prophet (16-d).
+// Overhears the room. Direct turns (DM / @mention / reply) also feed
+// Q|A pairs into the same Prophet -- no cloud net, the chat is the teacher.
 //
 //   set TELEGRAM_BOT_TOKEN=123:ABC
 //   bootstrap\bin\kenga-lite.exe run examples\telegram_bot.kenga
@@ -187,6 +189,77 @@ fn prev_path() -> str {
     return "minds/tg_prev.txt";
 }
 
+fn pairs_path() -> str {
+    return "minds/tg_pairs.txt";
+}
+
+fn last_path() -> str {
+    return "minds/tg_last.txt";
+}
+
+fn load_last() -> str {
+    if file_exists(last_path()) == 0 { return ""; }
+    return clip(read_file(last_path()), 240);
+}
+
+fn is_pair(line: str) -> i64 {
+    if find_sub(line, " | ") >= 0 { return 1; }
+    return 0;
+}
+
+fn take_pairs(mem: str, maxn: i64) -> str {
+    let raw: str = load_text(pairs_path());
+    if raw == "" { return ""; }
+    let lines = split(raw, "\n");
+    let n: i64 = len(lines);
+    let start: i64 = 0;
+    if n > maxn { start = n - maxn; }
+    let out: str = "";
+    let i: i64 = start;
+    while i < n {
+        if is_pair(lines[i]) == 1 {
+            let parts = qa_of(lines[i]);
+            if parts[0] != parts[1] {
+                if is_junk(parts[0]) == 0 {
+                    if is_junk(parts[1]) == 0 {
+                        out = out + lines[i] + "\n";
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+fn is_user_chat(kind: str, chat: str) -> i64 {
+    if kind == "private" { return 1; }
+    if chat == "" { return 0; }
+    if starts_with(chat, "-") == 1 { return 0; }
+    return 1;
+}
+
+fn drop_mention(text: str) -> str {
+    let tag: str = "@kenga_newsbot";
+    let f: str = fold_ascii(text);
+    let p: i64 = index_of(f, tag);
+    if p < 0 { return trim_left(text); }
+    let left: str = slice(text, 0, p);
+    let right: str = slice(text, p + len(tag), len(text));
+    return trim_left(left + right);
+}
+
+fn feed_answer(mem_path: str, mind: list, last_bot: str, text: str) -> list {
+    if last_bot == "" { return [mind, 0]; }
+    if last_bot == text { return [mind, 0]; }
+    if starts_with(text, "/") == 1 { return [mind, 0]; }
+    if is_junk(last_bot) == 1 { return [mind, 0]; }
+    remember_qa(mem_path, last_bot, text);
+    remember_qa(pairs_path(), last_bot, text);
+    mind = nudge_mind(mind, last_bot, text);
+    return [mind, 1];
+}
+
 fn load_prev() -> str {
     if file_exists(prev_path()) == 0 { return ""; }
     return clip(read_file(prev_path()), 240);
@@ -197,6 +270,11 @@ fn hear_line(mind: list, prev: str, text: str) -> list {
     if starts_with(text, "/") == 1 { return [mind, "", 0]; }
     if prev == "" { return [mind, text, 0]; }
     if prev == text { return [mind, text, 0]; }
+    if is_junk(text) == 1 { return [mind, text, 0]; }
+    if is_junk(prev) == 1 { return [mind, text, 0]; }
+    let n: i64 = bump_tick();
+    let r: i64 = n - (n / 3) * 3;
+    if r != 0 { return [mind, text, 0]; }
     mind = nudge_mind(mind, prev, text);
     return [mind, text, 1];
 }
@@ -266,41 +344,43 @@ fn vec_dist(a: list, b: list) -> f64 {
     return acc;
 }
 
+fn mem_tail(mem: str, maxn: i64) -> list {
+    let s: str = mem;
+    let cap: i64 = 6000;
+    if len(s) > cap { s = slice(s, len(s) - cap, len(s)); }
+    let all = split(s, "\n");
+    let n: i64 = len(all);
+    let start: i64 = 0;
+    if n > maxn { start = n - maxn; }
+    let out: list = [];
+    let i: i64 = start;
+    while i < n {
+        if all[i] != "" { out = push(out, all[i]); }
+        i = i + 1;
+    }
+    return out;
+}
+
 fn nearest_by_vec(mem: str, pred: list) -> str {
     let best_a: str = "";
     let best: f64 = 9999.0;
-    let line: str = "";
+    let lines = mem_tail(mem, 48);
     let i: i64 = 0;
-    while 1 == 1 {
-        let go: i64 = 0;
-        if i >= len(mem) {
-            if len(line) > 0 { go = 1; }
-        } else {
-            if mem[i] == "\n" {
-                if len(line) > 0 { go = 1; }
+    while i < len(lines) {
+        let parts = qa_of(lines[i]);
+        let apart: str = clip(parts[1], 240);
+        if is_junk(apart) == 1 { continue; }
+        if parts[0] == parts[1] { continue; }
+        if len(apart) > 0 {
+            let d: f64 = vec_dist(pred, text_vec(apart));
+            if d < best {
+                best = d;
+                best_a = apart;
             }
         }
-        if go == 1 {
-            let parts = qa_of(line);
-            let apart: str = parts[1];
-            if len(apart) > 0 {
-                let d: f64 = vec_dist(pred, text_vec(apart));
-                if d < best {
-                    best = d;
-                    best_a = apart;
-                }
-            }
-            line = "";
-            if i >= len(mem) { break; }
-        } else {
-            if i < len(mem) {
-                if mem[i] != "\n" { line = line + mem[i]; }
-            }
-        }
-        if i >= len(mem) { break; }
         i = i + 1;
     }
-    if best < 1.2 { return best_a; }
+    if best < 0.45 { return best_a; }
     return "";
 }
 
@@ -363,40 +443,28 @@ fn remember_qa(path: str, q: str, a: str) -> i64 {
 }
 
 fn heard_of(mem: str, query: str) -> str {
-    let qf: str = fold_ascii(query);
+    let qf: str = fold_ascii(clip(query, 240));
     let best_a: str = "";
     let best_s: i64 = 0;
-    let line: str = "";
+    let lines = mem_tail(mem, 80);
     let i: i64 = 0;
-    while 1 == 1 {
-        let go: i64 = 0;
-        if i >= len(mem) {
-            if len(line) > 0 { go = 1; }
-        } else {
-            if mem[i] == "\n" {
-                if len(line) > 0 { go = 1; }
+    while i < len(lines) {
+        let parts = qa_of(lines[i]);
+        let qpart: str = clip(parts[0], 240);
+        let apart: str = parts[1];
+        if is_junk(apart) == 1 { continue; }
+        if is_junk(qpart) == 1 { continue; }
+        if qpart == apart { continue; }
+        if fold_ascii(qpart) == qf {
+            if len(apart) > 0 {
+                if is_echo(query, apart) == 0 { return clip(apart, 3500); }
             }
         }
-        if go == 1 {
-            let parts = qa_of(line);
-            let qpart: str = parts[0];
-            let apart: str = parts[1];
-            if fold_ascii(qpart) == qf {
-                if len(apart) > 0 { return apart; }
-            }
-            let sc: i64 = score_line(query, qpart);
-            if sc > best_s {
-                best_s = sc;
-                best_a = apart;
-            }
-            line = "";
-            if i >= len(mem) { break; }
-        } else {
-            if i < len(mem) {
-                if mem[i] != "\n" { line = line + mem[i]; }
-            }
+        let sc: i64 = score_line(query, qpart);
+        if sc > best_s {
+            best_s = sc;
+            best_a = apart;
         }
-        if i >= len(mem) { break; }
         i = i + 1;
     }
     if best_s >= 1 { return best_a; }
@@ -481,24 +549,116 @@ fn is_question(text: str) -> i64 {
 }
 
 fn is_greeting(text: str) -> i64 {
+    let t: str = fold_ascii(text);
+    if find_sub(t, "ривет") >= 0 { return 1; }
+    if find_sub(t, "прив") >= 0 { return 1; }
+    if find_sub(t, "прии") >= 0 { return 1; }
+    if find_sub(t, "здравств") >= 0 { return 1; }
+    if find_sub(t, "privet") >= 0 { return 1; }
+    if find_sub(t, "hello") >= 0 { return 1; }
     if has_word(text, "hi") == 1 { return 1; }
-    if has_word(text, "hello") == 1 { return 1; }
     if has_word(text, "hey") == 1 { return 1; }
-    if has_word(text, "privet") == 1 { return 1; }
     return 0;
+}
+
+fn is_talk_invite(text: str) -> i64 {
+    let t: str = fold_ascii(text);
+    if find_sub(t, "поговор") >= 0 { return 1; }
+    if find_sub(t, "поговори") >= 0 { return 1; }
+    if find_sub(t, "talk") >= 0 {
+        if find_sub(t, "let") >= 0 { return 1; }
+        if find_sub(t, "about") >= 0 { return 1; }
+    }
+    return 0;
+}
+
+fn is_echo(q: str, a: str) -> i64 {
+    if a == "" { return 1; }
+    if fold_ascii(clip(q, 240)) == fold_ascii(clip(a, 240)) { return 1; }
+    return 0;
+}
+
+fn is_bot_canned(s: str) -> i64 {
+    if starts_with(s, "memory lines") == 1 { return 1; }
+    if starts_with(s, "kenga bot") == 1 { return 1; }
+    if starts_with(s, "kept:") == 1 { return 1; }
+    return 0;
+}
+
+fn is_junk(s: str) -> i64 {
+    if is_bot_canned(s) == 1 { return 1; }
+    if starts_with(s, "И за подготовку") == 1 { return 1; }
+    if find_sub(s, "сентябр") >= 0 { return 1; }
+    if find_sub(s, "Посикун") >= 0 { return 1; }
+    if find_sub(s, "Саше") >= 0 { return 1; }
+    if find_sub(s, "понравил") >= 0 { return 1; }
+    if find_sub(s, "Завис") >= 0 { return 1; }
+    return 0;
+}
+
+fn ok_say(q: str, a: str, last: str) -> i64 {
+    if a == "" { return 0; }
+    if is_echo(q, a) == 1 { return 0; }
+    if is_junk(a) == 1 { return 0; }
+    if last != "" {
+        if fold_ascii(clip(a, 240)) == fold_ascii(clip(last, 240)) { return 0; }
+    }
+    return 1;
+}
+
+fn tick_path() -> str {
+    return "minds/tg_tick.txt";
+}
+
+fn bump_tick() -> i64 {
+    let n: i64 = 0;
+    if file_exists(tick_path()) == 1 {
+        n = parse_i64(read_file(tick_path()));
+    }
+    n = n + 1;
+    write_file(tick_path(), to_str(n));
+    return n;
 }
 
 fn is_chitchat(text: str) -> i64 {
+    let t: str = fold_ascii(text);
     if has_word(text, "thanks") == 1 { return 1; }
     if has_word(text, "ok") == 1 { return 1; }
     if has_word(text, "bye") == 1 { return 1; }
-    if has_word(text, "????") == 1 { return 1; }
-    if has_word(text, "???????") == 1 { return 1; }
+    if find_sub(t, "спасибо") >= 0 { return 1; }
+    if find_sub(t, "пока") >= 0 { return 1; }
     return 0;
 }
 
+fn think_self(q: str) -> str {
+    if find_sub(q, "Саш") >= 0 { return "не знаю кто Саша. это чужое из чата, не моё."; }
+    if find_sub(q, "саш") >= 0 { return "не знаю кто Саша. это чужое из чата, не моё."; }
+    if find_sub(q, "зовут") >= 0 { return "я kenga. пророк это сетка, не человек."; }
+    if find_sub(q, "кто ты") >= 0 { return "я бот на языке Kenga. сетка 16-d, учусь с этого чата. облака нет."; }
+    if find_sub(q, "кто такой") >= 0 { return "я бот на языке Kenga. сетка 16-d, учусь с этого чата. облака нет."; }
+    if find_sub(q, "что ты") >= 0 { return "я бот. слышу комнату, отвечаю когда зовут. учусь на репликах."; }
+    if find_sub(q, "зачем ты") >= 0 { return "чтобы язык жил в чате, а не в чужом API."; }
+    if find_sub(q, "Пророк") >= 0 { return "пророк ест реплики в tg_prophet.km. я не повторяю кухню."; }
+    if find_sub(q, "пророк") >= 0 { return "пророк ест реплики в tg_prophet.km. я не повторяю кухню."; }
+    if find_sub(q, "обучен") >= 0 { return "учусь. шаги пишу в файл. иногда падаю по памяти и встаю тем же."; }
+    if find_sub(q, "учен") >= 0 { return "учусь. шаги пишу в файл. иногда падаю по памяти и встаю тем же."; }
+    if find_sub(q, "учишь") >= 0 { return "учусь с чата. скажи мне что-то своё, запомню пару."; }
+    if find_sub(q, "завис") >= 0 { return "живой. если молчу, или думаю, или меня только что подняли."; }
+    if find_sub(q, "Завис") >= 0 { return "живой. если молчу, или думаю, или меня только что подняли."; }
+    return "";
+}
+
+fn think_chat(q: str) -> str {
+    if is_greeting(q) == 1 { return "привет. слушаю."; }
+    if is_talk_invite(q) == 1 {
+        return "давай. спроси с ? или скажи тему. учусь на репликах, облака нет.";
+    }
+    if is_chitchat(q) == 1 { return "ок."; }
+    return "";
+}
+
 fn help_text() -> str {
-    return "kenga bot: file memory + prophet net (16-d).\nlearns every line I see, even when I stay quiet.\n/start /help /stats\nremember: fact\nsearch: query  or a question with ?\nin groups: I listen always. I answer if you @mention me.";
+    return "kenga bot: file memory + prophet net (16-d).\nlearns every line I see, even when I stay quiet.\nreply to me and I store that turn as Q|A and train Prophet.\n/start /help /stats\nremember: fact\nsearch: query  or a question with ?\nin groups: I listen always. I answer if you @mention me.";
 }
 
 fn think_cmd(mem_path: str, text: str) -> str {
@@ -507,15 +667,14 @@ fn think_cmd(mem_path: str, text: str) -> str {
     if starts_with(t, "/start") == 1 { cmd = "/start"; }
     if starts_with(t, "/help") == 1 { cmd = "/help"; }
     if starts_with(t, "/stats") == 1 { cmd = "/stats"; }
-    match cmd {
-        "/start" => { return help_text(); }
-        "/help" => { return help_text(); }
-        "/stats" => {
-            let n: i64 = count_lines(load_text(mem_path));
-            return "memory lines: " + to_str(n) + ". prophet file: minds/tg_prophet.km";
-        }
-        _ => { return ""; }
+    if cmd == "/start" { return help_text(); }
+    if cmd == "/help" { return help_text(); }
+    if cmd == "/stats" {
+        let n: i64 = count_lines(load_text(mem_path));
+        let p: i64 = count_lines(load_text(pairs_path()));
+        return "строк в памяти: " + to_str(n) + ". пар: " + to_str(p) + ". пророк на диске.";
     }
+    return "";
 }
 
 fn think_teach(mem_path: str, text: str) -> str {
@@ -541,31 +700,51 @@ fn think_seek(mem_path: str, text: str) -> str {
     return clip(found, 3500);
 }
 
-fn think(mem_path: str, mind: list, text: str) -> list {
+fn think(mem_path: str, mind: list, text: str, last_bot: str) -> list {
     let a: str = think_cmd(mem_path, text);
     if a != "" { return [a, mind, 0]; }
     let b: str = think_teach(mem_path, text);
     if b != "" { return [b, mind, 1]; }
-    if is_greeting(text) == 1 {
-        return ["hi. I learn. remember: fact  or ask with ?", mind, 1];
+    let q: str = drop_mention(text);
+    if q == "" { q = text; }
+    let me: str = think_self(q);
+    if me != "" { return [me, mind, 1]; }
+    let chat: str = think_chat(q);
+    if chat != "" { return [chat, mind, 1]; }
+    let fed = feed_answer(mem_path, mind, last_bot, q);
+    mind = fed[0];
+    let did: i64 = fed[1];
+    let pairs: str = take_pairs("", 120);
+    let hit: str = heard_of(pairs, q);
+    if ok_say(q, hit, last_bot) == 1 { return [clip(hit, 3500), mind, 1]; }
+    let pred = foresee(mind, text_vec(q));
+    let near: str = nearest_by_vec(pairs, pred);
+    if ok_say(q, near, last_bot) == 1 { return [clip(near, 3500), mind, 1]; }
+    if is_question(q) == 1 {
+        let seek: str = think_seek(mem_path, q);
+        if seek != "i heard." {
+            if ok_say(q, seek, last_bot) == 1 { return [seek, mind, 1]; }
+        }
+        return ["не знаю. скажи ты, запомню.", mind, 1];
     }
-    let mem: str = load_text(mem_path);
-    let hit: str = heard_of(mem, text);
-    if hit != "" { return [clip(hit, 3500), mind, 1]; }
-    let pred = foresee(mind, text_vec(text));
-    let near: str = nearest_by_vec(mem, pred);
-    if near != "" { return [clip(near, 3500), mind, 1]; }
-    let seek: str = think_seek(mem_path, text);
-    let flag: i64 = 0;
-    if seek != "" {
-        if seek != "i heard." { flag = 1; }
+    if did == 1 { return ["ок. дальше.", mind, 1]; }
+    return ["слушаю. спроси меня, кто я, или скажи тему.", mind, 0];
+}
+
+fn json_set(doc: str, key: str, val: str) -> str {
+    let q: str = html_text("&quot;");
+    let pair: str = q + json_escape(key) + q + ":" + q + json_escape(val) + q;
+    let n: i64 = len(doc);
+    if n <= 2 {
+        return slice(doc, 0, 1) + pair + slice(doc, n - 1, n);
     }
-    return [seek, mind, flag];
+    return slice(doc, 0, n - 1) + "," + pair + slice(doc, n - 1, n);
 }
 
 fn send_text(token: str, chat: str, text: str) -> str {
     let url: str = "https://api.telegram.org/bot" + token + "/sendMessage";
-    let body: str = json_set("{}", "chat_id", chat);
+    let empty: str = "{" + "}";
+    let body: str = json_set(empty, "chat_id", chat);
     body = json_set(body, "text", text);
     return http_request("POST", url, body, "Content-Type: application/json");
 }
@@ -595,6 +774,7 @@ fn poll_once() -> i64 {
     if json_get(raw, "result.0.update_id") == "" { return 0; }
     let mind = boot_mind();
     let prev: str = load_prev();
+    let last_bot: str = load_last();
     let i: i64 = 0;
     let taught: i64 = 0;
     while 1 == 1 {
@@ -608,26 +788,43 @@ fn poll_once() -> i64 {
         if text != "" {
             if chat != "" {
                 let go: i64 = 0;
-                if kind == "private" { go = 1; }
-                if kind == "" { go = 1; }
-                if find_sub(fold_ascii(text), "@kenga_newsbot") >= 0 { go = 1; }
+                if is_user_chat(kind, chat) == 1 { go = 1; }
+                if find_sub(fold_ascii(clip(text, 240)), "@kenga_newsbot") >= 0 { go = 1; }
                 if fold_ascii(reply_name) == "kenga_newsbot" { go = 1; }
                 if go == 1 {
-                    let got = think(mem_path, mind, text);
+                    let got = think(mem_path, mind, text, last_bot);
                     let reply: str = got[0];
                     mind = got[1];
                     if got[2] == 1 {
                         if starts_with(text, "/") == 0 {
-                            if reply != "" { mind = teach_mind(mind, text, reply); }
+                            if reply != "" {
+                                if is_echo(text, reply) == 0 {
+                                    mind = nudge_mind(mind, text, reply);
+                                }
+                            }
                         }
                         taught = 1;
                     }
                     if reply != "" {
                         if starts_with(text, "/") == 0 {
-                            remember_qa(mem_path, text, reply);
+                            if is_echo(text, reply) == 0 {
+                                if is_junk(reply) == 0 {
+                                    remember_qa(mem_path, text, reply);
+                                    remember_qa(pairs_path(), text, reply);
+                                }
+                            }
                         }
                         let sent: str = send_text(token, chat, reply);
-                        if starts_with(sent, "ERR") == 1 { println(sent); }
+                        if starts_with(sent, "ERR") == 1 {
+                            println(sent);
+                        } else {
+                            if starts_with(text, "/") == 0 {
+                                if is_junk(reply) == 0 {
+                                    last_bot = clip(reply, 240);
+                                    write_file(last_path(), last_bot);
+                                }
+                            }
+                        }
                     }
                 }
             }

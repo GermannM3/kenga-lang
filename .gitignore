@@ -87,8 +87,11 @@ minds/repair_corpus_v2/
 minds/tg_memory.txt
 minds/tg_offset.txt
 minds/tg_prev.txt
+minds/tg_pairs.txt
+minds/tg_last.txt
 minds/tg_prophet.km
 minds/tg_boot.err
 minds/bot_*.log
+minds/bot_*.log.old*
 minds/mid_prophet_*
 minds/kenga_big_*

@@ -149,7 +149,7 @@ Birth с промпта `"fn add"` пишет `examples/ml/kenga_born.kenga`, з
 
 Живой Пророк: `examples/ml/living_prophet.kenga`. Спека 400M (Z-ёмкость + смесь проверенных программ): `examples/ml/prophet_400m.kenga`.
 
-Telegram-бот на том же языке: `examples/telegram_bot.kenga` (токен в `TELEGRAM_BOT_TOKEN`). Слышит чат, отвечает из `minds/tg_memory.txt`, тихо учит 16-d Пророка (`minds/tg_prophet.km`). `remember: факт`, `search: запрос`, вопрос с `?`. VPS: `docs/VPS.md`.
+Telegram-бот на том же языке: `examples/telegram_bot.kenga` (токен в `TELEGRAM_BOT_TOKEN`). Слышит чат, отвечает из `minds/tg_memory.txt`, тихо учит 16-d Пророка (`minds/tg_prophet.km`). Прямой ход (личка / @mention / реплай) пишет пару Q|A в `minds/tg_pairs.txt` и ещё раз кормит Пророка — без облачной нейросети, учитель это сам чат. `remember: факт`, `search: запрос`, вопрос с `?`. VPS: `docs/VPS.md`.
 
 ## 9. Упражнения
 

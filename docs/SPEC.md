@@ -227,7 +227,18 @@ fn имя(a: i64, b: i64) -> i64 {
 
 Файлы: `read_file` / `write_file` / `file_exists` уже в ядре. Пример бота: `examples/telegram_bot.kenga`.
 
-## 12. Дальше
+## 12. Пророки
+
+Пророк — модель, у которой тело лежит в файле, которая учится на проверенном
+опыте (удивление `surprise`, оракул `kenga-lite`, сам чат) и которую второй
+запуск поднимает тем же телом (`file_exists` → `load_mind`). Создаётся на самом
+языке, **без новых ключевых слов**: тип `Memory` и функции `memory_config` /
+`remember` / `surprise` / `foresee` / `consolidate` / `recall` / `mem_stats` /
+`save_mind` / `load_mind` (lite, more, bc). Контракт из пяти условий, минимальный
+пример, семейства (Prophet Memory, Prophet-LM, энкодеры Z/Prophet 42M на HF) и
+дорога к instruct-Пророку: `docs/PROPHETS.md`.
+
+## 13. Дальше
 
 - Тур с ожидаемым выводом каждого урока: `docs/TOUR.md`.
 - Полный справочник (тензоры, Memory, events): `docs/LANGUAGE.md`.

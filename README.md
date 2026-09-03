@@ -64,6 +64,8 @@ bootstrap\bin\kenga-lite.exe run examples\selfhost\net_lite.kenga
 
 Telegram-бот (токен в env): `examples/telegram_bot.kenga` — файл + Пророк 16-d, учит с чата. VPS: [docs/VPS.md](docs/VPS.md).
 
+Пророки — модели с телом в файле, которые создаются на самом языке (память, генераторы Kenga-кода, энкодеры 42M на HF): [docs/PROPHETS.md](docs/PROPHETS.md).
+
 Полный self-host без gcc/cl — последний шаг лестницы. `kenga_lite.c` — каркас из ~90 строк includes.
 
 ---

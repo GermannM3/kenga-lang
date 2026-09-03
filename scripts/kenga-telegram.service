@@ -1,17 +1,27 @@
 [Unit]
-Description=Kenga Telegram bot
+Description=Kenga language Telegram bot (Prophet)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
+User=kengalang
+Group=kengalang
 WorkingDirectory=/opt/kenga-lang
 EnvironmentFile=/etc/kenga/telegram.env
 ExecStart=/opt/kenga-lang/bootstrap/bin/kenga-lite run examples/telegram_bot.kenga
 Restart=always
-RestartSec=3
-# long poll ~20s; do not kill mid-request unless needed
+RestartSec=5
 TimeoutStopSec=30
+Nice=10
+MemoryMax=1G
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kenga-lang-bot
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=40
 
 [Install]
 WantedBy=multi-user.target

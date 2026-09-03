@@ -262,6 +262,18 @@ static wchar_t *k_widen(const char *s) {
   return w;
 }
 
+static wchar_t *k_http_proxy_spec(void) {
+  const char *p = getenv("KENGA_HTTP_PROXY");
+  if (!p || !p[0]) p = getenv("HTTPS_PROXY");
+  if (!p || !p[0]) p = getenv("https_proxy");
+  if (!p || !p[0]) p = getenv("HTTP_PROXY");
+  if (!p || !p[0]) p = getenv("http_proxy");
+  if (!p || !p[0]) return NULL;
+  if (strncmp(p, "http://", 7) == 0) p += 7;
+  else if (strncmp(p, "https://", 8) == 0) p += 8;
+  return k_widen(p);
+}
+
 static char *k_http_request(const char *method, const char *url, const char *body, const char *headers) {
   wchar_t *wurl, *wmethod, *wheaders;
   URL_COMPONENTS uc;
@@ -296,8 +308,15 @@ static char *k_http_request(const char *method, const char *url, const char *bod
     while (*a && i < 6143) full[i++] = *a++;
     while (*b && i < 6143) full[i++] = *b++;
     full[i] = 0; }
-  sess = WinHttpOpen(L"kenga-lite/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+  { wchar_t *wprox = k_http_proxy_spec();
+    if (wprox) {
+      sess = WinHttpOpen(L"kenga-lite/1.0", WINHTTP_ACCESS_TYPE_NAMED_PROXY,
+                         wprox, WINHTTP_NO_PROXY_BYPASS, 0);
+      free(wprox);
+    } else {
+      sess = WinHttpOpen(L"kenga-lite/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                         WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    } }
   if (!sess) { free(wurl); free(wmethod); free(wheaders); return xstrdup("ERR: winhttp open"); }
   WinHttpSetTimeouts(sess, timeout, timeout, timeout, timeout);
   { DWORD proto = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1 |
